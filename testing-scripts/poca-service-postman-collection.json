@@ -1,0 +1,886 @@
+{
+  "info": {
+    "name": "POCA Service API",
+    "description": "A comprehensive collection for testing the POCA (Patient-Doctor Chat Assistant) service API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Checks",
+      "item": [
+        {
+          "name": "Root",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}",
+              "host": ["{{baseUrl}}"]
+            },
+            "description": "Get API information"
+          },
+          "response": []
+        },
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Check if the API is healthy"
+          },
+          "response": []
+        }
+      ],
+      "description": "Basic health check endpoints"
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.environment.set(\"authToken\", jsonData.access_token);",
+                  "pm.environment.set(\"refreshToken\", jsonData.refresh_token);",
+                  "pm.environment.set(\"userId\", jsonData.user_id);",
+                  "pm.environment.set(\"userRole\", jsonData.role);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "admin@example.com",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "admin123",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            },
+            "description": "Login to get authentication token"
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "refresh"]
+            },
+            "description": "Refresh authentication token"
+          },
+          "response": []
+        },
+        {
+          "name": "Doctor Signup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Dr. John Smith\",\n  \"email\": \"doctor@example.com\",\n  \"password\": \"doctor123\",\n  \"contact\": \"+1234567890\",\n  \"designation\": \"Cardiologist\",\n  \"experience\": 10,\n  \"details\": \"Specializes in heart conditions\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/doctor-signup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "doctor-signup"]
+            },
+            "description": "Register a new doctor"
+          },
+          "response": []
+        },
+        {
+          "name": "Patient Signup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Doe\",\n  \"email\": \"patient@example.com\",\n  \"password\": \"patient123\",\n  \"contact\": \"+1987654321\",\n  \"age\": 35,\n  \"gender\": \"female\",\n  \"address\": \"123 Main St, Anytown, USA\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/patient-signup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "patient-signup"]
+            },
+            "description": "Register a new patient"
+          },
+          "response": []
+        },
+        {
+          "name": "Hospital Signup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"General Hospital\",\n  \"email\": \"hospital@example.com\",\n  \"password\": \"hospital123\",\n  \"contact\": \"+1122334455\",\n  \"address\": \"456 Hospital Ave, Medtown, USA\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/hospital-signup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "hospital-signup"]
+            },
+            "description": "Register a new hospital"
+          },
+          "response": []
+        }
+      ],
+      "description": "Authentication endpoints for login, signup, and token refresh"
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users"]
+            },
+            "description": "Get all users (admin only)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get User by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "{{userId}}"]
+            },
+            "description": "Get user by ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Name\",\n  \"contact\": \"+1234567890\",\n  \"address\": \"Updated Address\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "{{userId}}"]
+            },
+            "description": "Update user profile"
+          },
+          "response": []
+        }
+      ],
+      "description": "User management endpoints"
+    },
+    {
+      "name": "Hospitals",
+      "item": [
+        {
+          "name": "Get All Hospitals",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/hospitals",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "hospitals"]
+            },
+            "description": "Get all hospitals"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Hospital by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/hospitals/{{hospitalId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "hospitals", "{{hospitalId}}"]
+            },
+            "description": "Get hospital by ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Hospital",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"New Hospital\",\n  \"email\": \"new.hospital@example.com\",\n  \"contact\": \"+1122334455\",\n  \"address\": \"789 Hospital Blvd, Medtown, USA\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/hospitals",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "hospitals"]
+            },
+            "description": "Create a new hospital (admin only)"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Hospital",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Hospital Name\",\n  \"contact\": \"+1122334455\",\n  \"address\": \"Updated Hospital Address\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/hospitals/{{hospitalId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "hospitals", "{{hospitalId}}"]
+            },
+            "description": "Update hospital information (admin only)"
+          },
+          "response": []
+        }
+      ],
+      "description": "Hospital management endpoints"
+    },
+    {
+      "name": "Doctors",
+      "item": [
+        {
+          "name": "Get All Doctors",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/doctors",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "doctors"]
+            },
+            "description": "Get all doctors"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Doctor by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/doctors/{{doctorId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "doctors", "{{doctorId}}"]
+            },
+            "description": "Get doctor by ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Doctor",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Doctor Name\",\n  \"designation\": \"Updated Designation\",\n  \"experience\": 12,\n  \"details\": \"Updated doctor details\",\n  \"contact\": \"+1234567890\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/doctors/{{doctorId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "doctors", "{{doctorId}}"]
+            },
+            "description": "Update doctor profile"
+          },
+          "response": []
+        }
+      ],
+      "description": "Doctor management endpoints"
+    },
+    {
+      "name": "Patients",
+      "item": [
+        {
+          "name": "Get All Patients",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "patients"]
+            },
+            "description": "Get all patients (admin only)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Patient by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients/{{patientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "patients", "{{patientId}}"]
+            },
+            "description": "Get patient by ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Patient",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Patient Name\",\n  \"age\": 36,\n  \"gender\": \"female\",\n  \"contact\": \"+1987654321\",\n  \"address\": \"Updated Patient Address\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients/{{patientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "patients", "{{patientId}}"]
+            },
+            "description": "Update patient profile"
+          },
+          "response": []
+        }
+      ],
+      "description": "Patient management endpoints"
+    },
+    {
+      "name": "Mappings",
+      "item": [
+        {
+          "name": "Map Hospital to Doctor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hospital_id\": \"{{hospitalId}}\",\n  \"doctor_id\": \"{{doctorId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mappings/hospital-doctor",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "mappings", "hospital-doctor"]
+            },
+            "description": "Map a hospital to a doctor (admin only)"
+          },
+          "response": []
+        },
+        {
+          "name": "Map Hospital to Patient",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hospital_id\": \"{{hospitalId}}\",\n  \"patient_id\": \"{{patientId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mappings/hospital-patient",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "mappings", "hospital-patient"]
+            },
+            "description": "Map a hospital to a patient (admin only)"
+          },
+          "response": []
+        },
+        {
+          "name": "Map Doctor to Patient",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctor_id\": \"{{doctorId}}\",\n  \"patient_id\": \"{{patientId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mappings/doctor-patient",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "mappings", "doctor-patient"]
+            },
+            "description": "Map a doctor to a patient (admin only)"
+          },
+          "response": []
+        }
+      ],
+      "description": "Mapping endpoints for connecting entities"
+    },
+    {
+      "name": "Chats",
+      "item": [
+        {
+          "name": "Get All Chats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "chats"]
+            },
+            "description": "Get all chats for the current user"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Chat by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chats/{{chatId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "chats", "{{chatId}}"]
+            },
+            "description": "Get chat by ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Chat",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctor_id\": \"{{doctorId}}\",\n  \"patient_id\": \"{{patientId}}\",\n  \"is_active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "chats"]
+            },
+            "description": "Create a new chat (admin only)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Chat Messages",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chats/{{chatId}}/messages",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "chats", "{{chatId}}", "messages"]
+            },
+            "description": "Get all messages for a chat"
+          },
+          "response": []
+        }
+      ],
+      "description": "Chat management endpoints"
+    },
+    {
+      "name": "Messages",
+      "item": [
+        {
+          "name": "Send Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_id\": \"{{chatId}}\",\n  \"content\": \"Hello, this is a test message.\",\n  \"message_type\": \"text\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/messages",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "messages"]
+            },
+            "description": "Send a new message"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Read Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message_ids\": [\"{{messageId}}\"],\n  \"is_read\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/messages/read-status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "messages", "read-status"]
+            },
+            "description": "Update read status for messages"
+          },
+          "response": []
+        }
+      ],
+      "description": "Message management endpoints"
+    },
+    {
+      "name": "AI Assistant",
+      "item": [
+        {
+          "name": "Create AI Session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_id\": \"{{chatId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/sessions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ai", "sessions"]
+            },
+            "description": "Create a new AI session"
+          },
+          "response": []
+        },
+        {
+          "name": "Send Message to AI",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": \"{{aiSessionId}}\",\n  \"message\": \"What are the symptoms of the flu?\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/messages",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ai", "messages"]
+            },
+            "description": "Send a message to the AI assistant"
+          },
+          "response": []
+        },
+        {
+          "name": "Get AI Session Messages",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/sessions/{{aiSessionId}}/messages",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ai", "sessions", "{{aiSessionId}}", "messages"]
+            },
+            "description": "Get all messages for an AI session"
+          },
+          "response": []
+        },
+        {
+          "name": "End AI Session",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/sessions/{{aiSessionId}}/end",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ai", "sessions", "{{aiSessionId}}", "end"]
+            },
+            "description": "End an AI session"
+          },
+          "response": []
+        },
+        {
+          "name": "Update AI Summary",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"summary\": \"Patient reported flu-like symptoms including fever, headache, and fatigue.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/sessions/{{aiSessionId}}/summary",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ai", "sessions", "{{aiSessionId}}", "summary"]
+            },
+            "description": "Update the summary for an AI session"
+          },
+          "response": []
+        },
+        {
+          "name": "WebSocket Connection",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai-assistant/ws/{{aiSessionId}}?token={{authToken}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ai-assistant", "ws", "{{aiSessionId}}"],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}"
+                }
+              ]
+            },
+            "description": "WebSocket endpoint for real-time AI chat (use in Postman WebSocket client)"
+          },
+          "response": []
+        }
+      ],
+      "description": "AI assistant endpoints"
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000"
+    }
+  ]
+}

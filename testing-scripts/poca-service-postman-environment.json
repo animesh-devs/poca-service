@@ -1,0 +1,73 @@
+{
+  "id": "poca-service-environment",
+  "name": "POCA Service Environment",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "userRole",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "hospitalId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "doctorId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "patientId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "chatId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "messageId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "aiSessionId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}
