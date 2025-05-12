@@ -1,0 +1,560 @@
+# Doctor-Patient Chat Service
+
+## Project Overview
+Create a comprehensive backend service for doctor-patient communication with AI assistance. The service should enable real-time communication between doctors and patients, provide AI-powered medical assistance, and manage patient case histories.
+
+## Core Features
+1. User authentication with role-based access (doctor, patient, admin, hospital)
+2. Hospital, doctor, and patient profile management
+3. Multiple relationship mappings (hospital-doctor, hospital-patient, doctor-patient, user-patient)
+4. Appointment scheduling and management with different types and status tracking
+5. Async chat between doctors and patients using API
+6. Realtime AI assistant for patient and medical assistance using websocket
+7. Case history management with document uploads
+8. Medical problem suggestions for doctors
+9. RESTful API for all functionality
+
+## Technical Requirements
+
+### Backend Framework
+- FastAPI (Python 3.9+)
+- SQLAlchemy ORM
+- Pydantic for data validation
+- JWT-based authentication
+- WebSockets for real-time communication
+
+### Database
+- SQLite for development (with option to switch to PostgreSQL for production)
+- Database schema with tables for users, doctors, patients, chats, messages, case histories, etc.
+
+### AI Integration
+- Support for both OpenAI gpt-4.0 and gimini2.0
+- Configurable AI provider selection
+- AI assistant for patient interviews with summarization capability
+
+### Deployment
+- Docker support with docker-compose
+- Environment variable configuration
+
+## Database Schema
+
+### Users
+- id (UUID, primary key)
+- email (unique)
+- hashed_password
+- name
+- role (doctor, patient, admin, hospital)
+- contact
+- address
+- is_active (boolean)
+- profile_id (foreign key to doctor/patient/hospital profile)
+- created_at, updated_at
+
+### Hospitals
+- id (UUID, primary key)
+- name
+- address
+- city
+- state
+- country
+- contact
+- pin_code
+- email (unique)
+- specialities (JSON array)
+- link
+- website
+- created_at, updated_at
+
+### Doctors
+- id (UUID, primary key)
+- name
+- photo (link to image)
+- designation
+- experience (years)
+- details (education, achievements, etc.)
+- contact
+- shift_time_start
+- shift_time_end
+- created_at, updated_at
+
+### Patients
+- id (UUID, primary key)
+- name
+- dob (date of birth)
+- gender
+- contact
+- photo (link to image)
+- created_at, updated_at
+
+### Hospital-Doctor-Mapping
+- id (UUID, primary key)
+- hospital_id (foreign key)
+- doctor_id (foreign key)
+- created_at, updated_at
+
+### Hospital-Patient-Mapping
+- id (UUID, primary key)
+- hospital_id (foreign key)
+- patient_id (foreign key)
+- created_at, updated_at
+
+### Doctor-Patient-Mapping
+- id (UUID, primary key)
+- doctor_id (foreign key)
+- patient_id (foreign key)
+- created_at, updated_at
+
+### User-Patient-Relation
+- id (UUID, primary key)
+- user_id (foreign key)
+- patient_id (foreign key)
+- relation (self, wife, child, husband)
+- created_at, updated_at
+
+### Appointments
+- id (UUID, primary key)
+- doctor_id (foreign key)
+- patient_id (foreign key)
+- time_slot (datetime)
+- hospital_id (foreign key)
+- type (remote, regular, emergency)
+- status
+- extras (JSON)
+- cancelled_by (optional)
+- cancellation_reason (optional)
+- created_at, updated_at
+
+### Chats
+- id (UUID, primary key)
+- doctor_id (foreign key)
+- patient_id (foreign key)
+- is_active (boolean)
+- created_at, updated_at
+
+### Messages
+- id (UUID, primary key)
+- chat_id (foreign key)
+- sender_id
+- receiver_id
+- message
+- message_type (text, audio, file)
+- file_details (JSON, optional)
+- timestamp
+- is_read (boolean)
+- created_at
+
+### Case Histories
+- id (UUID, primary key)
+- patient_id (foreign key)
+- summary
+- documents (JSON array)
+- created_at, updated_at
+
+### Documents
+- id (UUID, primary key)
+- case_history_id (foreign key)
+- file_name
+- size
+- link
+- uploaded_by (doctor or patient)
+- upload_timestamp
+- created_at
+
+### AI Sessions
+- id (UUID, primary key)
+- chat_id (foreign key)
+- start_timestamp
+- end_timestamp (optional)
+
+### AI Messages
+- id (UUID, primary key)
+- session_id (foreign key)
+- message
+- response
+- timestamp
+
+### Suggestions
+- id (UUID, primary key)
+- problem
+- description
+- created_at
+
+## API Endpoints
+
+### Authentication
+- POST /api/v1/auth/signup (admin only)
+- POST /api/v1/auth/doctor-signup
+- POST /api/v1/auth/patient-signup
+- POST /api/v1/auth/hospital-signup
+- POST /api/v1/auth/login
+- POST /api/v1/auth/refresh
+
+### Users
+- GET /api/v1/users (get all users, admin only)
+- GET /api/v1/users/{user_id} (get user by ID)
+- PUT /api/v1/users/{user_id} (update user profile)
+- GET /api/v1/users/me (get current user profile)
+- PUT /api/v1/users/me (update current user profile)
+
+### Hospitals
+- POST /api/v1/hospitals (create hospital)
+- GET /api/v1/hospitals (get all hospitals)
+- GET /api/v1/hospitals/{hospital_id} (get hospital by ID)
+- PUT /api/v1/hospitals/{hospital_id} (update hospital)
+- DELETE /api/v1/hospitals/{hospital_id} (delete hospital)
+- GET /api/v1/hospitals/{hospital_id}/doctors (get hospital's doctors)
+- GET /api/v1/hospitals/{hospital_id}/patients (get hospital's patients)
+
+### Doctors
+- POST /api/v1/doctors (create doctor)
+- GET /api/v1/doctors (get all doctors)
+- GET /api/v1/doctors/{doctor_id} (get doctor by ID)
+- PUT /api/v1/doctors/{doctor_id} (update doctor profile)
+- DELETE /api/v1/doctors/{doctor_id} (delete doctor)
+- GET /api/v1/doctors/{doctor_id}/patients (get doctor's patients)
+- GET /api/v1/doctors/{doctor_id}/hospitals (get doctor's hospitals)
+- GET /api/v1/doctors/{doctor_id}/appointments (get doctor's appointments)
+
+### Patients
+- POST /api/v1/patients (create patient)
+- GET /api/v1/patients (get all patients)
+- GET /api/v1/patients/{patient_id} (get patient by ID)
+- PUT /api/v1/patients/{patient_id} (update patient profile)
+- DELETE /api/v1/patients/{patient_id} (delete patient)
+- GET /api/v1/patients/{patient_id}/doctors (get patient's doctors)
+- GET /api/v1/patients/{patient_id}/hospitals (get patient's hospitals)
+- GET /api/v1/patients/{patient_id}/appointments (get patient's appointments)
+- GET /api/v1/patients/{patient_id}/case-history (get patient case history)
+- POST /api/v1/patients/{patient_id}/case-history (save patient case history)
+- GET /api/v1/patients/{patient_id}/reports (get patient reports)
+
+### Mappings
+- POST /api/v1/mappings/hospital-doctor (map hospital to doctor)
+- DELETE /api/v1/mappings/hospital-doctor/{mapping_id} (remove hospital-doctor mapping)
+- POST /api/v1/mappings/hospital-patient (map hospital to patient)
+- DELETE /api/v1/mappings/hospital-patient/{mapping_id} (remove hospital-patient mapping)
+- POST /api/v1/mappings/doctor-patient (map doctor to patient)
+- DELETE /api/v1/mappings/doctor-patient/{mapping_id} (remove doctor-patient mapping)
+- POST /api/v1/mappings/user-patient (create user-patient relation)
+- PUT /api/v1/mappings/user-patient/{mapping_id} (update user-patient relation)
+- DELETE /api/v1/mappings/user-patient/{mapping_id} (remove user-patient relation)
+- GET /api/v1/mappings/user/{user_id}/patients (get all patients related to user)
+
+### Appointments
+- POST /api/v1/appointments (create appointment)
+- GET /api/v1/appointments (get all appointments)
+- GET /api/v1/appointments/{appointment_id} (get appointment by ID)
+- PUT /api/v1/appointments/{appointment_id} (update appointment)
+- DELETE /api/v1/appointments/{appointment_id} (cancel appointment)
+- GET /api/v1/appointments/doctor/{doctor_id} (get appointments by doctor)
+- GET /api/v1/appointments/patient/{patient_id} (get appointments by patient)
+- GET /api/v1/appointments/hospital/{hospital_id} (get appointments by hospital)
+- PUT /api/v1/appointments/{appointment_id}/status (update appointment status)
+- PUT /api/v1/appointments/{appointment_id}/cancel (cancel appointment with reason)
+
+### Chats
+- POST /api/v1/chats (create chat session)
+- GET /api/v1/chats (get all chat sessions)
+- GET /api/v1/chats/{chat_id} (get chat session by ID)
+- GET /api/v1/chats/{chat_id}/messages (get chat messages)
+- WebSocket /api/v1/chats/ws/{chat_id}?token={token} (real-time chat)
+
+### Messages
+- POST /api/v1/messages (send message)
+- PUT /api/v1/messages/{message_id}/read (update read status)
+
+### AI Assistant
+- POST /api/v1/ai-assistant/sessions (create AI session)
+- GET /api/v1/ai-assistant/sessions/{session_id} (get AI session)
+- GET /api/v1/ai-assistant/sessions/{session_id}/messages (get AI session messages)
+- POST /api/v1/ai-assistant/sessions/{session_id}/messages (send message to AI assistant)
+- WebSocket /api/v1/ai-assistant/ws/{session_id} (real-time AI chat)
+
+### Suggestions
+- POST /api/v1/suggestions (create suggestion)
+- GET /api/v1/suggestions (get all suggestions)
+- GET /api/v1/suggestions/{suggestion_id} (get suggestion by ID)
+- PUT /api/v1/suggestions/{suggestion_id} (update suggestion)
+- DELETE /api/v1/suggestions/{suggestion_id} (delete suggestion)
+
+### Root Endpoints
+- GET / (root endpoint with API information)
+- GET /health (health check endpoint)
+
+## Implementation Details
+
+### Authentication
+- JWT-based authentication with access and refresh tokens
+- Password hashing using bcrypt
+- Role-based access control (doctor, patient, admin)
+- Separate signup flows for doctors, patients, and admins
+- Token refresh mechanism for extended sessions
+- User profile linking (connecting user accounts to doctor/patient profiles)
+
+### Real-time Communication
+- WebSocket connections for real-time chat
+- Connection manager to handle multiple connections
+- Broadcasting messages to specific sessions
+- Online status tracking for chat participants
+- Message read status tracking
+- Support for different message types (text, audio, file)
+
+### AI Assistant
+- System prompt for patient interviews
+- Support for both OpenAI and Hugging Face models
+- Configurable AI provider selection
+- Patient interview with 5 questions followed by a summary
+- Command processing for special actions
+- History management with context window
+- Stateful conversation tracking
+- AI session persistence in database
+
+### Case History Management
+- Document upload and storage
+- Base64 encoding for file transfer
+- File metadata tracking
+- Case history summaries
+- Multiple document support per case history
+- Access control (doctors can view patient case histories)
+
+### Entity Relationships and Mappings
+- Hospital-Doctor Mapping: Hospitals can have multiple doctors, doctors can work at multiple hospitals
+- Hospital-Patient Mapping: Hospitals can have multiple patients, patients can be registered at multiple hospitals
+- Doctor-Patient Mapping: Doctors can have multiple patients, patients can have multiple doctors
+- User-Patient Relation: Users with patient role can be linked to multiple patients with different relations (self, spouse, child)
+- Admin-only functionality to manage mappings between entities
+- Creates chat sessions between mapped doctors and patients
+- Doctors can view all their assigned patients
+
+### Appointment Management
+- Create, read, update, and delete appointments
+- Different appointment types: remote, regular, emergency
+- Appointment status tracking (scheduled, completed, cancelled, etc.)
+- Appointment cancellation with reason tracking
+- Filtering appointments by doctor, patient, hospital, date, status
+- JSON extras field for additional appointment-specific information
+- Time slot management to prevent double-booking
+- Notifications for appointment changes (optional)
+
+## Configuration
+The service should be configurable via environment variables:
+
+```
+# Database Configuration
+DATABASE_URL=sqlite:///./app.db
+
+# JWT Authentication
+SECRET_KEY=your_secret_key_here
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+REFRESH_TOKEN_EXPIRE_DAYS=7
+
+# OpenAI Configuration
+OPENAI_API_KEY=your_openai_api_key
+AI_MODEL=gpt-4
+
+# Hugging Face Configuration
+HF_API_KEY=your_huggingface_api_key
+HF_MODEL=TinyLlama/TinyLlama-1.1B-Chat-v1.0
+
+# AI Provider Selection (options: "openai" or "huggingface")
+AI_PROVIDER=openai
+
+# OpenAI Assistants API (options: "true" or "false")
+USE_ASSISTANTS_API=true
+
+# Application Settings
+PROJECT_NAME=Doctor-Patient Chat Service
+API_V1_PREFIX=/api/v1
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8000
+```
+
+## Project Structure
+Organize the project with the following directory structure:
+
+```
+doctor-patient-service/
+├── app/
+│   ├── api/                  # API endpoints
+│   │   ├── __init__.py
+│   │   ├── auth.py
+│   │   ├── users.py
+│   │   ├── hospitals.py
+│   │   ├── doctors.py
+│   │   ├── patients.py
+│   │   ├── mappings.py
+│   │   ├── appointments.py
+│   │   ├── chats.py
+│   │   ├── messages.py
+│   │   ├── ai_assistant.py
+│   │   └── suggestions.py
+│   ├── db/                   # Database configuration
+│   │   ├── __init__.py
+│   │   └── database.py
+│   ├── models/               # SQLAlchemy models
+│   │   ├── __init__.py
+│   │   ├── user.py
+│   │   ├── hospital.py
+│   │   ├── doctor.py
+│   │   ├── patient.py
+│   │   ├── mapping.py
+│   │   ├── appointment.py
+│   │   ├── chat.py
+│   │   ├── case_history.py
+│   │   ├── ai.py
+│   │   └── suggestion.py
+│   ├── schemas/              # Pydantic schemas
+│   │   ├── __init__.py
+│   │   ├── auth.py
+│   │   ├── user.py
+│   │   ├── hospital.py
+│   │   ├── doctor.py
+│   │   ├── patient.py
+│   │   ├── mapping.py
+│   │   ├── appointment.py
+│   │   ├── chat.py
+│   │   ├── case_history.py
+│   │   ├── ai.py
+│   │   └── suggestion.py
+│   ├── services/             # Business logic
+│   │   ├── __init__.py
+│   │   ├── ai_service.py
+│   │   ├── chat_service.py
+│   │   ├── appointment_service.py
+│   │   ├── hospital_service.py
+│   │   ├── mapping_service.py
+│   │   └── notification_service.py
+│   ├── websockets/           # WebSocket handlers
+│   │   ├── __init__.py
+│   │   ├── connection_manager.py
+│   │   ├── chat.py
+│   │   └── ai_assistant.py
+│   ├── errors.py             # Error handling
+│   ├── dependencies.py       # FastAPI dependencies
+│   ├── config.py             # Configuration
+│   └── main.py               # Application entry point
+├── tests/                    # Unit tests
+├── .env.example              # Example environment variables
+├── Dockerfile                # Docker configuration
+├── Dockerfile.slim           # Lightweight Docker configuration
+├── docker-compose.yml        # Docker Compose configuration
+├── docker-entrypoint.sh      # Docker entrypoint script
+├── init_db.py                # Database initialization script
+├── init_test_db.py           # Test data initialization script
+├── requirements.txt          # Python dependencies
+├── schema.sql                # SQL schema
+└── README.md                 # Project documentation
+```
+
+## Code Organization
+
+### Main Application (app/main.py)
+- Create FastAPI application
+- Configure middleware (CORS, etc.)
+- Include routers from API modules
+- Set up exception handlers
+- Define root endpoints
+
+### API Endpoints (app/api/)
+- Organize endpoints by resource (auth, doctors, patients, etc.)
+- Use FastAPI dependency injection for database and authentication
+- Implement proper error handling
+- Use Pydantic schemas for request/response validation
+
+### Database Models (app/models/)
+- Define SQLAlchemy ORM models
+- Implement relationships between models
+- Use UUIDs for primary keys
+- Include created_at/updated_at timestamps
+
+### Pydantic Schemas (app/schemas/)
+- Define request/response schemas
+- Implement validation rules
+- Separate base, create, update, and response schemas
+
+### WebSocket Handlers (app/websockets/)
+- Implement connection manager for WebSocket connections
+- Handle real-time chat functionality
+- Implement AI assistant WebSocket interface
+
+### Services (app/services/)
+- Implement business logic
+- Separate concerns (AI service, chat service, etc.)
+- Handle external API integrations
+
+## Testing
+- Include unit tests for core functionality and API endpoints
+- Use pytest for testing
+- Implement test fixtures for database and authentication
+- Test WebSocket functionality
+- Test AI integration
+
+## Documentation
+- Provide comprehensive API documentation using FastAPI's built-in Swagger UI
+- Include detailed descriptions for all endpoints
+- Document request/response schemas
+- Include example requests and responses
+- Create a comprehensive README.md with setup and usage instructions
+
+## Deployment
+- Include Docker and docker-compose configuration for easy deployment
+- Provide development and production configurations
+- Include database initialization scripts
+- Support environment variable configuration
+- Include health check endpoint
+
+## Security Considerations
+- Secure password storage with bcrypt
+- JWT token validation
+- Role-based access control
+- Input validation with Pydantic
+- Error handling with appropriate HTTP status codes
+- CORS configuration
+- WebSocket authentication
+- Rate limiting for sensitive endpoints
+- Proper error messages (informative but not revealing sensitive information)
+- Secure file handling for document uploads
+
+## AI Assistant Implementation Details
+
+### System Prompt
+The AI assistant should use the following system prompt for patient interviews:
+
+```
+You are a medical assistant interviewing a patient.
+Focus on symptoms, medical history, and current concerns.
+Track question progress and inform the patient.
+After all 5 questions, summarize for the doctor:
+1. Chief complaint and symptoms
+2. Relevant medical history
+3. Current medications
+4. Symptom duration and severity
+5. Impact on daily activities
+Be professional, empathetic, and concise.
+
+Your messages should not exceed 15 words. Summary can be upto 75 words.
+Wait for patient response before asking the next question.
+
+After all the questions are done just return the summary to the patient don't add any advices.
+```
+
+### AI Service Implementation
+1. Create a service that can switch between OpenAI and Hugging Face models
+2. Implement a stateful conversation tracker that counts questions asked
+3. After 5 questions, generate a summary of the patient's responses
+4. Support special commands (e.g., /summarize, /reset)
+5. Implement proper error handling for API failures
+6. Limit message history to a configurable number of messages
+7. Store all interactions in the database for future reference
+
+### WebSocket Implementation
+1. Create a WebSocket endpoint for real-time AI assistant chat
+2. Accept connections with proper authentication
+3. Process incoming messages and send AI responses
+4. Handle disconnections gracefully
+5. Support different message types (text, file)
+6. Implement proper error handling
+
+### Integration with Chat System
+1. Allow creating AI sessions linked to specific chat sessions
+2. Enable doctors to view AI interview summaries
+3. Provide an option to include AI summaries in case histories

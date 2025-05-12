@@ -1,0 +1,64 @@
+from pydantic import BaseModel, EmailStr, Field
+from typing import Optional
+from datetime import datetime
+
+from app.models.user import UserRole
+
+class Token(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    user_id: str
+    role: UserRole
+
+class TokenPayload(BaseModel):
+    sub: Optional[str] = None
+    exp: Optional[datetime] = None
+    type: Optional[str] = None
+
+class RefreshToken(BaseModel):
+    refresh_token: str
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    name: Optional[str] = None
+    role: UserRole
+    contact: Optional[str] = None
+    address: Optional[str] = None
+
+class DoctorSignup(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    name: str
+    contact: Optional[str] = None
+    designation: Optional[str] = None
+    experience: Optional[int] = None
+    details: Optional[str] = None
+    photo: Optional[str] = None
+
+class PatientSignup(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    name: str
+    dob: Optional[datetime] = None
+    gender: Optional[str] = None
+    contact: Optional[str] = None
+    photo: Optional[str] = None
+
+class HospitalSignup(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    name: str
+    address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    country: Optional[str] = None
+    contact: Optional[str] = None
+    pin_code: Optional[str] = None
+    specialities: Optional[list] = None
+    website: Optional[str] = None
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
