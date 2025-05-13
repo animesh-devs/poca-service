@@ -1,6 +1,6 @@
 # Testing Workflow
 
-This document outlines the testing workflow for the POCA Service, including API calls and test user credentials.
+This document outlines the testing workflow for the POCA Service, including API calls, test user credentials, and automated test scripts.
 
 ## Test Users
 
@@ -203,3 +203,97 @@ websocat "ws://localhost:8000/api/v1/chats/ws/CHAT_ID?token=YOUR_ACCESS_TOKEN"
 ```bash
 websocat "ws://localhost:8000/api/v1/ai-assistant/ws/SESSION_ID?token=YOUR_ACCESS_TOKEN"
 ```
+
+## Automated Test Scripts
+
+The following automated test scripts are available to test the POCA Service:
+
+### 1. Test Data Creation
+
+#### create_test_data.py
+This script creates test data for the POCA service, including hospitals, doctors, patients, and mappings between them.
+
+**Usage:**
+```bash
+python create_test_data.py
+```
+
+**What it does:**
+- Creates 2 hospitals
+- Creates 4 doctors with different specialties
+- Creates 4 patients
+- Maps doctors to patients
+- Maps hospitals to doctors
+- Maps hospitals to patients
+- Saves the created data to a file for reference
+
+### 2. API Testing (Non-Docker)
+
+#### test_api_flow_direct.py
+This script tests all the flows of the POCA service by hitting actual APIs in non-docker flow. It uses direct signup endpoints to create test data.
+
+**Usage:**
+```bash
+cd testing-scripts
+python test_api_flow_direct.py
+```
+
+**What it does:**
+- Tests authentication flow (admin, hospital, doctor, patient)
+- Tests user management APIs
+- Tests hospital management APIs
+- Tests doctor management APIs
+- Tests patient management APIs
+- Tests mapping APIs (hospital-doctor, hospital-patient, doctor-patient)
+- Tests chat APIs
+- Tests message APIs
+- Tests AI assistant APIs
+
+### 3. API Testing (Docker)
+
+#### test_docker_flow_direct.py
+This script tests all the flows of the POCA service by hitting actual APIs in docker flow. It uses direct signup endpoints to create test data.
+
+**Usage:**
+```bash
+cd testing-scripts
+python test_docker_flow_direct.py
+```
+
+**What it does:**
+- Checks if Docker is running
+- Checks if the Docker container is running
+- Tests authentication flow (admin, hospital, doctor, patient)
+- Tests user management APIs
+- Tests hospital management APIs
+- Tests doctor management APIs
+- Tests patient management APIs
+- Tests mapping APIs (hospital-doctor, hospital-patient, doctor-patient)
+- Tests chat APIs
+- Tests message APIs
+- Tests AI assistant APIs
+
+### 4. API Helper Files
+
+#### test_endpoints.py
+This script tests specific API endpoints of the POCA service, focusing on mappings, chats, and messages.
+
+**Usage:**
+```bash
+python test_endpoints.py
+```
+
+**What it does:**
+- Tests mappings API (hospital-doctor, hospital-patient, doctor-patient)
+- Tests chats API (create, get, deactivate)
+- Tests messages API (send, get, update read status)
+
+## Test Data Requirements
+
+The test scripts maintain the following test data:
+- 2 hospitals
+- 4 users (2 doctors, 2 patients)
+- 2-3 patients per doctor
+- 4-5 doctors in total
+
+This ensures comprehensive testing of all API endpoints and workflows.

@@ -77,5 +77,10 @@ class MessageListResponse(BaseModel):
     total: int
 
 class ReadStatusUpdate(BaseModel):
-    message_id: str
+    message_id: Optional[str] = None
+    message_ids: Optional[List[str]] = None
     is_read: bool = True
+
+    model_config = {
+        "extra": "allow"
+    }

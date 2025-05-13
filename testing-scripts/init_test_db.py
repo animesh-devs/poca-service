@@ -1,6 +1,11 @@
 import argparse
 import uuid
+import os
+import sys
 from datetime import datetime, timedelta
+
+# Add the parent directory to the Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from app.db.database import get_db
 from app.models.user import User, UserRole
@@ -8,8 +13,8 @@ from app.models.hospital import Hospital
 from app.models.doctor import Doctor
 from app.models.patient import Patient, Gender
 from app.models.mapping import (
-    HospitalDoctorMapping, 
-    HospitalPatientMapping, 
+    HospitalDoctorMapping,
+    HospitalPatientMapping,
     DoctorPatientMapping,
     UserPatientRelation,
     RelationType
@@ -21,7 +26,7 @@ def init_test_data():
     """Initialize the database with test data"""
     # Get database session
     db = next(get_db())
-    
+
     try:
         # Create hospital
         hospital_id = str(uuid.uuid4())
@@ -40,7 +45,7 @@ def init_test_data():
         )
         db.add(hospital)
         db.commit()
-        
+
         # Create hospital user
         hospital_user_id = str(uuid.uuid4())
         hospital_user = User(
@@ -56,7 +61,7 @@ def init_test_data():
         )
         db.add(hospital_user)
         db.commit()
-        
+
         # Create doctors
         # 1. Cardiologist
         cardio_id = str(uuid.uuid4())
@@ -71,7 +76,7 @@ def init_test_data():
         )
         db.add(cardio)
         db.commit()
-        
+
         cardio_user_id = str(uuid.uuid4())
         cardio_user = User(
             id=cardio_user_id,
@@ -85,7 +90,7 @@ def init_test_data():
         )
         db.add(cardio_user)
         db.commit()
-        
+
         # 2. Neurologist
         neuro_id = str(uuid.uuid4())
         neuro = Doctor(
@@ -99,7 +104,7 @@ def init_test_data():
         )
         db.add(neuro)
         db.commit()
-        
+
         neuro_user_id = str(uuid.uuid4())
         neuro_user = User(
             id=neuro_user_id,
@@ -113,7 +118,7 @@ def init_test_data():
         )
         db.add(neuro_user)
         db.commit()
-        
+
         # Create patients
         # 1. Adult Patient
         adult_id = str(uuid.uuid4())
@@ -127,7 +132,7 @@ def init_test_data():
         )
         db.add(adult)
         db.commit()
-        
+
         adult_user_id = str(uuid.uuid4())
         adult_user = User(
             id=adult_user_id,
@@ -141,7 +146,7 @@ def init_test_data():
         )
         db.add(adult_user)
         db.commit()
-        
+
         # 2. Child Patient
         child_id = str(uuid.uuid4())
         child = Patient(
@@ -154,7 +159,7 @@ def init_test_data():
         )
         db.add(child)
         db.commit()
-        
+
         # Create mappings
         # Hospital-Doctor mappings
         hospital_cardio = HospitalDoctorMapping(
@@ -162,39 +167,39 @@ def init_test_data():
             doctor_id=cardio_id
         )
         db.add(hospital_cardio)
-        
+
         hospital_neuro = HospitalDoctorMapping(
             hospital_id=hospital_id,
             doctor_id=neuro_id
         )
         db.add(hospital_neuro)
-        
+
         # Hospital-Patient mappings
         hospital_adult = HospitalPatientMapping(
             hospital_id=hospital_id,
             patient_id=adult_id
         )
         db.add(hospital_adult)
-        
+
         hospital_child = HospitalPatientMapping(
             hospital_id=hospital_id,
             patient_id=child_id
         )
         db.add(hospital_child)
-        
+
         # Doctor-Patient mappings
         cardio_adult = DoctorPatientMapping(
             doctor_id=cardio_id,
             patient_id=adult_id
         )
         db.add(cardio_adult)
-        
+
         neuro_child = DoctorPatientMapping(
             doctor_id=neuro_id,
             patient_id=child_id
         )
         db.add(neuro_child)
-        
+
         # User-Patient relations
         adult_relation = UserPatientRelation(
             user_id=adult_user_id,
@@ -202,14 +207,14 @@ def init_test_data():
             relation=RelationType.SELF
         )
         db.add(adult_relation)
-        
+
         child_relation = UserPatientRelation(
             user_id=adult_user_id,
             patient_id=child_id,
             relation=RelationType.CHILD
         )
         db.add(child_relation)
-        
+
         # Create chat sessions
         cardio_adult_chat = Chat(
             doctor_id=cardio_id,
@@ -217,16 +222,16 @@ def init_test_data():
             is_active=True
         )
         db.add(cardio_adult_chat)
-        
+
         neuro_child_chat = Chat(
             doctor_id=neuro_id,
             patient_id=child_id,
             is_active=True
         )
         db.add(neuro_child_chat)
-        
+
         db.commit()
-        
+
         print("Test data initialized successfully!")
         print("\nTest Users:")
         print("Admin: admin@example.com / admin123")
@@ -234,7 +239,7 @@ def init_test_data():
         print("Doctor (Cardiologist): doctor.cardio@example.com / doctor123")
         print("Doctor (Neurologist): doctor.neuro@example.com / doctor123")
         print("Patient (Adult): patient.adult@example.com / patient123")
-        
+
         return True
     except Exception as e:
         db.rollback()
@@ -247,7 +252,7 @@ def main():
     """Main function to initialize test data"""
     parser = argparse.ArgumentParser(description="Initialize test data for POCA Service")
     args = parser.parse_args()
-    
+
     # Initialize test data
     init_test_data()
 

@@ -1,0 +1,25 @@
+Test Hospitals:
+1. ef073daf-73d7-4880-a9e8-f856ea3ecb14 - test.hospital1.7da43765@example.com - password123
+   Profile ID: ae82b34e-5278-490b-8ddc-d6738ccdaa24
+2. fff0586b-d92f-4532-8899-f9eeff70ba7c - test.hospital2.87720751@example.com - password123
+   Profile ID: 2f631984-5a37-43cb-8b4b-7a7c82db620f
+
+Test Doctors:
+1. 6420b591-572d-4da0-afce-b2fe979e4117 - test.doctor1.520b6a6d@example.com - password123
+   Profile ID: d5762c53-c7b7-448d-b065-d7a49ca4c46a
+2. 8aabb3bd-9ad4-428a-ba30-a523f335aa26 - test.doctor2.9dd35d3e@example.com - password123
+   Profile ID: 7d21fa27-2708-41f3-8152-6a1802ee2991
+3. d33bffad-a98c-4145-b71f-4e9cccf6a6ce - test.doctor3.dcd8c38f@example.com - password123
+   Profile ID: ab53fdd1-0138-46c4-82a6-4873305fbcde
+4. c75977c2-53ab-49ef-a43b-2ecd67a13d30 - test.doctor4.ea6c5889@example.com - password123
+   Profile ID: 9d182227-4861-4750-804c-e2c7e4d5f799
+
+Test Patients:
+1. e9739a8d-bb96-4788-a226-3de4dbdee79d - test.patient1.c90b4265@example.com - password123
+   Profile ID: 1c59b1fa-115e-4438-8a67-cff9d2c8b211
+2. f5593a76-df9f-4edb-859b-cf4f9a6e063a - test.patient2.bf2402bf@example.com - password123
+   Profile ID: cb6b4f83-4cb4-46dd-9418-1c3a19901d38
+3. 128f2d19-f39d-4a16-9bbd-da970c5f0499 - test.patient3.72b9c8c2@example.com - password123
+   Profile ID: 0dfd7378-9147-4708-8e10-2f392d63e0ed
+4. e3e4ded7-e475-4257-a287-f85c1683d1e3 - test.patient4.4f624949@example.com - password123
+   Profile ID: 4bcc4814-25d7-462b-8d23-65ef3b441d8b

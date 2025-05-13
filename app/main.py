@@ -12,7 +12,10 @@ from app.api import (
     users,
     hospitals,
     ai,
-    patients
+    patients,
+    mappings,
+    chats,
+    messages
 )
 from app.websockets import ai_assistant
 from app.errors import http_exception_handler, validation_exception_handler
@@ -56,6 +59,9 @@ app.include_router(hospitals.router, prefix=f"{settings.API_V1_PREFIX}/hospitals
 app.include_router(patients.router, prefix=f"{settings.API_V1_PREFIX}/patients", tags=["Patients"])
 app.include_router(ai.router, prefix=f"{settings.API_V1_PREFIX}/ai", tags=["AI Assistant"])
 app.include_router(ai_assistant.router, prefix=f"{settings.API_V1_PREFIX}/ai-assistant", tags=["AI Assistant WebSocket"])
+app.include_router(mappings.router, prefix=f"{settings.API_V1_PREFIX}/mappings", tags=["Mappings"])
+app.include_router(chats.router, prefix=f"{settings.API_V1_PREFIX}/chats", tags=["Chats"])
+app.include_router(messages.router, prefix=f"{settings.API_V1_PREFIX}/messages", tags=["Messages"])
 
 @app.get("/")
 def read_root():

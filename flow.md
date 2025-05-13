@@ -138,31 +138,58 @@ This document outlines the complete flow for the POCA (Patient-Doctor Chat Assis
     - Endpoint: `GET /api/v1/patients/{patient_id}/case-history`
     - Response: Case history details with documents
 
-26. **Upload Documents in Chat**
+26. **Create Case History (if not exists)**
+    - Endpoint: `GET /api/v1/patients/{patient_id}/case-history?create_if_not_exists=true`
+    - Response: Case history details (newly created if it didn't exist)
+
+27. **Upload Documents in Chat**
     - Endpoint: `POST /api/v1/messages`
     - Payload: Chat ID, sender ID, receiver ID, message, message_type="file", file_details
     - Response: Message details with message ID
 
-27. **Get Suggested Problems/Messages**
+28. **Get Patient Reports**
+    - Endpoint: `GET /api/v1/patients/{patient_id}/reports`
+    - Response: List of reports for the patient
+
+29. **Get Specific Report**
+    - Endpoint: `GET /api/v1/patients/{patient_id}/reports/{report_id}`
+    - Response: Report details with documents
+
+30. **Create Patient Report**
+    - Endpoint: `POST /api/v1/patients/{patient_id}/reports`
+    - Payload: Title, description, report_type
+    - Response: Report details with report ID
+
+31. **Update Patient Report**
+    - Endpoint: `PUT /api/v1/patients/{patient_id}/reports/{report_id}`
+    - Payload: Updated title, description, report_type
+    - Response: Updated report details
+
+32. **Upload Report Document**
+    - Endpoint: `POST /api/v1/patients/{patient_id}/reports/{report_id}/documents`
+    - Payload: File (multipart/form-data) and optional remark
+    - Response: Document details with document ID
+
+33. **Get Suggested Problems/Messages**
     - Endpoint: `GET /api/v1/suggestions`
     - Response: List of suggested problems/messages
 
-28. **View Booked Appointments**
+34. **View Booked Appointments**
     - For Doctor: `GET /api/v1/appointments/doctor/{doctor_id}`
     - For Patient: `GET /api/v1/appointments/patient/{patient_id}`
     - Response: List of appointments
 
-29. **Book Appointment**
+35. **Book Appointment**
     - Endpoint: `POST /api/v1/appointments`
     - Payload: Doctor ID, patient ID, time slot, hospital ID, type
     - Response: Appointment details with appointment ID
 
-30. **Update Appointment**
+36. **Update Appointment**
     - Endpoint: `PUT /api/v1/appointments/{appointment_id}`
     - Payload: Updated appointment details
     - Response: Updated appointment details
 
-31. **View Previous Messages**
+37. **View Previous Messages**
     - Endpoint: `GET /api/v1/chats/{chat_id}/messages`
     - Response: List of messages in the chat
 
@@ -180,12 +207,16 @@ Admin User -> POST /api/v1/mappings/hospital-patient
 Admin User -> POST /api/v1/mappings/doctor-patient
 Admin User -> POST /api/v1/patients/{patient_id}/case-history
 Admin User -> PUT /api/v1/patients/{patient_id}/case-history
+Admin User -> POST /api/v1/patients/{patient_id}/reports
+Admin User -> POST /api/v1/patients/{patient_id}/reports/{report_id}/documents
 ```
 
 ### Patient-AI Interaction Flow
 ```
 Patient User -> POST /api/v1/auth/login
 Patient User -> GET /api/v1/mappings/user/{user_id}/patients
+Patient User -> GET /api/v1/patients/{patient_id}/case-history?create_if_not_exists=true
+Patient User -> GET /api/v1/patients/{patient_id}/reports
 Patient User -> POST /api/v1/ai-assistant/sessions
 Patient User -> WebSocket /api/v1/ai-assistant/ws/{session_id}
   or
@@ -200,6 +231,11 @@ Patient User -> POST /api/v1/messages (to send summary to doctor)
 Doctor User -> POST /api/v1/auth/login
 Doctor User -> GET /api/v1/chats?is_read=false
 Doctor User -> GET /api/v1/chats/{chat_id}/messages
+Doctor User -> GET /api/v1/patients/{patient_id}/case-history
+Doctor User -> GET /api/v1/patients/{patient_id}/reports
+Doctor User -> GET /api/v1/patients/{patient_id}/reports/{report_id}
+Doctor User -> POST /api/v1/patients/{patient_id}/reports (create new report if needed)
+Doctor User -> POST /api/v1/patients/{patient_id}/reports/{report_id}/documents (upload report documents)
 Doctor User -> POST /api/v1/ai/sessions
 Doctor User -> POST /api/v1/ai/messages
 Doctor User -> POST /api/v1/messages (to send response to patient)
@@ -221,7 +257,13 @@ The implementation now includes all the necessary components to support the expe
 
 6. **File Upload in Messages**: The implementation for handling file uploads in messages is in place.
 
-7. **JSON Response Format**: The AI responses are now formatted as JSON objects with the following structure:
+7. **Case History Management**: The implementation now includes endpoints for creating, retrieving, and updating case histories for patients, with support for creating a case history if it doesn't exist.
+
+8. **Report Management**: The implementation now includes endpoints for creating, retrieving, and updating reports for patients, as well as uploading documents to reports.
+
+9. **Document Management**: The implementation now includes support for adding remarks to documents and associating documents with case histories and reports.
+
+10. **JSON Response Format**: The AI responses are now formatted as JSON objects with the following structure:
    ```json
    {
        "message": "The AI response text",
@@ -275,20 +317,23 @@ To test the complete flow, follow these steps:
    ws://localhost:8000/api/v1/ai-assistant/ws/{session_id}?token=YOUR_ACCESS_TOKEN
    ```
 
-5. **Test the OpenAI Integration**:
+5. **Create Test Data**:
    ```bash
-   python3 test_openai_simple.py
+   python3 testing-scripts/create_test_data.py
    ```
+   This creates comprehensive test data including hospitals, doctors, patients, and mappings.
 
-6. **Test the AI API Endpoints**:
+6. **Test API Flow (Non-Docker)**:
    ```bash
-   python3 test_ai_direct.py
+   python3 testing-scripts/test_api_flow.py
    ```
+   This tests all flows by hitting actual APIs in non-docker environment.
 
-7. **Test the WebSocket Implementation**:
+7. **Test Docker Flow**:
    ```bash
-   python3 test_websocket.py
+   python3 testing-scripts/test_docker_flow.py
    ```
+   This tests all flows by hitting actual APIs in docker environment.
 
 ## Additional Enhancements
 

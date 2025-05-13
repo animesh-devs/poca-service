@@ -40,8 +40,15 @@ A comprehensive backend service for doctor-patient communication with AI assista
 
 2. Create and activate a virtual environment:
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   # Create the virtual environment
+   python -m venv venv  # or python3 -m venv venv
+
+   # Activate the virtual environment
+   # On macOS/Linux:
+   . venv/bin/activate  # or source venv/bin/activate
+
+   # On Windows:
+   # venv\Scripts\activate
    ```
 
 3. Install dependencies:
@@ -59,34 +66,103 @@ A comprehensive backend service for doctor-patient communication with AI assista
 
 1. Initialize the database:
    ```bash
+   # For a clean database
    python init_db.py
+
+   # For a database with test data
+   ./init_test_db.sh
    ```
 
 2. Start the service:
    ```bash
+   # Using the run.py script (recommended)
+   python run.py
+
+   # To specify a different port
+   python run.py --port 9000
+
+   # Or using uvicorn directly
    uvicorn app.main:app --reload
    ```
 
 3. The service will be available at:
-   - API: http://localhost:8000
+   - API: http://localhost:8000 (or the port you specified)
    - Swagger UI: http://localhost:8000/api/v1/docs
    - ReDoc: http://localhost:8000/api/v1/redoc
 
+   If you used a different port (e.g., 9000), replace 8000 with your port number in the URLs above.
+
 ## 🐳 Docker Deployment
 
-1. Build and run with Docker Compose:
+1. Make sure Docker Desktop is running:
+   - On macOS: Open Docker Desktop from the Applications folder
+   - On Windows: Open Docker Desktop from the Start menu
+   - On Linux: Start the Docker daemon with `sudo systemctl start docker`
+
+2. Build and run with Docker Compose:
    ```bash
+   # For Docker Compose V2 (newer versions)
+   docker compose up -d
+
+   # For Docker Compose V1 (older versions)
    docker-compose up -d
    ```
 
-2. The service will be available at http://localhost:8000
+3. Check if the container is running:
+   ```bash
+   docker ps
+   ```
+
+4. The service will be available at http://localhost:8000
+
+5. To stop the containers:
+   ```bash
+   # For Docker Compose V2
+   docker compose down
+
+   # For Docker Compose V1
+   docker-compose down
+   ```
+
+6. To reset the database and restart the containers:
+   ```bash
+   # Make the script executable
+   chmod +x reset_db_docker.sh
+
+   # Run the script
+   ./reset_db_docker.sh
+   ```
 
 ## 🧪 Testing
 
-Run the tests with pytest:
+### Running Unit Tests
+Run the unit tests with pytest:
 ```bash
 pytest
 ```
+
+### Creating Test Data
+Create comprehensive test data for the service:
+```bash
+python testing-scripts/create_test_data.py
+```
+
+This script creates multiple hospitals, doctors, patients, and maps them together. See `testing.md` for details on the test data created.
+
+### Running End-to-End Tests
+Run the API flow test (without Docker):
+```bash
+python testing-scripts/test_api_flow.py
+```
+
+Run the Docker flow test (requires Docker and Docker Compose):
+```bash
+python testing-scripts/test_docker_flow.py
+```
+
+These test scripts verify all the functionality of the service by hitting actual APIs, including authentication, mapping, chat, and AI assistant flows.
+
+For more detailed information about testing, see the `testing.md` file.
 
 ## 🤖 AI Integration
 
@@ -119,6 +195,8 @@ The API documentation is available at `/api/v1/docs` when the service is running
 - `GET /api/v1/users` - Get all users (admin only)
 - `GET /api/v1/users/{user_id}` - Get user by ID
 - `PUT /api/v1/users/{user_id}` - Update user
+- `GET /api/v1/users/me` - Get current user profile
+- `PUT /api/v1/users/me` - Update current user profile
 
 #### Hospitals
 - `POST /api/v1/hospitals` - Create hospital
@@ -142,10 +220,31 @@ The API documentation is available at `/api/v1/docs` when the service is running
 - `PUT /api/v1/patients/{patient_id}/reports/{report_id}` - Update a report for a patient
 - `POST /api/v1/patients/{patient_id}/reports/{report_id}/documents` - Upload a document for a patient's report
 
+#### Mappings
+- `POST /api/v1/mappings/hospital-doctor` - Map a hospital to a doctor
+- `POST /api/v1/mappings/hospital-patient` - Map a hospital to a patient
+- `POST /api/v1/mappings/doctor-patient` - Map a doctor to a patient
+- `DELETE /api/v1/mappings/hospital-doctor/{mapping_id}` - Delete a hospital-doctor mapping
+- `DELETE /api/v1/mappings/hospital-patient/{mapping_id}` - Delete a hospital-patient mapping
+- `DELETE /api/v1/mappings/doctor-patient/{mapping_id}` - Delete a doctor-patient mapping
+
+#### Chats
+- `POST /api/v1/chats` - Create a new chat
+- `GET /api/v1/chats` - Get all chats for the current user
+- `GET /api/v1/chats/{chat_id}` - Get a specific chat
+- `PUT /api/v1/chats/{chat_id}/deactivate` - Deactivate a chat
+- `DELETE /api/v1/chats/{chat_id}` - Delete a chat (admin only)
+
+#### Messages
+- `POST /api/v1/messages` - Send a message
+- `GET /api/v1/messages/chat/{chat_id}` - Get all messages for a chat
+- `PUT /api/v1/messages/read-status` - Update read status for messages
+
 #### AI Assistant
-- `POST /api/v1/ai/chat` - Chat with AI
-- `POST /api/v1/ai/summarize` - Summarize text with AI
-- `POST /api/v1/ai/analyze` - Analyze medical text with AI
+- `POST /api/v1/ai/sessions` - Create a new AI session
+- `GET /api/v1/ai/sessions/{session_id}` - Get an AI session
+- `POST /api/v1/ai/messages` - Send a message to AI
+- `GET /api/v1/ai/sessions/{session_id}/messages` - Get all messages for an AI session
 
 ## 📝 License
 

@@ -490,6 +490,249 @@
             "description": "Update patient profile"
           },
           "response": []
+        },
+        {
+          "name": "Get Patient Case History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients/{{patientId}}/case-history",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "patients", "{{patientId}}", "case-history"]
+            },
+            "description": "Get the medical case history for a specific patient."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Patient Case History (Create if not exists)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients/{{patientId}}/case-history?create_if_not_exists=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "patients", "{{patientId}}", "case-history"],
+              "query": [
+                {
+                  "key": "create_if_not_exists",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "Get the medical case history for a specific patient. If no case history exists, a new empty one will be created."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Patient Case History",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient_id\": \"{{patientId}}\",\n  \"summary\": \"Initial consultation for hypertension\",\n  \"documents\": [\"doc123\", \"doc456\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients/{{patientId}}/case-history",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "patients", "{{patientId}}", "case-history"]
+            },
+            "description": "Create a new case history for a patient."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Patient Case History",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"summary\": \"Updated consultation notes for hypertension\",\n  \"documents\": [\"doc123\", \"doc456\", \"doc789\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients/{{patientId}}/case-history",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "patients", "{{patientId}}", "case-history"]
+            },
+            "description": "Update an existing case history for a patient."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Patient Documents",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients/{{patientId}}/documents",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "patients", "{{patientId}}", "documents"]
+            },
+            "description": "Get all documents for a specific patient."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Patient Reports",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients/{{patientId}}/reports",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "patients", "{{patientId}}", "reports"]
+            },
+            "description": "Get all reports for a specific patient."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Patient Report by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients/{{patientId}}/reports/{{reportId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "patients", "{{patientId}}", "reports", "{{reportId}}"]
+            },
+            "description": "Get a specific report for a patient."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Patient Report",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Blood Test Results\",\n  \"description\": \"Complete blood count and metabolic panel\",\n  \"report_type\": \"lab_test\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients/{{patientId}}/reports",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "patients", "{{patientId}}", "reports"]
+            },
+            "description": "Create a new report for a patient."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Patient Report",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Blood Test Results\",\n  \"description\": \"Updated complete blood count and metabolic panel\",\n  \"report_type\": \"lab_test\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients/{{patientId}}/reports/{{reportId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "patients", "{{patientId}}", "reports", "{{reportId}}"]
+            },
+            "description": "Update an existing report for a patient."
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Report Document",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "/path/to/your/file.pdf"
+                },
+                {
+                  "key": "remark",
+                  "value": "Lab results from City Hospital",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients/{{patientId}}/reports/{{reportId}}/documents",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "patients", "{{patientId}}", "reports", "{{reportId}}", "documents"]
+            },
+            "description": "Upload a document for a patient's report."
+          },
+          "response": []
         }
       ],
       "description": "Patient management endpoints"
@@ -881,6 +1124,12 @@
     {
       "key": "baseUrl",
       "value": "http://localhost:8000"
+    },
+    {
+      "key": "reportId",
+      "value": "",
+      "type": "string",
+      "description": "ID of a report"
     }
   ]
 }
