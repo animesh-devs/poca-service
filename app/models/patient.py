@@ -13,7 +13,7 @@ class Gender(str, enum.Enum):
 
 class Patient(Base):
     __tablename__ = "patients"
-    
+
     id = Column(String, primary_key=True, default=lambda: str(uuid4()))
     name = Column(String, nullable=False)
     dob = Column(Date, nullable=True)  # Date of birth
@@ -22,7 +22,7 @@ class Patient(Base):
     photo = Column(String, nullable=True)  # Link to image
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+
     # Relationships
     hospitals = relationship("HospitalPatientMapping", back_populates="patient")
     doctors = relationship("DoctorPatientMapping", back_populates="patient")
@@ -30,3 +30,4 @@ class Patient(Base):
     appointments = relationship("Appointment", back_populates="patient")
     case_histories = relationship("CaseHistory", back_populates="patient")
     user_relations = relationship("UserPatientRelation", back_populates="patient")
+    report_mappings = relationship("PatientReportMapping", back_populates="patient", cascade="all, delete-orphan")

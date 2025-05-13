@@ -106,6 +106,47 @@ The service supports both OpenAI GPT-4 and Google Gemini models for AI assistanc
 
 The API documentation is available at `/api/v1/docs` when the service is running. It provides detailed information about all endpoints, request/response schemas, and authentication requirements.
 
+### Key API Endpoints
+
+#### Authentication
+- `POST /api/v1/auth/login` - User login
+- `POST /api/v1/auth/refresh` - Refresh access token
+- `POST /api/v1/auth/doctor/signup` - Doctor signup
+- `POST /api/v1/auth/patient/signup` - Patient signup
+- `POST /api/v1/auth/hospital/signup` - Hospital signup
+
+#### Users
+- `GET /api/v1/users` - Get all users (admin only)
+- `GET /api/v1/users/{user_id}` - Get user by ID
+- `PUT /api/v1/users/{user_id}` - Update user
+
+#### Hospitals
+- `POST /api/v1/hospitals` - Create hospital
+- `GET /api/v1/hospitals` - Get all hospitals
+- `GET /api/v1/hospitals/{hospital_id}` - Get hospital by ID
+- `PUT /api/v1/hospitals/{hospital_id}` - Update hospital
+- `DELETE /api/v1/hospitals/{hospital_id}` - Delete hospital
+- `GET /api/v1/hospitals/{hospital_id}/doctors` - Get hospital doctors
+- `GET /api/v1/hospitals/{hospital_id}/patients` - Get hospital patients
+
+#### Patients
+- `GET /api/v1/patients/{patient_id}/case-history` - Get patient case history (with option to create if not exists)
+- `POST /api/v1/patients/{patient_id}/case-history` - Create patient case history
+- `PUT /api/v1/patients/{patient_id}/case-history` - Update patient case history
+- `GET /api/v1/patients/{patient_id}/documents` - Get patient documents
+
+#### Reports
+- `GET /api/v1/patients/{patient_id}/reports` - Get all reports for a patient
+- `GET /api/v1/patients/{patient_id}/reports/{report_id}` - Get a specific report for a patient
+- `POST /api/v1/patients/{patient_id}/reports` - Create a new report for a patient
+- `PUT /api/v1/patients/{patient_id}/reports/{report_id}` - Update a report for a patient
+- `POST /api/v1/patients/{patient_id}/reports/{report_id}/documents` - Upload a document for a patient's report
+
+#### AI Assistant
+- `POST /api/v1/ai/chat` - Chat with AI
+- `POST /api/v1/ai/summarize` - Summarize text with AI
+- `POST /api/v1/ai/analyze` - Analyze medical text with AI
+
 ## 📝 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.

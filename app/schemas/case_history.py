@@ -9,6 +9,7 @@ class DocumentBase(BaseModel):
     size: Optional[int] = None
     link: str
     uploaded_by: UploadedBy
+    remark: Optional[str] = None
 
 class DocumentCreate(DocumentBase):
     case_history_id: str
@@ -18,7 +19,7 @@ class DocumentResponse(DocumentBase):
     case_history_id: str
     upload_timestamp: datetime
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -39,6 +40,6 @@ class CaseHistoryResponse(CaseHistoryBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     document_files: Optional[List[DocumentResponse]] = None
-    
+
     class Config:
         from_attributes = True

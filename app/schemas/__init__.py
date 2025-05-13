@@ -40,3 +40,8 @@ from app.schemas.suggestion import (
     SuggestionBase, SuggestionCreate, SuggestionUpdate, SuggestionResponse,
     SuggestionListResponse
 )
+from app.schemas.report import (
+    ReportBase, ReportCreate, ReportUpdate, ReportResponse, ReportListResponse,
+    ReportDocumentBase, ReportDocumentCreate, ReportDocumentResponse,
+    PatientReportMappingCreate, PatientReportMappingResponse
+)

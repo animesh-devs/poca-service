@@ -11,7 +11,8 @@ from app.api import (
     auth,
     users,
     hospitals,
-    ai
+    ai,
+    patients
 )
 from app.websockets import ai_assistant
 from app.errors import http_exception_handler, validation_exception_handler
@@ -52,6 +53,7 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.include_router(auth.router, prefix=f"{settings.API_V1_PREFIX}/auth", tags=["Authentication"])
 app.include_router(users.router, prefix=f"{settings.API_V1_PREFIX}/users", tags=["Users"])
 app.include_router(hospitals.router, prefix=f"{settings.API_V1_PREFIX}/hospitals", tags=["Hospitals"])
+app.include_router(patients.router, prefix=f"{settings.API_V1_PREFIX}/patients", tags=["Patients"])
 app.include_router(ai.router, prefix=f"{settings.API_V1_PREFIX}/ai", tags=["AI Assistant"])
 app.include_router(ai_assistant.router, prefix=f"{settings.API_V1_PREFIX}/ai-assistant", tags=["AI Assistant WebSocket"])
 
