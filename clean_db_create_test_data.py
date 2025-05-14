@@ -28,12 +28,16 @@ from app.models.mapping import (
 from app.models.chat import Chat
 from app.api.auth import get_password_hash
 
-# Store credentials for output
+# Store credentials and entity information for output
 credentials = {
     "admin": [],
     "hospitals": [],
     "doctors": [],
-    "patients": []
+    "patients": [],
+    "hospital_doctor_mappings": [],
+    "hospital_patient_mappings": [],
+    "doctor_patient_mappings": [],
+    "chats": []
 }
 
 def clean_db():
@@ -52,12 +56,14 @@ def create_test_data():
     try:
         # Create admin user
         admin_id = str(uuid.uuid4())
+        admin_name = "Admin User"
+        admin_email = "admin@example.com"
         admin_password = "admin123"
         admin_user = User(
             id=admin_id,
-            email="admin@example.com",
+            email=admin_email,
             hashed_password=get_password_hash(admin_password),
-            name="Admin User",
+            name=admin_name,
             role=UserRole.ADMIN,
             contact="+1234567890",
             address="123 Admin St, Adminville",
@@ -65,7 +71,8 @@ def create_test_data():
         )
         db.add(admin_user)
         credentials["admin"].append({
-            "email": "admin@example.com",
+            "name": admin_name,
+            "email": admin_email,
             "password": admin_password,
             "id": admin_id
         })
@@ -77,16 +84,18 @@ def create_test_data():
             hospital_name = f"Hospital {i+1}"
             hospital_email = f"hospital{i+1}@example.com"
             hospital_password = f"hospital{i+1}"
+            hospital_address = f"{100+i} Hospital Ave, Medtown"
+            hospital_contact = f"+1555{i}55{i}555"
 
             # Create hospital profile
             hospital = Hospital(
                 id=hospital_id,
                 name=hospital_name,
-                address=f"{100+i} Hospital Ave, Medtown",
+                address=hospital_address,
                 city="Medtown",
                 state="Medstate",
                 country="Medcountry",
-                contact=f"+1555{i}55{i}555",
+                contact=hospital_contact,
                 pin_code=f"1000{i}",
                 email=hospital_email,
                 specialities=["Cardiology", "Neurology", "Pediatrics", "Orthopedics"],
@@ -95,14 +104,15 @@ def create_test_data():
             db.add(hospital)
 
             # Create hospital user
+            hospital_user_id = str(uuid.uuid4())
             hospital_user = User(
-                id=str(uuid.uuid4()),
+                id=hospital_user_id,
                 email=hospital_email,
                 hashed_password=get_password_hash(hospital_password),
                 name=hospital_name,
                 role=UserRole.HOSPITAL,
-                contact=f"+1555{i}55{i}555",
-                address=f"{100+i} Hospital Ave, Medtown",
+                contact=hospital_contact,
+                address=hospital_address,
                 profile_id=hospital_id,
                 is_active=True
             )
@@ -110,40 +120,54 @@ def create_test_data():
 
             hospitals.append(hospital)
             credentials["hospitals"].append({
+                "name": hospital_name,
                 "email": hospital_email,
                 "password": hospital_password,
-                "id": hospital_id
+                "id": hospital_id,
+                "user_id": hospital_user_id,
+                "address": hospital_address,
+                "contact": hospital_contact
             })
 
         # Create 5 doctors
         doctors = []
         specialties = ["Cardiologist", "Neurologist", "Pediatrician", "Orthopedic Surgeon", "General Practitioner"]
+        first_names = ['John', 'Sarah', 'Michael', 'Emily', 'David']
+        last_names = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones']
+
         for i in range(5):
             doctor_id = str(uuid.uuid4())
-            doctor_name = f"Dr. {['John', 'Sarah', 'Michael', 'Emily', 'David'][i]} {['Smith', 'Johnson', 'Williams', 'Brown', 'Jones'][i]}"
+            doctor_first_name = first_names[i]
+            doctor_last_name = last_names[i]
+            doctor_name = f"Dr. {doctor_first_name} {doctor_last_name}"
             doctor_email = f"doctor{i+1}@example.com"
             doctor_password = f"doctor{i+1}"
+            doctor_specialty = specialties[i]
+            doctor_experience = 5 + i
+            doctor_contact = f"+1666{i}66{i}666"
+            doctor_details = f"Experienced {doctor_specialty} with {doctor_experience} years of practice"
 
             # Create doctor profile
             doctor = Doctor(
                 id=doctor_id,
                 name=doctor_name,
                 photo=f"https://example.com/doctors/doctor{i+1}.jpg",
-                designation=specialties[i],
-                experience=5 + i,
-                details=f"Experienced {specialties[i]} with {5+i} years of practice",
-                contact=f"+1666{i}66{i}666"
+                designation=doctor_specialty,
+                experience=doctor_experience,
+                details=doctor_details,
+                contact=doctor_contact
             )
             db.add(doctor)
 
             # Create doctor user
+            doctor_user_id = str(uuid.uuid4())
             doctor_user = User(
-                id=str(uuid.uuid4()),
+                id=doctor_user_id,
                 email=doctor_email,
                 hashed_password=get_password_hash(doctor_password),
                 name=doctor_name,
                 role=UserRole.DOCTOR,
-                contact=f"+1666{i}66{i}666",
+                contact=doctor_contact,
                 profile_id=doctor_id,
                 is_active=True
             )
@@ -151,37 +175,59 @@ def create_test_data():
 
             doctors.append(doctor)
             credentials["doctors"].append({
+                "name": doctor_name,
+                "first_name": doctor_first_name,
+                "last_name": doctor_last_name,
                 "email": doctor_email,
                 "password": doctor_password,
                 "id": doctor_id,
-                "specialty": specialties[i]
+                "user_id": doctor_user_id,
+                "specialty": doctor_specialty,
+                "experience": doctor_experience,
+                "contact": doctor_contact,
+                "details": doctor_details
             })
 
             # Map doctors to hospitals
             # First 3 doctors to Hospital 1, last 2 doctors to Hospital 2
-            hospital = hospitals[1 if i >= 3 else 0]
+            hospital_idx = 1 if i >= 3 else 0
+            hospital = hospitals[hospital_idx]
+
+            mapping_id = str(uuid.uuid4())
             hospital_doctor_mapping = HospitalDoctorMapping(
-                id=str(uuid.uuid4()),
+                id=mapping_id,
                 hospital_id=hospital.id,
                 doctor_id=doctor_id
             )
             db.add(hospital_doctor_mapping)
 
+            # Store mapping information
+            credentials["hospital_doctor_mappings"].append({
+                "id": mapping_id,
+                "hospital_id": hospital.id,
+                "hospital_name": hospital.name,
+                "doctor_id": doctor_id,
+                "doctor_name": doctor_name
+            })
+
         # Create 4 patient users with 2-3 patients each
         for i in range(4):
             patient_user_id = str(uuid.uuid4())
+            patient_user_name = f"Patient User {i+1}"
             patient_email = f"patient{i+1}@example.com"
             patient_password = f"patient{i+1}"
+            patient_contact = f"+1777{i}77{i}777"
+            patient_address = f"{200+i} Patient St, Patientville"
 
             # Create patient user
             patient_user = User(
                 id=patient_user_id,
                 email=patient_email,
                 hashed_password=get_password_hash(patient_password),
-                name=f"Patient User {i+1}",
+                name=patient_user_name,
                 role=UserRole.PATIENT,
-                contact=f"+1777{i}77{i}777",
-                address=f"{200+i} Patient St, Patientville",
+                contact=patient_contact,
+                address=patient_address,
                 is_active=True
             )
             db.add(patient_user)
@@ -197,69 +243,122 @@ def create_test_data():
                 last_names = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Miller', 'Davis', 'Garcia', 'Rodriguez', 'Wilson']
                 first_name_idx = (i*3+j) % len(first_names)
                 last_name_idx = i % len(last_names)
-                patient_name = f"{first_names[first_name_idx]} {last_names[last_name_idx]}"
+                patient_first_name = first_names[first_name_idx]
+                patient_last_name = last_names[last_name_idx]
+                patient_name = f"{patient_first_name} {patient_last_name}"
                 gender = random.choice([Gender.MALE, Gender.FEMALE])
+                patient_age = 20 + i + j
+                patient_dob = datetime.now() - timedelta(days=365*patient_age)
+                patient_contact = f"+1888{i}{j}8{i}{j}888"
 
                 # Create patient profile
                 patient = Patient(
                     id=patient_id,
                     name=patient_name,
-                    dob=datetime.now() - timedelta(days=365*(20+i+j)),
+                    dob=patient_dob,
                     gender=gender,
-                    contact=f"+1888{i}{j}8{i}{j}888",
+                    contact=patient_contact,
                     photo=f"https://example.com/patients/patient{i+1}_{j+1}.jpg"
                 )
                 db.add(patient)
 
                 # Create user-patient relation
+                relation_type = RelationType.SELF if j == 0 else random.choice([RelationType.CHILD, RelationType.PARENT, RelationType.GUARDIAN, RelationType.FRIEND])
+                relation_id = str(uuid.uuid4())
                 relation = UserPatientRelation(
-                    id=str(uuid.uuid4()),
+                    id=relation_id,
                     user_id=patient_user_id,
                     patient_id=patient_id,
-                    relation=RelationType.SELF if j == 0 else random.choice([RelationType.CHILD, RelationType.PARENT, RelationType.GUARDIAN, RelationType.FRIEND])
+                    relation=relation_type
                 )
                 db.add(relation)
 
-                patient_records.append({
+                patient_info = {
                     "id": patient_id,
                     "name": patient_name,
-                    "relation": relation.relation.value
-                })
+                    "first_name": patient_first_name,
+                    "last_name": patient_last_name,
+                    "gender": gender.value,
+                    "age": patient_age,
+                    "dob": patient_dob.isoformat(),
+                    "contact": patient_contact,
+                    "relation": relation_type.value,
+                    "relation_id": relation_id
+                }
+
+                patient_records.append(patient_info)
 
                 # Map patients to hospitals and doctors
                 # Map to either hospital
-                hospital = random.choice(hospitals)
+                hospital_idx = random.randint(0, len(hospitals) - 1)
+                hospital = hospitals[hospital_idx]
+
+                mapping_id = str(uuid.uuid4())
                 hospital_patient_mapping = HospitalPatientMapping(
-                    id=str(uuid.uuid4()),
+                    id=mapping_id,
                     hospital_id=hospital.id,
                     patient_id=patient_id
                 )
                 db.add(hospital_patient_mapping)
 
+                # Store hospital-patient mapping
+                credentials["hospital_patient_mappings"].append({
+                    "id": mapping_id,
+                    "hospital_id": hospital.id,
+                    "hospital_name": hospital.name,
+                    "patient_id": patient_id,
+                    "patient_name": patient_name
+                })
+
                 # Map to 1-2 doctors
                 num_doctors = random.randint(1, 2)
                 for _ in range(num_doctors):
-                    doctor = random.choice(doctors)
+                    doctor_idx = random.randint(0, len(doctors) - 1)
+                    doctor = doctors[doctor_idx]
+
+                    mapping_id = str(uuid.uuid4())
                     doctor_patient_mapping = DoctorPatientMapping(
-                        id=str(uuid.uuid4()),
+                        id=mapping_id,
                         doctor_id=doctor.id,
                         patient_id=patient_id
                     )
                     db.add(doctor_patient_mapping)
 
+                    # Store doctor-patient mapping
+                    credentials["doctor_patient_mappings"].append({
+                        "id": mapping_id,
+                        "doctor_id": doctor.id,
+                        "doctor_name": doctor.name,
+                        "patient_id": patient_id,
+                        "patient_name": patient_name
+                    })
+
                     # Create a chat between doctor and patient
+                    chat_id = str(uuid.uuid4())
                     chat = Chat(
-                        id=str(uuid.uuid4()),
+                        id=chat_id,
                         doctor_id=doctor.id,
                         patient_id=patient_id,
                         is_active=True
                     )
                     db.add(chat)
 
+                    # Store chat information
+                    credentials["chats"].append({
+                        "id": chat_id,
+                        "doctor_id": doctor.id,
+                        "doctor_name": doctor.name,
+                        "patient_id": patient_id,
+                        "patient_name": patient_name
+                    })
+
             credentials["patients"].append({
+                "name": patient_user_name,
                 "email": patient_email,
                 "password": patient_password,
                 "id": patient_user_id,
+                "contact": patient_contact,
+                "address": patient_address,
                 "patients": patient_records
             })
 
@@ -280,6 +379,7 @@ def print_credentials():
 
     print("ADMIN:")
     for admin in credentials["admin"]:
+        print(f"  Name: {admin.get('name', 'Admin User')}")
         print(f"  Email: {admin['email']}")
         print(f"  Password: {admin['password']}")
         print(f"  ID: {admin['id']}")
@@ -288,6 +388,7 @@ def print_credentials():
     print("HOSPITALS:")
     for i, hospital in enumerate(credentials["hospitals"]):
         print(f"  Hospital {i+1}:")
+        print(f"    Name: {hospital.get('name', f'Hospital {i+1}')}")
         print(f"    Email: {hospital['email']}")
         print(f"    Password: {hospital['password']}")
         print(f"    ID: {hospital['id']}")
@@ -296,6 +397,7 @@ def print_credentials():
     print("DOCTORS:")
     for i, doctor in enumerate(credentials["doctors"]):
         print(f"  Doctor {i+1} ({doctor['specialty']}):")
+        print(f"    Name: {doctor.get('name', f'Doctor {i+1}')}")
         print(f"    Email: {doctor['email']}")
         print(f"    Password: {doctor['password']}")
         print(f"    ID: {doctor['id']}")
@@ -304,12 +406,33 @@ def print_credentials():
     print("PATIENTS:")
     for i, patient in enumerate(credentials["patients"]):
         print(f"  Patient User {i+1}:")
+        print(f"    Name: {patient.get('name', f'Patient User {i+1}')}")
         print(f"    Email: {patient['email']}")
         print(f"    Password: {patient['password']}")
         print(f"    ID: {patient['id']}")
         print(f"    Associated Patients:")
         for j, p in enumerate(patient["patients"]):
             print(f"      Patient {j+1}: {p['name']} (Relation: {p['relation']}, ID: {p['id']})")
+        print()
+
+    print("=== MAPPING INFORMATION ===\n")
+    print("Hospital-Doctor Mappings:")
+    for mapping in credentials.get("hospital_doctor_mappings", []):
+        print(f"  Hospital '{mapping['hospital_name']}' (ID: {mapping['hospital_id']}) -> Doctor '{mapping['doctor_name']}' (ID: {mapping['doctor_id']})")
+
+    print("\nHospital-Patient Mappings:")
+    for mapping in credentials.get("hospital_patient_mappings", []):
+        print(f"  Hospital '{mapping['hospital_name']}' (ID: {mapping['hospital_id']}) -> Patient '{mapping['patient_name']}' (ID: {mapping['patient_id']})")
+
+    print("\nDoctor-Patient Mappings:")
+    for mapping in credentials.get("doctor_patient_mappings", []):
+        print(f"  Doctor '{mapping['doctor_name']}' (ID: {mapping['doctor_id']}) -> Patient '{mapping['patient_name']}' (ID: {mapping['patient_id']})")
+
+    print("\nChat Sessions:")
+    for chat in credentials.get("chats", []):
+        print(f"  Chat ID: {chat['id']}")
+        print(f"    Doctor: {chat['doctor_name']} (ID: {chat['doctor_id']})")
+        print(f"    Patient: {chat['patient_name']} (ID: {chat['patient_id']})")
         print()
 
 if __name__ == "__main__":

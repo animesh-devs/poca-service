@@ -3,11 +3,12 @@ from sqlalchemy.orm import Session
 from typing import Any, List, Dict
 
 from app.db.database import get_db
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.models.patient import Patient
 from app.models.hospital import Hospital
 from app.models.doctor import Doctor
-from app.models.mapping import HospitalPatientMapping, DoctorPatientMapping
+from app.models.chat import Chat
+from app.models.mapping import HospitalPatientMapping, DoctorPatientMapping, UserPatientRelation
 from app.schemas.patient import PatientUpdate, PatientResponse, PatientListResponse, PatientListItem
 from app.schemas.hospital import HospitalListItem
 from app.dependencies import get_current_user, get_admin_user, get_patient_user
@@ -310,3 +311,105 @@ async def get_patient_hospitals(
         }
         for hospital in hospitals
     ]
+
+@router.get("/user/{user_id}", response_model=PatientListResponse)
+async def get_user_patients(
+    user_id: str,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> Any:
+    """
+    Get all patients associated with a user who has the patient role
+    """
+    try:
+        # Check if user exists
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="User not found",
+                    error_code=ErrorCode.RES_001
+                )
+            )
+
+        # Check if user has patient role
+        if user.role != UserRole.PATIENT:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=create_error_response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message="User does not have patient role",
+                    error_code=ErrorCode.BIZ_001
+                )
+            )
+
+        # Check if current user is authorized to view this user's patients
+        is_admin = current_user.role == UserRole.ADMIN
+        is_self = current_user.id == user_id
+
+        if not (is_admin or is_self):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=create_error_response(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    message="Not enough permissions",
+                    error_code=ErrorCode.AUTH_004
+                )
+            )
+
+        # Get all patient relations for this user
+        relations = db.query(UserPatientRelation).filter(
+            UserPatientRelation.user_id == user_id
+        ).offset(skip).limit(limit).all()
+
+        # Get patient IDs from relations
+        patient_ids = [relation.patient_id for relation in relations]
+
+        # Query for patients
+        patients = db.query(Patient).filter(Patient.id.in_(patient_ids)).all()
+
+        # For each patient, check if there's an active chat
+        patient_list_items = []
+        for patient in patients:
+            # Check for active chats
+            chat = None
+            is_active_chat = False
+
+            # For patients, look for chats with doctors
+            chat = db.query(Chat).filter(
+                Chat.patient_id == patient.id,
+                Chat.is_active == True
+            ).first()
+
+            if chat:
+                is_active_chat = True
+
+            # Create PatientListItem
+            patient_item = PatientListItem(
+                id=patient.id,
+                name=patient.name,
+                gender=patient.gender,
+                photo=patient.photo,
+                chat_id=chat.id if chat else None,
+                is_active_chat=is_active_chat
+            )
+            patient_list_items.append(patient_item)
+
+        return {
+            "patients": patient_list_items,
+            "total": len(patient_list_items)
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=create_error_response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred: {str(e)}",
+                error_code=ErrorCode.SRV_001
+            )
+        )

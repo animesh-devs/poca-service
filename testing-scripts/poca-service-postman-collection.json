@@ -1471,6 +1471,33 @@
             "description": "Get all documents for a patient across all case histories"
           },
           "response": []
+        },
+        {
+          "name": "Get User Patients",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients/user/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "patients",
+                "user",
+                "{{userId}}"
+              ]
+            },
+            "description": "Get all patients associated with a user who has the patient role"
+          },
+          "response": []
         }
       ],
       "description": "Patient management endpoints"
@@ -1754,6 +1781,34 @@
               ]
             },
             "description": "Delete a relation between a user and a patient"
+          },
+          "response": []
+        },
+        {
+          "name": "Get User Patients",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mappings/user/{{userId}}/patients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mappings",
+                "user",
+                "{{userId}}",
+                "patients"
+              ]
+            },
+            "description": "Get all patients related to a user"
           },
           "response": []
         }
