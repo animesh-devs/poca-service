@@ -12,7 +12,7 @@ from app.schemas.chat import (
     ChatCreate, ChatResponse, ChatListResponse, ChatListItem,
     MessageListResponse
 )
-from app.dependencies import get_current_user, get_admin_user, get_doctor_user, get_patient_user
+from app.dependencies import get_current_user, get_admin_user, get_doctor_user, get_patient_user, get_user_entity_id
 from app.errors import ErrorCode, create_error_response
 
 router = APIRouter()
@@ -175,8 +175,13 @@ async def get_chats(
                 Chat.is_active_for_patient == True
             ).count()
         else:
-            # Try to find patient profile
-            patient = db.query(Patient).filter(Patient.id == current_user.id).first()
+            # Try to find patient profile by user_id
+            patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+
+            # If not found, try to find by direct ID match
+            if not patient:
+                patient = db.query(Patient).filter(Patient.id == current_user.id).first()
+
             if not patient:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -205,10 +210,14 @@ async def get_chats(
 async def get_chat(
     chat_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ) -> Any:
     """
     Get a specific chat by ID
+
+    This endpoint uses the user_entity_id header to determine which entity (doctor, patient)
+    the user is operating as. This simplifies permission checks.
     """
     chat = db.query(Chat).filter(Chat.id == chat_id).first()
     if not chat:
@@ -224,57 +233,35 @@ async def get_chat(
     # Check if user has access to this chat
     if current_user.role == UserRole.ADMIN:
         # Admins can access any chat
-        pass
+        return chat
     elif current_user.role == UserRole.DOCTOR:
-        # Doctors can access their chats
-        if current_user.profile_id:
-            # Use profile_id directly if available
-            if current_user.profile_id != chat.doctor_id:
-                raise HTTPException(
+        # Check if doctor has access to this chat using user_entity_id
+        if user_entity_id != chat.doctor_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=create_error_response(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=create_error_response(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        message="Not enough permissions",
-                        error_code=ErrorCode.AUTH_004
-                    )
+                    message="Not enough permissions",
+                    error_code=ErrorCode.AUTH_004
                 )
-        else:
-            # Try to find doctor profile
-            doctor = db.query(Doctor).filter(Doctor.id == current_user.id).first()
-            if not doctor or doctor.id != chat.doctor_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=create_error_response(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        message="Not enough permissions",
-                        error_code=ErrorCode.AUTH_004
-                    )
-                )
+            )
+
+        # Chats should be accessible to doctors regardless of active status
+        return chat
     elif current_user.role == UserRole.PATIENT:
-        # Patients can access their chats
-        if current_user.profile_id:
-            # Use profile_id directly if available
-            if current_user.profile_id != chat.patient_id:
-                raise HTTPException(
+        # Check if patient has access to this chat using user_entity_id
+        if user_entity_id != chat.patient_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=create_error_response(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=create_error_response(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        message="Not enough permissions",
-                        error_code=ErrorCode.AUTH_004
-                    )
+                    message="Not enough permissions",
+                    error_code=ErrorCode.AUTH_004
                 )
-        else:
-            # Try to find patient profile
-            patient = db.query(Patient).filter(Patient.id == current_user.id).first()
-            if not patient or patient.id != chat.patient_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=create_error_response(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        message="Not enough permissions",
-                        error_code=ErrorCode.AUTH_004
-                    )
-                )
+            )
+
+        # Chats should be accessible to patients regardless of active status
+        return chat
     else:
         # Hospitals and other roles don't have access to chats
         raise HTTPException(
@@ -286,16 +273,18 @@ async def get_chat(
             )
         )
 
-    return chat
-
 @router.put("/{chat_id}/deactivate-for-doctor", response_model=ChatResponse)
 async def deactivate_chat_for_doctor(
     chat_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ) -> Any:
     """
     Deactivate a chat for the doctor
+
+    This endpoint uses the user_entity_id header to determine which entity (doctor)
+    the user is operating as. This simplifies permission checks.
     """
     try:
         chat = db.query(Chat).filter(Chat.id == chat_id).first()
@@ -314,15 +303,8 @@ async def deactivate_chat_for_doctor(
             # Admins can deactivate any chat
             pass
         elif current_user.role == UserRole.DOCTOR:
-            # Doctors can deactivate their chats
-            # First try to get doctor by user_id
-            doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
-
-            # If not found, try to get doctor by profile_id
-            if not doctor and current_user.profile_id:
-                doctor = db.query(Doctor).filter(Doctor.id == current_user.profile_id).first()
-
-            if not doctor or doctor.id != chat.doctor_id:
+            # Check if doctor has access to this chat using user_entity_id
+            if user_entity_id != chat.doctor_id:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=create_error_response(
@@ -363,10 +345,14 @@ async def deactivate_chat_for_doctor(
 async def deactivate_chat_for_patient(
     chat_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ) -> Any:
     """
     Deactivate a chat for the patient
+
+    This endpoint uses the user_entity_id header to determine which entity (patient)
+    the user is operating as. This simplifies permission checks.
     """
     try:
         chat = db.query(Chat).filter(Chat.id == chat_id).first()
@@ -385,15 +371,8 @@ async def deactivate_chat_for_patient(
             # Admins can deactivate any chat
             pass
         elif current_user.role == UserRole.PATIENT:
-            # Patients can deactivate their chats
-            # First try to get patient by user_id
-            patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
-
-            # If not found, try to get patient by profile_id
-            if not patient and current_user.profile_id:
-                patient = db.query(Patient).filter(Patient.id == current_user.profile_id).first()
-
-            if not patient or patient.id != chat.patient_id:
+            # Check if patient has access to this chat using user_entity_id
+            if user_entity_id != chat.patient_id:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=create_error_response(
@@ -434,10 +413,14 @@ async def deactivate_chat_for_patient(
 async def activate_chat_for_doctor(
     chat_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ) -> Any:
     """
     Activate a chat for the doctor
+
+    This endpoint uses the user_entity_id header to determine which entity (doctor)
+    the user is operating as. This simplifies permission checks.
     """
     try:
         chat = db.query(Chat).filter(Chat.id == chat_id).first()
@@ -456,15 +439,8 @@ async def activate_chat_for_doctor(
             # Admins can activate any chat
             pass
         elif current_user.role == UserRole.DOCTOR:
-            # Doctors can activate their chats
-            # First try to get doctor by user_id
-            doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
-
-            # If not found, try to get doctor by profile_id
-            if not doctor and current_user.profile_id:
-                doctor = db.query(Doctor).filter(Doctor.id == current_user.profile_id).first()
-
-            if not doctor or doctor.id != chat.doctor_id:
+            # Check if doctor has access to this chat using user_entity_id
+            if user_entity_id != chat.doctor_id:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=create_error_response(
@@ -505,10 +481,14 @@ async def activate_chat_for_doctor(
 async def activate_chat_for_patient(
     chat_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ) -> Any:
     """
     Activate a chat for the patient
+
+    This endpoint uses the user_entity_id header to determine which entity (patient)
+    the user is operating as. This simplifies permission checks.
     """
     try:
         chat = db.query(Chat).filter(Chat.id == chat_id).first()
@@ -527,15 +507,8 @@ async def activate_chat_for_patient(
             # Admins can activate any chat
             pass
         elif current_user.role == UserRole.PATIENT:
-            # Patients can activate their chats
-            # First try to get patient by user_id
-            patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
-
-            # If not found, try to get patient by profile_id
-            if not patient and current_user.profile_id:
-                patient = db.query(Patient).filter(Patient.id == current_user.profile_id).first()
-
-            if not patient or patient.id != chat.patient_id:
+            # Check if patient has access to this chat using user_entity_id
+            if user_entity_id != chat.patient_id:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=create_error_response(
@@ -576,7 +549,7 @@ async def activate_chat_for_patient(
 async def delete_chat(
     chat_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_admin_user)
+    _: User = Depends(get_admin_user)  # Using _ to indicate unused parameter
 ):
     """
     Delete a chat (admin only)
@@ -601,10 +574,14 @@ async def get_chat_messages(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ) -> Any:
     """
     Get all messages for a specific chat
+
+    This endpoint uses the user_entity_id header to determine which entity (doctor, patient)
+    the user is operating as. This simplifies permission checks.
     """
     try:
         # Check if chat exists
@@ -624,15 +601,8 @@ async def get_chat_messages(
             # Admins can access any chat
             pass
         elif current_user.role == UserRole.DOCTOR:
-            # Doctors can access their chats
-            # First try to get doctor by user_id
-            doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
-
-            # If not found, try to get doctor by profile_id
-            if not doctor and current_user.profile_id:
-                doctor = db.query(Doctor).filter(Doctor.id == current_user.profile_id).first()
-
-            if not doctor or doctor.id != chat.doctor_id:
+            # Check if doctor has access to this chat using user_entity_id
+            if user_entity_id != chat.doctor_id:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=create_error_response(
@@ -641,16 +611,11 @@ async def get_chat_messages(
                         error_code=ErrorCode.AUTH_004
                     )
                 )
+
+            # Messages should be accessible regardless of chat active status
         elif current_user.role == UserRole.PATIENT:
-            # Patients can access their chats
-            # First try to get patient by user_id
-            patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
-
-            # If not found, try to get patient by profile_id
-            if not patient and current_user.profile_id:
-                patient = db.query(Patient).filter(Patient.id == current_user.profile_id).first()
-
-            if not patient or patient.id != chat.patient_id:
+            # Check if patient has access to this chat using user_entity_id
+            if user_entity_id != chat.patient_id:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=create_error_response(
@@ -659,6 +624,8 @@ async def get_chat_messages(
                         error_code=ErrorCode.AUTH_004
                     )
                 )
+
+            # Messages should be accessible regardless of chat active status
         else:
             # Hospitals and other roles don't have access to chats
             raise HTTPException(

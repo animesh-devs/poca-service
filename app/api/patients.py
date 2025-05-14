@@ -68,12 +68,16 @@ async def get_case_history(
 
         # Check if current user is authorized to view this patient's case history
         if current_user.role == UserRole.PATIENT:
-            # First try to get patient by user_id
-            current_patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
-
-            # If not found, try to get patient by profile_id
-            if not current_patient and current_user.profile_id:
+            # First try to get patient by profile_id (preferred way)
+            if current_user.profile_id:
                 current_patient = db.query(Patient).filter(Patient.id == current_user.profile_id).first()
+            else:
+                # Try to find patient by user_id
+                current_patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+
+                # If not found, try to find by direct ID match
+                if not current_patient:
+                    current_patient = db.query(Patient).filter(Patient.id == current_user.id).first()
 
             if not current_patient or current_patient.id != patient_id:
                 raise HTTPException(
@@ -364,12 +368,16 @@ async def get_patient_documents(
 
         # Check if current user is authorized to view this patient's documents
         if current_user.role == UserRole.PATIENT:
-            # First try to get patient by user_id
-            current_patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
-
-            # If not found, try to get patient by profile_id
-            if not current_patient and current_user.profile_id:
+            # First try to get patient by profile_id (preferred way)
+            if current_user.profile_id:
                 current_patient = db.query(Patient).filter(Patient.id == current_user.profile_id).first()
+            else:
+                # Try to find patient by user_id
+                current_patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+
+                # If not found, try to find by direct ID match
+                if not current_patient:
+                    current_patient = db.query(Patient).filter(Patient.id == current_user.id).first()
 
             if not current_patient or current_patient.id != patient_id:
                 raise HTTPException(
@@ -493,12 +501,16 @@ async def get_patient_reports(
 
         # Check if current user is authorized to view this patient's reports
         if current_user.role == UserRole.PATIENT:
-            # First try to get patient by user_id
-            current_patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
-
-            # If not found, try to get patient by profile_id
-            if not current_patient and current_user.profile_id:
+            # First try to get patient by profile_id (preferred way)
+            if current_user.profile_id:
                 current_patient = db.query(Patient).filter(Patient.id == current_user.profile_id).first()
+            else:
+                # Try to find patient by user_id
+                current_patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+
+                # If not found, try to find by direct ID match
+                if not current_patient:
+                    current_patient = db.query(Patient).filter(Patient.id == current_user.id).first()
 
             if not current_patient or current_patient.id != patient_id:
                 raise HTTPException(

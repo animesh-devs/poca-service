@@ -1,13 +1,17 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Header, Request
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from typing import Optional, Union, List
+import logging
 
 from app.db.database import get_db
 from app.config import settings
 from app.models.user import User, UserRole
+from app.models.doctor import Doctor
+from app.models.patient import Patient
+from app.models.hospital import Hospital
 from app.errors import ErrorCode, create_error_response
 
 # OAuth2 scheme for token authentication
@@ -194,6 +198,165 @@ async def get_hospital_user(current_user: User = Depends(get_current_user)) -> U
             )
         )
     return current_user
+
+async def get_user_entity_id(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> str:
+    """
+    Get and validate the user_entity_id header.
+
+    This header contains the ID of the entity (doctor, patient, hospital) that the user
+    is currently operating as. It simplifies permission checks by allowing direct comparison
+    with resource IDs.
+
+    Entity relationships:
+    - User-Doctor: 1:1 mapping (doctor.id == user.profile_id)
+    - User-Patient: 1:n mapping (through user_patient_relations table)
+    - User-Hospital: 1:1 mapping (hospital.id == user.profile_id)
+
+    Returns:
+        str: The validated entity ID
+
+    Raises:
+        HTTPException: If the header is missing or invalid for the user's role
+    """
+    # Get the user_entity_id from the header
+    user_entity_id = request.headers.get("user-entity-id")
+    logger = logging.getLogger(__name__)
+
+    logger.info(f"Role: {current_user.role}, User ID: {current_user.id}.")
+
+    # If header is not provided, try to use profile_id or find the appropriate entity
+    if not user_entity_id:
+        # For doctor and hospital roles, we can use profile_id
+        if current_user.role in [UserRole.DOCTOR, UserRole.HOSPITAL] and current_user.profile_id:
+            logger.info(f"Using profile_id {current_user.profile_id} for user {current_user.id}")
+            return current_user.profile_id
+
+        # For patient role, we need to check the user_patient_relations table
+        elif current_user.role == UserRole.PATIENT:
+            # Import here to avoid circular imports
+            from app.models.mapping import UserPatientRelation, RelationType
+
+            # Try to find the "self" relation first
+            self_relation = db.query(UserPatientRelation).filter(
+                UserPatientRelation.user_id == current_user.id,
+                UserPatientRelation.relation == RelationType.SELF
+            ).first()
+
+            if self_relation:
+                logger.info(f"Found self patient relation {self_relation.patient_id} for user {current_user.id}")
+                return self_relation.patient_id
+
+            # If no self relation, get the first patient relation
+            any_relation = db.query(UserPatientRelation).filter(
+                UserPatientRelation.user_id == current_user.id
+            ).first()
+
+            if any_relation:
+                logger.info(f"Found patient relation {any_relation.patient_id} for user {current_user.id}")
+                return any_relation.patient_id
+
+        # For admin role, we can use the user's ID
+        elif current_user.role == UserRole.ADMIN:
+            logger.info(f"Using admin user ID {current_user.id} as entity ID")
+            return current_user.id
+
+        # If we couldn't determine an entity ID, require the header
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=create_error_response(
+                status_code=status.HTTP_403_FORBIDDEN,
+                message="user-entity-id header is required for this operation",
+                error_code=ErrorCode.AUTH_004
+            )
+        )
+
+    # Validate that the entity ID is appropriate for the user's role
+    if current_user.role == UserRole.ADMIN:
+        # Admins can use any entity ID
+        logger.info(f"Admin user {current_user.id} using entity ID {user_entity_id}")
+        return user_entity_id
+
+    elif current_user.role == UserRole.DOCTOR:
+        # Doctor has 1:1 mapping with user
+        # Validate that the entity ID belongs to this doctor
+        if current_user.profile_id and current_user.profile_id == user_entity_id:
+            logger.info(f"Doctor user {current_user.id} using profile_id {user_entity_id}")
+            return user_entity_id
+
+        doctor = db.query(Doctor).filter(
+            Doctor.id == user_entity_id,
+            Doctor.user_id == current_user.id
+        ).first()
+
+        if not doctor:
+            logger.warning(f"Invalid doctor entity ID {user_entity_id} for user {current_user.id}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=create_error_response(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    message="Invalid entity ID for this user",
+                    error_code=ErrorCode.AUTH_004
+                )
+            )
+
+        logger.info(f"Doctor user {current_user.id} using entity ID {user_entity_id}")
+        return user_entity_id
+
+    elif current_user.role == UserRole.PATIENT:
+        # Patient has 1:n mapping with user through user_patient_relations
+        # Validate that the entity ID belongs to a patient related to this user
+        from app.models.mapping import UserPatientRelation
+
+        relation = db.query(UserPatientRelation).filter(
+            UserPatientRelation.user_id == current_user.id,
+            UserPatientRelation.patient_id == user_entity_id
+        ).first()
+
+        if not relation:
+            logger.warning(f"Invalid patient entity ID {user_entity_id} for user {current_user.id}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=create_error_response(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    message="Invalid entity ID for this user",
+                    error_code=ErrorCode.AUTH_004
+                )
+            )
+
+        logger.info(f"Patient user {current_user.id} using entity ID {user_entity_id} with relation {relation.relation}")
+        return user_entity_id
+
+    elif current_user.role == UserRole.HOSPITAL:
+        # Hospital has 1:1 mapping with user
+        # Validate that the entity ID belongs to this hospital
+        if current_user.profile_id and current_user.profile_id == user_entity_id:
+            logger.info(f"Hospital user {current_user.id} using profile_id {user_entity_id}")
+            return user_entity_id
+
+        hospital = db.query(Hospital).filter(
+            Hospital.id == user_entity_id,
+            Hospital.user_id == current_user.id
+        ).first()
+
+        if not hospital:
+            logger.warning(f"Invalid hospital entity ID {user_entity_id} for user {current_user.id}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=create_error_response(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    message="Invalid entity ID for this user",
+                    error_code=ErrorCode.AUTH_004
+                )
+            )
+
+        logger.info(f"Hospital user {current_user.id} using entity ID {user_entity_id}")
+        return user_entity_id
+
+    return user_entity_id
 
 async def get_current_user_ws(token: str, db: Session) -> Optional[User]:
     """Get the current user from a WebSocket connection"""

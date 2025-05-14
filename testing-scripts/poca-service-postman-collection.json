@@ -4,6 +4,34 @@
     "description": "A comprehensive collection for testing the POCA (Patient-Doctor Chat Assistant) service API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Add user-entity-id header to all requests if it exists in the environment",
+          "const userEntityId = pm.environment.get('userEntityId');",
+          "const userRole = pm.environment.get('userRole');",
+          "",
+          "if (userEntityId) {",
+          "    // Add or update the user-entity-id header",
+          "    pm.request.headers.upsert({",
+          "        key: 'user-entity-id',",
+          "        value: userEntityId",
+          "    });",
+          "    console.log(`[${pm.info.requestName}] Added user-entity-id header: ${userEntityId} (Role: ${userRole || 'unknown'})`);",
+          "} else {",
+          "    console.warn(`[${pm.info.requestName}] No userEntityId found in environment. The user-entity-id header will not be added.`);",
+          "    console.warn('Available environment variables:', Object.keys(pm.environment.toObject()).join(', '));",
+          "}",
+          "",
+          "// Log all headers for debugging",
+          "console.log(`[${pm.info.requestName}] Request headers:`, pm.request.headers.all().map(h => `${h.key}: ${h.value}`).join(', '));"
+        ]
+      }
+    }
+  ],
   "item": [
     {
       "name": "Health Checks",
@@ -72,7 +100,8 @@
                   "    ",
                   "    if (jsonData.user_id) {",
                   "        pm.environment.set(\"userId\", jsonData.user_id);",
-                  "        console.log('Set userId:', jsonData.user_id);",
+                  "        pm.environment.set(\"userEntityId\", jsonData.user_id);",
+                  "        console.log('Set userId and userEntityId:', jsonData.user_id);",
                   "    }",
                   "    ",
                   "    if (jsonData.role) {",
@@ -185,7 +214,8 @@
                   "    if (jsonData.user_id) {",
                   "        pm.environment.set(\"userId\", jsonData.user_id);",
                   "        pm.environment.set(\"doctorId\", jsonData.user_id);",
-                  "        console.log('Set userId and doctorId:', jsonData.user_id);",
+                  "        pm.environment.set(\"userEntityId\", jsonData.user_id);",
+                  "        console.log('Set userId, doctorId, and userEntityId:', jsonData.user_id);",
                   "    }",
                   "    ",
                   "    if (jsonData.role) {",
@@ -257,7 +287,8 @@
                   "    if (jsonData.user_id) {",
                   "        pm.environment.set(\"userId\", jsonData.user_id);",
                   "        pm.environment.set(\"patientId\", jsonData.user_id);",
-                  "        console.log('Set userId and patientId:', jsonData.user_id);",
+                  "        pm.environment.set(\"userEntityId\", jsonData.user_id);",
+                  "        console.log('Set userId, patientId, and userEntityId:', jsonData.user_id);",
                   "    }",
                   "    ",
                   "    if (jsonData.role) {",
@@ -329,7 +360,8 @@
                   "    if (jsonData.user_id) {",
                   "        pm.environment.set(\"userId\", jsonData.user_id);",
                   "        pm.environment.set(\"hospitalId\", jsonData.user_id);",
-                  "        console.log('Set userId and hospitalId:', jsonData.user_id);",
+                  "        pm.environment.set(\"userEntityId\", jsonData.user_id);",
+                  "        console.log('Set userId, hospitalId, and userEntityId:', jsonData.user_id);",
                   "    }",
                   "    ",
                   "    if (jsonData.role) {",
@@ -434,7 +466,8 @@
                   "    ",
                   "    if (jsonData.user_id) {",
                   "        pm.environment.set(\"userId\", jsonData.user_id);",
-                  "        console.log('Set userId:', jsonData.user_id);",
+                  "        pm.environment.set(\"userEntityId\", jsonData.user_id);",
+                  "        console.log('Set userId and userEntityId:', jsonData.user_id);",
                   "    }",
                   "    ",
                   "    if (jsonData.role) {",
@@ -1878,6 +1911,10 @@
               {
                 "key": "Authorization",
                 "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "user-entity-id",
+                "value": "{{userEntityId}}"
               }
             ],
             "url": {
@@ -1963,6 +2000,10 @@
               {
                 "key": "Authorization",
                 "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "user-entity-id",
+                "value": "{{userEntityId}}"
               }
             ],
             "url": {
@@ -2140,12 +2181,12 @@
                 }
               ]
             },
-            "description": "WebSocket endpoint for real-time chat (use in Postman WebSocket client)"
+            "description": "WebSocket endpoint for real-time chat between users (doctor-patient). This endpoint allows for bidirectional communication in a specific chat room. To use this in Postman, switch to the WebSocket client mode and connect to this URL. Messages should be sent in JSON format with a structure like: {\"content\": \"Hello, this is a real-time message\", \"message_type\": \"text\"}. All participants in the same chat room will receive the messages."
           },
           "response": []
         }
       ],
-      "description": "Chat management endpoints"
+      "description": "Chat management endpoints, including REST APIs and WebSocket for real-time communication between users"
     },
     {
       "name": "Appointments",
@@ -2481,6 +2522,35 @@
           "name": "Send Message",
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Set the correct receiver ID based on the user's role",
+                  "const userRole = pm.environment.get('userRole');",
+                  "const doctorId = pm.environment.get('doctorId');",
+                  "const patientId = pm.environment.get('patientId');",
+                  "",
+                  "// If the user is a doctor, set the receiver to the patient",
+                  "if (userRole === 'doctor') {",
+                  "    pm.environment.set('receiverId', patientId);",
+                  "    console.log('Set receiverId to patientId:', patientId);",
+                  "}",
+                  "// If the user is a patient, set the receiver to the doctor",
+                  "else if (userRole === 'patient') {",
+                  "    pm.environment.set('receiverId', doctorId);",
+                  "    console.log('Set receiverId to doctorId:', doctorId);",
+                  "}",
+                  "// If the user is an admin, they can send to either",
+                  "else if (userRole === 'admin') {",
+                  "    // Default to sending to the doctor",
+                  "    pm.environment.set('receiverId', doctorId);",
+                  "    console.log('Set receiverId to doctorId (admin default):', doctorId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "exec": [
@@ -2515,11 +2585,15 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "user-entity-id",
+                "value": "{{userEntityId}}"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"chat_id\": \"{{chatId}}\",\n  \"content\": \"Hello, this is a test message.\",\n  \"message_type\": \"text\"\n}"
+              "raw": "{\n  \"chat_id\": \"{{chatId}}\",\n  \"sender_id\": \"{{userEntityId}}\",\n  \"receiver_id\": \"{{receiverId}}\",\n  \"message\": \"Hello, this is a test message.\",\n  \"message_type\": \"text\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/messages",
@@ -3018,7 +3092,7 @@
                 }
               ]
             },
-            "description": "WebSocket endpoint for real-time AI chat (use in Postman WebSocket client)"
+            "description": "WebSocket endpoint for real-time AI chat. This endpoint allows for bidirectional communication with the AI assistant in a specific session. First create an AI session using the 'Create AI Session' endpoint to get a session ID. To use this in Postman, switch to the WebSocket client mode and connect to this URL. Messages should be sent in JSON format with a structure like: {\"message\": \"What are the symptoms of the flu?\"}. The AI will process your message and stream responses back in real-time."
           },
           "response": []
         },
@@ -3093,7 +3167,7 @@
           "response": []
         }
       ],
-      "description": "AI assistant endpoints"
+      "description": "AI assistant endpoints, including REST APIs and WebSocket for real-time communication with the AI"
     }
   ],
   "variable": [

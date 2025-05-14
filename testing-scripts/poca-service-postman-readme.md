@@ -68,7 +68,11 @@ Follow this sequence to test the complete flow:
 
 ### WebSocket Testing
 
-For testing the WebSocket endpoint:
+The POCA service provides two WebSocket endpoints for real-time communication:
+
+#### AI Assistant WebSocket
+
+For testing the AI Assistant WebSocket endpoint:
 
 1. Create an AI session using the "Create AI Session" request
 2. Copy the `aiSessionId` from the response
@@ -83,6 +87,27 @@ For testing the WebSocket endpoint:
      "message": "Hello, I'm not feeling well today."
    }
    ```
+7. The AI will process your message and stream responses back in real-time
+
+#### Chat WebSocket
+
+For testing the Chat WebSocket endpoint (for doctor-patient communication):
+
+1. Create a chat using the "Create Chat" request or use an existing chat
+2. Copy the `chatId` from the response
+3. In Postman, click on "New" > "WebSocket Request"
+4. Enter the WebSocket URL: `ws://localhost:8000/api/v1/chats/ws/{chatId}?token={authToken}`
+   - Replace `{chatId}` with the actual chat ID
+   - Replace `{authToken}` with the actual token
+5. Connect to the WebSocket
+6. Send messages in JSON format:
+   ```json
+   {
+     "content": "Hello, this is a real-time message",
+     "message_type": "text"
+   }
+   ```
+7. All participants in the same chat room will receive the messages
 
 ## Environment Variables
 
@@ -127,9 +152,11 @@ The collection is organized into the following categories:
 
 8. **Chats**
    - Get All Chats, Get Chat by ID, Create Chat, Get Chat Messages
+   - WebSocket Connection for real-time chat between users
 
 9. **Messages**
    - Send Message, Update Read Status
 
 10. **AI Assistant**
-    - Create AI Session, Send Message to AI, Get AI Session Messages, End AI Session, Update AI Summary, WebSocket Connection
+    - Create AI Session, Send Message to AI, Get AI Session Messages, End AI Session, Update AI Summary
+    - WebSocket Connection for real-time AI chat

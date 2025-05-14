@@ -145,12 +145,16 @@ async def get_appointment(
                 )
         elif current_user.role == UserRole.PATIENT:
             # Patients can access their appointments
-            # First try to get patient by user_id
-            patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
-
-            # If not found, try to get patient by profile_id
-            if not patient and current_user.profile_id:
+            # First try to get patient by profile_id (preferred way)
+            if current_user.profile_id:
                 patient = db.query(Patient).filter(Patient.id == current_user.profile_id).first()
+            else:
+                # Try to find patient by user_id
+                patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+
+                # If not found, try to find by direct ID match
+                if not patient:
+                    patient = db.query(Patient).filter(Patient.id == current_user.id).first()
 
             if not patient or patient.id != appointment.patient_id:
                 raise HTTPException(
@@ -296,8 +300,23 @@ async def cancel_appointment(
             )
     elif current_user.role == UserRole.PATIENT:
         # Patients can cancel their appointments
-        patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
-        if not patient or patient.id != appointment.patient_id:
+        patient_id = None
+
+        # First try to get patient by profile_id (preferred way)
+        if current_user.profile_id:
+            patient_id = current_user.profile_id
+        else:
+            # Try to find patient by user_id
+            patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+
+            # If not found, try to find by direct ID match
+            if not patient:
+                patient = db.query(Patient).filter(Patient.id == current_user.id).first()
+
+            if patient:
+                patient_id = patient.id
+
+        if not patient_id or patient_id != appointment.patient_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=create_error_response(
@@ -369,12 +388,16 @@ async def cancel_appointment_with_reason(
                 )
         elif current_user.role == UserRole.PATIENT:
             # Patients can cancel their appointments
-            # First try to get patient by user_id
-            patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
-
-            # If not found, try to get patient by profile_id
-            if not patient and current_user.profile_id:
+            # First try to get patient by profile_id (preferred way)
+            if current_user.profile_id:
                 patient = db.query(Patient).filter(Patient.id == current_user.profile_id).first()
+            else:
+                # Try to find patient by user_id
+                patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+
+                # If not found, try to find by direct ID match
+                if not patient:
+                    patient = db.query(Patient).filter(Patient.id == current_user.id).first()
 
             if not patient or patient.id != appointment.patient_id:
                 raise HTTPException(
@@ -482,12 +505,16 @@ async def get_doctor_appointments(
                 )
         elif current_user.role == UserRole.PATIENT:
             # Patients can view appointments with their doctors
-            # First try to get patient by user_id
-            patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
-
-            # If not found, try to get patient by profile_id
-            if not patient and current_user.profile_id:
+            # First try to get patient by profile_id (preferred way)
+            if current_user.profile_id:
                 patient = db.query(Patient).filter(Patient.id == current_user.profile_id).first()
+            else:
+                # Try to find patient by user_id
+                patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+
+                # If not found, try to find by direct ID match
+                if not patient:
+                    patient = db.query(Patient).filter(Patient.id == current_user.id).first()
 
             if not patient:
                 raise HTTPException(
@@ -640,12 +667,16 @@ async def get_patient_appointments(
                 )
         elif current_user.role == UserRole.PATIENT:
             # Patients can only view their own appointments
-            # First try to get patient by user_id
-            current_patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
-
-            # If not found, try to get patient by profile_id
-            if not current_patient and current_user.profile_id:
+            # First try to get patient by profile_id (preferred way)
+            if current_user.profile_id:
                 current_patient = db.query(Patient).filter(Patient.id == current_user.profile_id).first()
+            else:
+                # Try to find patient by user_id
+                current_patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+
+                # If not found, try to find by direct ID match
+                if not current_patient:
+                    current_patient = db.query(Patient).filter(Patient.id == current_user.id).first()
 
             if not current_patient or current_patient.id != patient_id:
                 raise HTTPException(
@@ -840,12 +871,16 @@ async def update_appointment_status(
                 )
         elif current_user.role == UserRole.PATIENT:
             # Patients can only cancel their own appointments
-            # First try to get patient by user_id
-            patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
-
-            # If not found, try to get patient by profile_id
-            if not patient and current_user.profile_id:
+            # First try to get patient by profile_id (preferred way)
+            if current_user.profile_id:
                 patient = db.query(Patient).filter(Patient.id == current_user.profile_id).first()
+            else:
+                # Try to find patient by user_id
+                patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+
+                # If not found, try to find by direct ID match
+                if not patient:
+                    patient = db.query(Patient).filter(Patient.id == current_user.id).first()
 
             if not patient or patient.id != appointment.patient_id:
                 raise HTTPException(
