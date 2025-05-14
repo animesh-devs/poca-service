@@ -27,6 +27,13 @@ class UserCreate(BaseModel):
     contact: Optional[str] = None
     address: Optional[str] = None
 
+class AdminSignup(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    name: Optional[str] = None
+    contact: Optional[str] = None
+    address: Optional[str] = None
+
 class DoctorSignup(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)

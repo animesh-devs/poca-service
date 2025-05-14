@@ -52,11 +52,37 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "var jsonData = pm.response.json();",
-                  "pm.environment.set(\"authToken\", jsonData.access_token);",
-                  "pm.environment.set(\"refreshToken\", jsonData.refresh_token);",
-                  "pm.environment.set(\"userId\", jsonData.user_id);",
-                  "pm.environment.set(\"userRole\", jsonData.role);"
+                  "// Check if the response is valid JSON",
+                  "try {",
+                  "    var jsonData = pm.response.json();",
+                  "    console.log('Response data:', jsonData);",
+                  "    ",
+                  "    // Set environment variables if the response contains the expected fields",
+                  "    if (jsonData.access_token) {",
+                  "        pm.environment.set(\"authToken\", jsonData.access_token);",
+                  "        console.log('Set authToken:', jsonData.access_token);",
+                  "    } else {",
+                  "        console.error('access_token not found in response');",
+                  "    }",
+                  "    ",
+                  "    if (jsonData.refresh_token) {",
+                  "        pm.environment.set(\"refreshToken\", jsonData.refresh_token);",
+                  "        console.log('Set refreshToken:', jsonData.refresh_token);",
+                  "    }",
+                  "    ",
+                  "    if (jsonData.user_id) {",
+                  "        pm.environment.set(\"userId\", jsonData.user_id);",
+                  "        console.log('Set userId:', jsonData.user_id);",
+                  "    }",
+                  "    ",
+                  "    if (jsonData.role) {",
+                  "        pm.environment.set(\"userRole\", jsonData.role);",
+                  "        console.log('Set userRole:', jsonData.role);",
+                  "    }",
+                  "} catch (e) {",
+                  "    console.error('Error parsing response as JSON:', e.message);",
+                  "    console.log('Response body:', pm.response.text());",
+                  "}"
                 ],
                 "type": "text/javascript"
               }
@@ -133,6 +159,48 @@
         },
         {
           "name": "Doctor Signup",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Check if the response is valid JSON",
+                  "try {",
+                  "    var jsonData = pm.response.json();",
+                  "    console.log('Response data:', jsonData);",
+                  "    ",
+                  "    // Set environment variables if the response contains the expected fields",
+                  "    if (jsonData.access_token) {",
+                  "        pm.environment.set(\"authToken\", jsonData.access_token);",
+                  "        console.log('Set authToken:', jsonData.access_token);",
+                  "    } else {",
+                  "        console.error('access_token not found in response');",
+                  "    }",
+                  "    ",
+                  "    if (jsonData.refresh_token) {",
+                  "        pm.environment.set(\"refreshToken\", jsonData.refresh_token);",
+                  "        console.log('Set refreshToken:', jsonData.refresh_token);",
+                  "    }",
+                  "    ",
+                  "    if (jsonData.user_id) {",
+                  "        pm.environment.set(\"userId\", jsonData.user_id);",
+                  "        pm.environment.set(\"doctorId\", jsonData.user_id);",
+                  "        console.log('Set userId and doctorId:', jsonData.user_id);",
+                  "    }",
+                  "    ",
+                  "    if (jsonData.role) {",
+                  "        pm.environment.set(\"userRole\", jsonData.role);",
+                  "        console.log('Set userRole:', jsonData.role);",
+                  "    }",
+                  "} catch (e) {",
+                  "    console.error('Error parsing response as JSON:', e.message);",
+                  "    console.log('Response body:', pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -163,6 +231,48 @@
         },
         {
           "name": "Patient Signup",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Check if the response is valid JSON",
+                  "try {",
+                  "    var jsonData = pm.response.json();",
+                  "    console.log('Response data:', jsonData);",
+                  "    ",
+                  "    // Set environment variables if the response contains the expected fields",
+                  "    if (jsonData.access_token) {",
+                  "        pm.environment.set(\"authToken\", jsonData.access_token);",
+                  "        console.log('Set authToken:', jsonData.access_token);",
+                  "    } else {",
+                  "        console.error('access_token not found in response');",
+                  "    }",
+                  "    ",
+                  "    if (jsonData.refresh_token) {",
+                  "        pm.environment.set(\"refreshToken\", jsonData.refresh_token);",
+                  "        console.log('Set refreshToken:', jsonData.refresh_token);",
+                  "    }",
+                  "    ",
+                  "    if (jsonData.user_id) {",
+                  "        pm.environment.set(\"userId\", jsonData.user_id);",
+                  "        pm.environment.set(\"patientId\", jsonData.user_id);",
+                  "        console.log('Set userId and patientId:', jsonData.user_id);",
+                  "    }",
+                  "    ",
+                  "    if (jsonData.role) {",
+                  "        pm.environment.set(\"userRole\", jsonData.role);",
+                  "        console.log('Set userRole:', jsonData.role);",
+                  "    }",
+                  "} catch (e) {",
+                  "    console.error('Error parsing response as JSON:', e.message);",
+                  "    console.log('Response body:', pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -193,6 +303,48 @@
         },
         {
           "name": "Hospital Signup",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Check if the response is valid JSON",
+                  "try {",
+                  "    var jsonData = pm.response.json();",
+                  "    console.log('Response data:', jsonData);",
+                  "    ",
+                  "    // Set environment variables if the response contains the expected fields",
+                  "    if (jsonData.access_token) {",
+                  "        pm.environment.set(\"authToken\", jsonData.access_token);",
+                  "        console.log('Set authToken:', jsonData.access_token);",
+                  "    } else {",
+                  "        console.error('access_token not found in response');",
+                  "    }",
+                  "    ",
+                  "    if (jsonData.refresh_token) {",
+                  "        pm.environment.set(\"refreshToken\", jsonData.refresh_token);",
+                  "        console.log('Set refreshToken:', jsonData.refresh_token);",
+                  "    }",
+                  "    ",
+                  "    if (jsonData.user_id) {",
+                  "        pm.environment.set(\"userId\", jsonData.user_id);",
+                  "        pm.environment.set(\"hospitalId\", jsonData.user_id);",
+                  "        console.log('Set userId and hospitalId:', jsonData.user_id);",
+                  "    }",
+                  "    ",
+                  "    if (jsonData.role) {",
+                  "        pm.environment.set(\"userRole\", jsonData.role);",
+                  "        console.log('Set userRole:', jsonData.role);",
+                  "    }",
+                  "} catch (e) {",
+                  "    console.error('Error parsing response as JSON:', e.message);",
+                  "    console.log('Response body:', pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -252,6 +404,77 @@
               ]
             },
             "description": "Create a new user (admin only)"
+          },
+          "response": []
+        },
+        {
+          "name": "Admin Signup",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Check if the response is valid JSON",
+                  "try {",
+                  "    var jsonData = pm.response.json();",
+                  "    console.log('Response data:', jsonData);",
+                  "    ",
+                  "    // Set environment variables if the response contains the expected fields",
+                  "    if (jsonData.access_token) {",
+                  "        pm.environment.set(\"authToken\", jsonData.access_token);",
+                  "        console.log('Set authToken:', jsonData.access_token);",
+                  "    } else {",
+                  "        console.error('access_token not found in response');",
+                  "    }",
+                  "    ",
+                  "    if (jsonData.refresh_token) {",
+                  "        pm.environment.set(\"refreshToken\", jsonData.refresh_token);",
+                  "        console.log('Set refreshToken:', jsonData.refresh_token);",
+                  "    }",
+                  "    ",
+                  "    if (jsonData.user_id) {",
+                  "        pm.environment.set(\"userId\", jsonData.user_id);",
+                  "        console.log('Set userId:', jsonData.user_id);",
+                  "    }",
+                  "    ",
+                  "    if (jsonData.role) {",
+                  "        pm.environment.set(\"userRole\", jsonData.role);",
+                  "        console.log('Set userRole:', jsonData.role);",
+                  "    }",
+                  "} catch (e) {",
+                  "    console.error('Error parsing response as JSON:', e.message);",
+                  "    console.log('Response body:', pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Admin User\",\n  \"email\": \"admin@example.com\",\n  \"password\": \"admin123\",\n  \"contact\": \"+1234567890\",\n  \"address\": \"123 Admin St, Anytown, USA\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/admin-signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "admin-signup"
+              ]
+            },
+            "description": "Create a new admin user (public endpoint)"
           },
           "response": []
         }
@@ -1593,6 +1816,32 @@
         },
         {
           "name": "Create Chat",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Check if the response is valid JSON",
+                  "try {",
+                  "    var jsonData = pm.response.json();",
+                  "    console.log('Response data:', jsonData);",
+                  "    ",
+                  "    // Set environment variables if the response contains the expected fields",
+                  "    if (jsonData.id) {",
+                  "        pm.environment.set(\"chatId\", jsonData.id);",
+                  "        console.log('Set chatId:', jsonData.id);",
+                  "    } else {",
+                  "        console.error('id not found in response');",
+                  "    }",
+                  "} catch (e) {",
+                  "    console.error('Error parsing response as JSON:', e.message);",
+                  "    console.log('Response body:', pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -1607,7 +1856,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"doctor_id\": \"{{doctorId}}\",\n  \"patient_id\": \"{{patientId}}\",\n  \"is_active\": true\n}"
+              "raw": "{\n  \"doctor_id\": \"{{doctorId}}\",\n  \"patient_id\": \"{{patientId}}\",\n  \"title\": \"Initial Consultation\",\n  \"is_active\": true\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/chats",
@@ -1740,6 +1989,32 @@
       "item": [
         {
           "name": "Create Appointment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Check if the response is valid JSON",
+                  "try {",
+                  "    var jsonData = pm.response.json();",
+                  "    console.log('Response data:', jsonData);",
+                  "    ",
+                  "    // Set environment variables if the response contains the expected fields",
+                  "    if (jsonData.id) {",
+                  "        pm.environment.set(\"appointmentId\", jsonData.id);",
+                  "        console.log('Set appointmentId:', jsonData.id);",
+                  "    } else {",
+                  "        console.error('id not found in response');",
+                  "    }",
+                  "} catch (e) {",
+                  "    console.error('Error parsing response as JSON:', e.message);",
+                  "    console.log('Response body:', pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -2041,6 +2316,32 @@
       "item": [
         {
           "name": "Send Message",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Check if the response is valid JSON",
+                  "try {",
+                  "    var jsonData = pm.response.json();",
+                  "    console.log('Response data:', jsonData);",
+                  "    ",
+                  "    // Set environment variables if the response contains the expected fields",
+                  "    if (jsonData.id) {",
+                  "        pm.environment.set(\"messageId\", jsonData.id);",
+                  "        console.log('Set messageId:', jsonData.id);",
+                  "    } else {",
+                  "        console.error('id not found in response');",
+                  "    }",
+                  "} catch (e) {",
+                  "    console.error('Error parsing response as JSON:', e.message);",
+                  "    console.log('Response body:', pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -2174,6 +2475,32 @@
       "item": [
         {
           "name": "Create Suggestion",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Check if the response is valid JSON",
+                  "try {",
+                  "    var jsonData = pm.response.json();",
+                  "    console.log('Response data:', jsonData);",
+                  "    ",
+                  "    // Set environment variables if the response contains the expected fields",
+                  "    if (jsonData.id) {",
+                  "        pm.environment.set(\"suggestionId\", jsonData.id);",
+                  "        console.log('Set suggestionId:', jsonData.id);",
+                  "    } else {",
+                  "        console.error('id not found in response');",
+                  "    }",
+                  "} catch (e) {",
+                  "    console.error('Error parsing response as JSON:', e.message);",
+                  "    console.log('Response body:', pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -2355,6 +2682,32 @@
       "item": [
         {
           "name": "Create AI Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Check if the response is valid JSON",
+                  "try {",
+                  "    var jsonData = pm.response.json();",
+                  "    console.log('Response data:', jsonData);",
+                  "    ",
+                  "    // Set environment variables if the response contains the expected fields",
+                  "    if (jsonData.id) {",
+                  "        pm.environment.set(\"aiSessionId\", jsonData.id);",
+                  "        console.log('Set aiSessionId:', jsonData.id);",
+                  "    } else {",
+                  "        console.error('id not found in response');",
+                  "    }",
+                  "} catch (e) {",
+                  "    console.error('Error parsing response as JSON:', e.message);",
+                  "    console.log('Response body:', pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -2477,42 +2830,7 @@
           },
           "response": []
         },
-        {
-          "name": "Update AI Summary",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"summary\": \"Patient reported flu-like symptoms including fever, headache, and fatigue.\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/ai/sessions/{{aiSessionId}}/summary",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "ai",
-                "sessions",
-                "{{aiSessionId}}",
-                "summary"
-              ]
-            },
-            "description": "Update the summary for an AI session"
-          },
-          "response": []
-        },
+
         {
           "name": "WebSocket Connection",
           "request": {

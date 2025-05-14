@@ -13,7 +13,7 @@ from app.models.patient import Patient
 from app.models.hospital import Hospital
 from app.schemas.auth import (
     Token, TokenPayload, UserCreate, UserLogin, RefreshToken,
-    DoctorSignup, PatientSignup, HospitalSignup
+    DoctorSignup, PatientSignup, HospitalSignup, AdminSignup
 )
 from app.dependencies import (
     get_admin_user, create_access_token, create_refresh_token
@@ -64,6 +64,74 @@ async def signup(
         hashed_password=hashed_password,
         name=user_data.name,
         role=user_data.role,
+        contact=user_data.contact,
+        address=user_data.address
+    )
+
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+
+    # Create access and refresh tokens
+    access_token = create_access_token(
+        data={"sub": db_user.id},
+        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+    refresh_token = create_refresh_token(data={"sub": db_user.id})
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "user_id": db_user.id,
+        "role": db_user.role
+    }
+
+@router.post("/admin-signup", response_model=Token)
+async def admin_signup(
+    user_data: AdminSignup,
+    db: Session = Depends(get_db)
+) -> Any:
+    """
+    Create a new admin user (public endpoint, but should be secured in production)
+    """
+    # Check if user with this email already exists
+    db_user = db.query(User).filter(User.email == user_data.email).first()
+    if db_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=create_error_response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message="Email already registered",
+                error_code=ErrorCode.RES_002
+            )
+        )
+
+    # Check if there are any existing admin users
+    existing_admin = db.query(User).filter(User.role == UserRole.ADMIN).first()
+
+    # In production, you might want to restrict this endpoint if admins already exist
+    # or implement additional security measures
+    if existing_admin:
+        # For security, you might want to uncomment this in production
+        # raise HTTPException(
+        #     status_code=status.HTTP_403_FORBIDDEN,
+        #     detail=create_error_response(
+        #         status_code=status.HTTP_403_FORBIDDEN,
+        #         message="Admin users already exist. Please contact an existing admin.",
+        #         error_code=ErrorCode.AUTH_004
+        #     )
+        # )
+        # For now, we'll just log a warning
+        logging.warning(f"Creating additional admin user {user_data.email} when admins already exist")
+
+    # Create new admin user with ADMIN role
+    hashed_password = get_password_hash(user_data.password)
+    db_user = User(
+        email=user_data.email,
+        hashed_password=hashed_password,
+        name=user_data.name,
+        role=UserRole.ADMIN,  # Always set role to ADMIN
         contact=user_data.contact,
         address=user_data.address
     )
