@@ -90,7 +90,8 @@ async def create_chat(
     existing_chat = db.query(Chat).filter(
         Chat.doctor_id == chat_data.doctor_id,
         Chat.patient_id == chat_data.patient_id,
-        Chat.is_active == True
+        Chat.is_active_for_doctor == True,
+        Chat.is_active_for_patient == True
     ).first()
 
     if existing_chat:
@@ -128,12 +129,18 @@ async def get_chats(
         chats = db.query(Chat).offset(skip).limit(limit).all()
         total = db.query(Chat).count()
     elif current_user.role == UserRole.DOCTOR:
-        # Doctors can see their chats
+        # Doctors can see their chats that are active for doctors
         if current_user.profile_id:
             # Use profile_id directly if available
             doctor_id = current_user.profile_id
-            chats = db.query(Chat).filter(Chat.doctor_id == doctor_id).offset(skip).limit(limit).all()
-            total = db.query(Chat).filter(Chat.doctor_id == doctor_id).count()
+            chats = db.query(Chat).filter(
+                Chat.doctor_id == doctor_id,
+                Chat.is_active_for_doctor == True
+            ).offset(skip).limit(limit).all()
+            total = db.query(Chat).filter(
+                Chat.doctor_id == doctor_id,
+                Chat.is_active_for_doctor == True
+            ).count()
         else:
             # Try to find doctor profile
             doctor = db.query(Doctor).filter(Doctor.id == current_user.id).first()
@@ -146,15 +153,27 @@ async def get_chats(
                         error_code=ErrorCode.RES_001
                     )
                 )
-            chats = db.query(Chat).filter(Chat.doctor_id == doctor.id).offset(skip).limit(limit).all()
-            total = db.query(Chat).filter(Chat.doctor_id == doctor.id).count()
+            chats = db.query(Chat).filter(
+                Chat.doctor_id == doctor.id,
+                Chat.is_active_for_doctor == True
+            ).offset(skip).limit(limit).all()
+            total = db.query(Chat).filter(
+                Chat.doctor_id == doctor.id,
+                Chat.is_active_for_doctor == True
+            ).count()
     elif current_user.role == UserRole.PATIENT:
-        # Patients can see their chats
+        # Patients can see their chats that are active for patients
         if current_user.profile_id:
             # Use profile_id directly if available
             patient_id = current_user.profile_id
-            chats = db.query(Chat).filter(Chat.patient_id == patient_id).offset(skip).limit(limit).all()
-            total = db.query(Chat).filter(Chat.patient_id == patient_id).count()
+            chats = db.query(Chat).filter(
+                Chat.patient_id == patient_id,
+                Chat.is_active_for_patient == True
+            ).offset(skip).limit(limit).all()
+            total = db.query(Chat).filter(
+                Chat.patient_id == patient_id,
+                Chat.is_active_for_patient == True
+            ).count()
         else:
             # Try to find patient profile
             patient = db.query(Patient).filter(Patient.id == current_user.id).first()
@@ -167,8 +186,14 @@ async def get_chats(
                         error_code=ErrorCode.RES_001
                     )
                 )
-            chats = db.query(Chat).filter(Chat.patient_id == patient.id).offset(skip).limit(limit).all()
-            total = db.query(Chat).filter(Chat.patient_id == patient.id).count()
+            chats = db.query(Chat).filter(
+                Chat.patient_id == patient.id,
+                Chat.is_active_for_patient == True
+            ).offset(skip).limit(limit).all()
+            total = db.query(Chat).filter(
+                Chat.patient_id == patient.id,
+                Chat.is_active_for_patient == True
+            ).count()
     else:
         # Hospitals and other roles don't have chats
         chats = []
@@ -263,14 +288,14 @@ async def get_chat(
 
     return chat
 
-@router.put("/{chat_id}/deactivate", response_model=ChatResponse)
-async def deactivate_chat(
+@router.put("/{chat_id}/deactivate-for-doctor", response_model=ChatResponse)
+async def deactivate_chat_for_doctor(
     chat_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """
-    Deactivate a chat
+    Deactivate a chat for the doctor
     """
     try:
         chat = db.query(Chat).filter(Chat.id == chat_id).first()
@@ -306,8 +331,61 @@ async def deactivate_chat(
                         error_code=ErrorCode.AUTH_004
                     )
                 )
+        else:
+            # Other roles can't deactivate chats for doctors
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=create_error_response(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    message="Not enough permissions",
+                    error_code=ErrorCode.AUTH_004
+                )
+            )
+
+        # Deactivate the chat for the doctor
+        chat.is_active_for_doctor = False
+        db.commit()
+        db.refresh(chat)
+
+        return chat
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=create_error_response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred: {str(e)}",
+                error_code=ErrorCode.SRV_001
+            )
+        )
+
+@router.put("/{chat_id}/deactivate-for-patient", response_model=ChatResponse)
+async def deactivate_chat_for_patient(
+    chat_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> Any:
+    """
+    Deactivate a chat for the patient
+    """
+    try:
+        chat = db.query(Chat).filter(Chat.id == chat_id).first()
+        if not chat:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="Chat not found",
+                    error_code=ErrorCode.RES_001
+                )
+            )
+
+        # Check if user has access to this chat
+        if current_user.role == UserRole.ADMIN:
+            # Admins can deactivate any chat
+            pass
         elif current_user.role == UserRole.PATIENT:
-            # Allow patients to deactivate their chats too
+            # Patients can deactivate their chats
             # First try to get patient by user_id
             patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
 
@@ -325,7 +403,7 @@ async def deactivate_chat(
                     )
                 )
         else:
-            # Other roles can't deactivate chats
+            # Other roles can't deactivate chats for patients
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=create_error_response(
@@ -335,8 +413,150 @@ async def deactivate_chat(
                 )
             )
 
-        # Deactivate the chat
-        chat.is_active = False
+        # Deactivate the chat for the patient
+        chat.is_active_for_patient = False
+        db.commit()
+        db.refresh(chat)
+
+        return chat
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=create_error_response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred: {str(e)}",
+                error_code=ErrorCode.SRV_001
+            )
+        )
+
+@router.put("/{chat_id}/activate-for-doctor", response_model=ChatResponse)
+async def activate_chat_for_doctor(
+    chat_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> Any:
+    """
+    Activate a chat for the doctor
+    """
+    try:
+        chat = db.query(Chat).filter(Chat.id == chat_id).first()
+        if not chat:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="Chat not found",
+                    error_code=ErrorCode.RES_001
+                )
+            )
+
+        # Check if user has access to this chat
+        if current_user.role == UserRole.ADMIN:
+            # Admins can activate any chat
+            pass
+        elif current_user.role == UserRole.DOCTOR:
+            # Doctors can activate their chats
+            # First try to get doctor by user_id
+            doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
+
+            # If not found, try to get doctor by profile_id
+            if not doctor and current_user.profile_id:
+                doctor = db.query(Doctor).filter(Doctor.id == current_user.profile_id).first()
+
+            if not doctor or doctor.id != chat.doctor_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="Not enough permissions",
+                        error_code=ErrorCode.AUTH_004
+                    )
+                )
+        else:
+            # Other roles can't activate chats for doctors
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=create_error_response(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    message="Not enough permissions",
+                    error_code=ErrorCode.AUTH_004
+                )
+            )
+
+        # Activate the chat for the doctor
+        chat.is_active_for_doctor = True
+        db.commit()
+        db.refresh(chat)
+
+        return chat
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=create_error_response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred: {str(e)}",
+                error_code=ErrorCode.SRV_001
+            )
+        )
+
+@router.put("/{chat_id}/activate-for-patient", response_model=ChatResponse)
+async def activate_chat_for_patient(
+    chat_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> Any:
+    """
+    Activate a chat for the patient
+    """
+    try:
+        chat = db.query(Chat).filter(Chat.id == chat_id).first()
+        if not chat:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="Chat not found",
+                    error_code=ErrorCode.RES_001
+                )
+            )
+
+        # Check if user has access to this chat
+        if current_user.role == UserRole.ADMIN:
+            # Admins can activate any chat
+            pass
+        elif current_user.role == UserRole.PATIENT:
+            # Patients can activate their chats
+            # First try to get patient by user_id
+            patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+
+            # If not found, try to get patient by profile_id
+            if not patient and current_user.profile_id:
+                patient = db.query(Patient).filter(Patient.id == current_user.profile_id).first()
+
+            if not patient or patient.id != chat.patient_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="Not enough permissions",
+                        error_code=ErrorCode.AUTH_004
+                    )
+                )
+        else:
+            # Other roles can't activate chats for patients
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=create_error_response(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    message="Not enough permissions",
+                    error_code=ErrorCode.AUTH_004
+                )
+            )
+
+        # Activate the chat for the patient
+        chat.is_active_for_patient = True
         db.commit()
         db.refresh(chat)
 

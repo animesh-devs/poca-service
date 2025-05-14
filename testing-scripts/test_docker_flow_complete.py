@@ -680,7 +680,8 @@ def test_create_ai_session():
         chat_data = {
             "doctor_id": doctor_id,
             "patient_id": patient_id,
-            "is_active": True
+            "is_active_for_doctor": True,
+            "is_active_for_patient": True
         }
 
         chat_response, chat_success = make_request(

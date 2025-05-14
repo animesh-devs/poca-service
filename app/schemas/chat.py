@@ -7,7 +7,8 @@ from app.models.chat import MessageType
 class ChatBase(BaseModel):
     doctor_id: str
     patient_id: str
-    is_active: bool = True
+    is_active_for_doctor: bool = True
+    is_active_for_patient: bool = True
 
 class ChatCreate(ChatBase):
     pass
@@ -25,7 +26,8 @@ class ChatListItem(BaseModel):
     id: str
     doctor_id: str
     patient_id: str
-    is_active: bool
+    is_active_for_doctor: bool
+    is_active_for_patient: bool
     created_at: datetime
 
     model_config = {

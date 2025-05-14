@@ -38,8 +38,8 @@ async def create_message(
             )
         )
 
-    # Check if chat is active
-    if not chat.is_active:
+    # Check if chat is active for both doctor and patient
+    if not (chat.is_active_for_doctor and chat.is_active_for_patient):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=create_error_response(

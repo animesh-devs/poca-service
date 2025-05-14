@@ -171,13 +171,25 @@ async def get_patient_doctors(
             )
         )
 
-    # Check if the current user is an admin, a doctor treating this patient, or the patient
-    is_admin = current_user.role == "admin"
-    is_patient_owner = current_user.role == "patient" and current_user.profile_id == patient_id
+    # Check if the current user is an admin, a doctor treating this patient, or a user with patient role who has access to this patient
+    is_admin = current_user.role == UserRole.ADMIN
+    is_patient_owner = current_user.role == UserRole.PATIENT and current_user.profile_id == patient_id
 
-    if not (is_admin or is_patient_owner):
+    # Check if the user with patient role has a relation to this patient
+    is_patient_related = False
+    if current_user.role == UserRole.PATIENT:
+        # Check if there's a relation between the current user and the patient
+        relation = db.query(UserPatientRelation).filter(
+            UserPatientRelation.user_id == current_user.id,
+            UserPatientRelation.patient_id == patient_id
+        ).first()
+
+        if relation:
+            is_patient_related = True
+
+    if not (is_admin or is_patient_owner or is_patient_related):
         # If the user is a doctor, check if they are treating this patient
-        if current_user.role == "doctor":
+        if current_user.role == UserRole.DOCTOR:
             doctor_id = current_user.profile_id
             mapping = db.query(DoctorPatientMapping).filter(
                 DoctorPatientMapping.doctor_id == doctor_id,
@@ -253,13 +265,25 @@ async def get_patient_hospitals(
             )
         )
 
-    # Check if the current user is an admin, a doctor treating this patient, or the patient
-    is_admin = current_user.role == "admin"
-    is_patient_owner = current_user.role == "patient" and current_user.profile_id == patient_id
+    # Check if the current user is an admin, a doctor treating this patient, or a user with patient role who has access to this patient
+    is_admin = current_user.role == UserRole.ADMIN
+    is_patient_owner = current_user.role == UserRole.PATIENT and current_user.profile_id == patient_id
 
-    if not (is_admin or is_patient_owner):
+    # Check if the user with patient role has a relation to this patient
+    is_patient_related = False
+    if current_user.role == UserRole.PATIENT:
+        # Check if there's a relation between the current user and the patient
+        relation = db.query(UserPatientRelation).filter(
+            UserPatientRelation.user_id == current_user.id,
+            UserPatientRelation.patient_id == patient_id
+        ).first()
+
+        if relation:
+            is_patient_related = True
+
+    if not (is_admin or is_patient_owner or is_patient_related):
         # If the user is a doctor, check if they are treating this patient
-        if current_user.role == "doctor":
+        if current_user.role == UserRole.DOCTOR:
             doctor_id = current_user.profile_id
             mapping = db.query(DoctorPatientMapping).filter(
                 DoctorPatientMapping.doctor_id == doctor_id,
@@ -382,7 +406,8 @@ async def get_user_patients(
             # For patients, look for chats with doctors
             chat = db.query(Chat).filter(
                 Chat.patient_id == patient.id,
-                Chat.is_active == True
+                Chat.is_active_for_patient == True,
+                Chat.is_active_for_doctor == True
             ).first()
 
             if chat:

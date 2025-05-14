@@ -219,14 +219,16 @@ def init_test_data():
         cardio_adult_chat = Chat(
             doctor_id=cardio_id,
             patient_id=adult_id,
-            is_active=True
+            is_active_for_doctor=True,
+            is_active_for_patient=True
         )
         db.add(cardio_adult_chat)
 
         neuro_child_chat = Chat(
             doctor_id=neuro_id,
             patient_id=child_id,
-            is_active=True
+            is_active_for_doctor=True,
+            is_active_for_patient=True
         )
         db.add(neuro_child_chat)
 

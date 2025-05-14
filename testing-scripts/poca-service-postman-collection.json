@@ -1032,7 +1032,34 @@
                 "doctors"
               ]
             },
-            "description": "Get all doctors for a patient"
+            "description": "Get all doctors for a patient. Accessible by admins, doctors treating the patient, and users with patient role who have a relation to the patient."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Patient Hospitals",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients/{{patientId}}/hospitals",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "patients",
+                "{{patientId}}",
+                "hospitals"
+              ]
+            },
+            "description": "Get all hospitals for a patient. Accessible by admins, doctors treating the patient, and users with patient role who have a relation to the patient."
           },
           "response": []
         },
@@ -1911,7 +1938,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"doctor_id\": \"{{doctorId}}\",\n  \"patient_id\": \"{{patientId}}\",\n  \"title\": \"Initial Consultation\",\n  \"is_active\": true\n}"
+              "raw": "{\n  \"doctor_id\": \"{{doctorId}}\",\n  \"patient_id\": \"{{patientId}}\",\n  \"is_active_for_doctor\": true,\n  \"is_active_for_patient\": true\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/chats",
@@ -1956,7 +1983,7 @@
           "response": []
         },
         {
-          "name": "Deactivate Chat",
+          "name": "Deactivate Chat for Doctor",
           "request": {
             "method": "PUT",
             "header": [
@@ -1966,7 +1993,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/chats/{{chatId}}/deactivate",
+              "raw": "{{baseUrl}}/api/v1/chats/{{chatId}}/deactivate-for-doctor",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -1975,10 +2002,91 @@
                 "v1",
                 "chats",
                 "{{chatId}}",
-                "deactivate"
+                "deactivate-for-doctor"
               ]
             },
-            "description": "Deactivate a chat"
+            "description": "Deactivate a chat for the doctor. Only accessible by admins and the doctor in the chat."
+          },
+          "response": []
+        },
+        {
+          "name": "Deactivate Chat for Patient",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chats/{{chatId}}/deactivate-for-patient",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chats",
+                "{{chatId}}",
+                "deactivate-for-patient"
+              ]
+            },
+            "description": "Deactivate a chat for the patient. Only accessible by admins and the patient in the chat."
+          },
+          "response": []
+        },
+        {
+          "name": "Activate Chat for Doctor",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chats/{{chatId}}/activate-for-doctor",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chats",
+                "{{chatId}}",
+                "activate-for-doctor"
+              ]
+            },
+            "description": "Activate a chat for the doctor. Only accessible by admins and the doctor in the chat."
+          },
+          "response": []
+        },
+        {
+          "name": "Activate Chat for Patient",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chats/{{chatId}}/activate-for-patient",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chats",
+                "{{chatId}}",
+                "activate-for-patient"
+              ]
+            },
+            "description": "Activate a chat for the patient. Only accessible by admins and the patient in the chat."
           },
           "response": []
         },

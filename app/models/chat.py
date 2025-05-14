@@ -13,14 +13,15 @@ class MessageType(str, enum.Enum):
 
 class Chat(Base):
     __tablename__ = "chats"
-    
+
     id = Column(String, primary_key=True, default=lambda: str(uuid4()))
     doctor_id = Column(String, ForeignKey("doctors.id", ondelete="CASCADE"), nullable=False)
     patient_id = Column(String, ForeignKey("patients.id", ondelete="CASCADE"), nullable=False)
-    is_active = Column(Boolean, default=True)
+    is_active_for_doctor = Column(Boolean, default=True)
+    is_active_for_patient = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+
     # Relationships
     doctor = relationship("Doctor", back_populates="chats")
     patient = relationship("Patient", back_populates="chats")
@@ -29,7 +30,7 @@ class Chat(Base):
 
 class Message(Base):
     __tablename__ = "messages"
-    
+
     id = Column(String, primary_key=True, default=lambda: str(uuid4()))
     chat_id = Column(String, ForeignKey("chats.id", ondelete="CASCADE"), nullable=False)
     sender_id = Column(String, nullable=False)  # User ID of the sender
@@ -40,6 +41,6 @@ class Message(Base):
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
     is_read = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
+
     # Relationships
     chat = relationship("Chat", back_populates="messages")

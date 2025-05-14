@@ -569,7 +569,8 @@ async def get_user_patients(
                 # For patients, look for chats with doctors
                 chat = db.query(Chat).filter(
                     Chat.patient_id == patient.id,
-                    Chat.is_active == True
+                    Chat.is_active_for_patient == True,
+                    Chat.is_active_for_doctor == True
                 ).first()
             elif user.role == UserRole.DOCTOR:
                 # For doctors, look for chats with this patient
@@ -581,7 +582,8 @@ async def get_user_patients(
                     chat = db.query(Chat).filter(
                         Chat.doctor_id == doctor.id,
                         Chat.patient_id == patient.id,
-                        Chat.is_active == True
+                        Chat.is_active_for_doctor == True,
+                        Chat.is_active_for_patient == True
                     ).first()
 
             if chat:
