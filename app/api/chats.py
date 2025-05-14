@@ -9,7 +9,8 @@ from app.models.doctor import Doctor
 from app.models.patient import Patient
 from app.models.chat import Chat, Message
 from app.schemas.chat import (
-    ChatCreate, ChatResponse, ChatListResponse, ChatListItem
+    ChatCreate, ChatResponse, ChatListResponse, ChatListItem,
+    MessageListResponse
 )
 from app.dependencies import get_current_user, get_admin_user, get_doctor_user, get_patient_user
 from app.errors import ErrorCode, create_error_response
@@ -25,6 +26,42 @@ async def create_chat(
     """
     Create a new chat between a doctor and a patient
     """
+    # Check if user is admin, the doctor, or the patient in the chat
+    is_admin = current_user.role == UserRole.ADMIN
+
+    # For doctor, check if the doctor_id matches either the user's ID or profile_id
+    is_doctor_in_chat = False
+    if current_user.role == UserRole.DOCTOR:
+        # Check if doctor_id is the user's profile_id
+        if current_user.profile_id == chat_data.doctor_id:
+            is_doctor_in_chat = True
+        # Check if doctor_id is the user's ID and get the doctor profile
+        elif current_user.id == chat_data.doctor_id:
+            is_doctor_in_chat = True
+            # Update chat_data.doctor_id to use the profile_id
+            chat_data.doctor_id = current_user.profile_id
+
+    # For patient, check if the patient_id matches either the user's ID or profile_id
+    is_patient_in_chat = False
+    if current_user.role == UserRole.PATIENT:
+        # Check if patient_id is the user's profile_id
+        if current_user.profile_id == chat_data.patient_id:
+            is_patient_in_chat = True
+        # Check if patient_id is the user's ID and get the patient profile
+        elif current_user.id == chat_data.patient_id:
+            is_patient_in_chat = True
+            # Update chat_data.patient_id to use the profile_id
+            chat_data.patient_id = current_user.profile_id
+
+    if not (is_admin or is_doctor_in_chat or is_patient_in_chat):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=create_error_response(
+                status_code=status.HTTP_403_FORBIDDEN,
+                message="Not enough permissions",
+                error_code=ErrorCode.AUTH_004
+            )
+        )
     # Check if doctor exists
     doctor = db.query(Doctor).filter(Doctor.id == chat_data.doctor_id).first()
     if not doctor:
@@ -92,34 +129,46 @@ async def get_chats(
         total = db.query(Chat).count()
     elif current_user.role == UserRole.DOCTOR:
         # Doctors can see their chats
-        doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
-        if not doctor:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=create_error_response(
+        if current_user.profile_id:
+            # Use profile_id directly if available
+            doctor_id = current_user.profile_id
+            chats = db.query(Chat).filter(Chat.doctor_id == doctor_id).offset(skip).limit(limit).all()
+            total = db.query(Chat).filter(Chat.doctor_id == doctor_id).count()
+        else:
+            # Try to find doctor profile
+            doctor = db.query(Doctor).filter(Doctor.id == current_user.id).first()
+            if not doctor:
+                raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    message="Doctor profile not found",
-                    error_code=ErrorCode.RES_001
+                    detail=create_error_response(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        message="Doctor profile not found",
+                        error_code=ErrorCode.RES_001
+                    )
                 )
-            )
-
-        chats = db.query(Chat).filter(Chat.doctor_id == doctor.id).offset(skip).limit(limit).all()
-        total = db.query(Chat).filter(Chat.doctor_id == doctor.id).count()
+            chats = db.query(Chat).filter(Chat.doctor_id == doctor.id).offset(skip).limit(limit).all()
+            total = db.query(Chat).filter(Chat.doctor_id == doctor.id).count()
     elif current_user.role == UserRole.PATIENT:
         # Patients can see their chats
-        patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
-        if not patient:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=create_error_response(
+        if current_user.profile_id:
+            # Use profile_id directly if available
+            patient_id = current_user.profile_id
+            chats = db.query(Chat).filter(Chat.patient_id == patient_id).offset(skip).limit(limit).all()
+            total = db.query(Chat).filter(Chat.patient_id == patient_id).count()
+        else:
+            # Try to find patient profile
+            patient = db.query(Patient).filter(Patient.id == current_user.id).first()
+            if not patient:
+                raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    message="Patient profile not found",
-                    error_code=ErrorCode.RES_001
+                    detail=create_error_response(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        message="Patient profile not found",
+                        error_code=ErrorCode.RES_001
+                    )
                 )
-            )
-
-        chats = db.query(Chat).filter(Chat.patient_id == patient.id).offset(skip).limit(limit).all()
-        total = db.query(Chat).filter(Chat.patient_id == patient.id).count()
+            chats = db.query(Chat).filter(Chat.patient_id == patient.id).offset(skip).limit(limit).all()
+            total = db.query(Chat).filter(Chat.patient_id == patient.id).count()
     else:
         # Hospitals and other roles don't have chats
         chats = []
@@ -153,28 +202,54 @@ async def get_chat(
         pass
     elif current_user.role == UserRole.DOCTOR:
         # Doctors can access their chats
-        doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
-        if not doctor or doctor.id != chat.doctor_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=create_error_response(
+        if current_user.profile_id:
+            # Use profile_id directly if available
+            if current_user.profile_id != chat.doctor_id:
+                raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    message="Not enough permissions",
-                    error_code=ErrorCode.AUTH_004
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="Not enough permissions",
+                        error_code=ErrorCode.AUTH_004
+                    )
                 )
-            )
+        else:
+            # Try to find doctor profile
+            doctor = db.query(Doctor).filter(Doctor.id == current_user.id).first()
+            if not doctor or doctor.id != chat.doctor_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="Not enough permissions",
+                        error_code=ErrorCode.AUTH_004
+                    )
+                )
     elif current_user.role == UserRole.PATIENT:
         # Patients can access their chats
-        patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
-        if not patient or patient.id != chat.patient_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=create_error_response(
+        if current_user.profile_id:
+            # Use profile_id directly if available
+            if current_user.profile_id != chat.patient_id:
+                raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    message="Not enough permissions",
-                    error_code=ErrorCode.AUTH_004
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="Not enough permissions",
+                        error_code=ErrorCode.AUTH_004
+                    )
                 )
-            )
+        else:
+            # Try to find patient profile
+            patient = db.query(Patient).filter(Patient.id == current_user.id).first()
+            if not patient or patient.id != chat.patient_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="Not enough permissions",
+                        error_code=ErrorCode.AUTH_004
+                    )
+                )
     else:
         # Hospitals and other roles don't have access to chats
         raise HTTPException(
@@ -197,25 +272,60 @@ async def deactivate_chat(
     """
     Deactivate a chat
     """
-    chat = db.query(Chat).filter(Chat.id == chat_id).first()
-    if not chat:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=create_error_response(
+    try:
+        chat = db.query(Chat).filter(Chat.id == chat_id).first()
+        if not chat:
+            raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                message="Chat not found",
-                error_code=ErrorCode.RES_001
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="Chat not found",
+                    error_code=ErrorCode.RES_001
+                )
             )
-        )
 
-    # Check if user has access to this chat
-    if current_user.role == UserRole.ADMIN:
-        # Admins can deactivate any chat
-        pass
-    elif current_user.role == UserRole.DOCTOR:
-        # Doctors can deactivate their chats
-        doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
-        if not doctor or doctor.id != chat.doctor_id:
+        # Check if user has access to this chat
+        if current_user.role == UserRole.ADMIN:
+            # Admins can deactivate any chat
+            pass
+        elif current_user.role == UserRole.DOCTOR:
+            # Doctors can deactivate their chats
+            # First try to get doctor by user_id
+            doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
+
+            # If not found, try to get doctor by profile_id
+            if not doctor and current_user.profile_id:
+                doctor = db.query(Doctor).filter(Doctor.id == current_user.profile_id).first()
+
+            if not doctor or doctor.id != chat.doctor_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="Not enough permissions",
+                        error_code=ErrorCode.AUTH_004
+                    )
+                )
+        elif current_user.role == UserRole.PATIENT:
+            # Allow patients to deactivate their chats too
+            # First try to get patient by user_id
+            patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+
+            # If not found, try to get patient by profile_id
+            if not patient and current_user.profile_id:
+                patient = db.query(Patient).filter(Patient.id == current_user.profile_id).first()
+
+            if not patient or patient.id != chat.patient_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="Not enough permissions",
+                        error_code=ErrorCode.AUTH_004
+                    )
+                )
+        else:
+            # Other roles can't deactivate chats
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=create_error_response(
@@ -224,23 +334,23 @@ async def deactivate_chat(
                     error_code=ErrorCode.AUTH_004
                 )
             )
-    else:
-        # Patients and other roles can't deactivate chats
+
+        # Deactivate the chat
+        chat.is_active = False
+        db.commit()
+        db.refresh(chat)
+
+        return chat
+    except Exception as e:
+        db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=create_error_response(
-                status_code=status.HTTP_403_FORBIDDEN,
-                message="Not enough permissions",
-                error_code=ErrorCode.AUTH_004
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred: {str(e)}",
+                error_code=ErrorCode.SRV_001
             )
         )
-
-    # Deactivate the chat
-    chat.is_active = False
-    db.commit()
-    db.refresh(chat)
-
-    return chat
 
 @router.delete("/{chat_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_chat(
@@ -264,3 +374,94 @@ async def delete_chat(
 
     db.delete(chat)
     db.commit()
+
+@router.get("/{chat_id}/messages", response_model=MessageListResponse)
+async def get_chat_messages(
+    chat_id: str,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> Any:
+    """
+    Get all messages for a specific chat
+    """
+    try:
+        # Check if chat exists
+        chat = db.query(Chat).filter(Chat.id == chat_id).first()
+        if not chat:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="Chat not found",
+                    error_code=ErrorCode.RES_001
+                )
+            )
+
+        # Check if user has access to this chat
+        if current_user.role == UserRole.ADMIN:
+            # Admins can access any chat
+            pass
+        elif current_user.role == UserRole.DOCTOR:
+            # Doctors can access their chats
+            # First try to get doctor by user_id
+            doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
+
+            # If not found, try to get doctor by profile_id
+            if not doctor and current_user.profile_id:
+                doctor = db.query(Doctor).filter(Doctor.id == current_user.profile_id).first()
+
+            if not doctor or doctor.id != chat.doctor_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="Not enough permissions",
+                        error_code=ErrorCode.AUTH_004
+                    )
+                )
+        elif current_user.role == UserRole.PATIENT:
+            # Patients can access their chats
+            # First try to get patient by user_id
+            patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+
+            # If not found, try to get patient by profile_id
+            if not patient and current_user.profile_id:
+                patient = db.query(Patient).filter(Patient.id == current_user.profile_id).first()
+
+            if not patient or patient.id != chat.patient_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="Not enough permissions",
+                        error_code=ErrorCode.AUTH_004
+                    )
+                )
+        else:
+            # Hospitals and other roles don't have access to chats
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=create_error_response(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    message="Not enough permissions",
+                    error_code=ErrorCode.AUTH_004
+                )
+            )
+
+        # Get messages for the chat
+        messages = db.query(Message).filter(Message.chat_id == chat_id).order_by(Message.timestamp.desc()).offset(skip).limit(limit).all()
+        total = db.query(Message).filter(Message.chat_id == chat_id).count()
+
+        return {"messages": messages, "total": total}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=create_error_response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred: {str(e)}",
+                error_code=ErrorCode.SRV_001
+            )
+        )

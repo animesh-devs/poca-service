@@ -1,0 +1,331 @@
+Flow ->
+
+1. Hospital signup/login
+   - POST /api/v1/auth/hospital-signup (Hospital signup)
+   - POST /api/v1/auth/login (Hospital login)
+
+2. Doctor signup/login
+   - POST /api/v1/auth/doctor-signup (Doctor signup)
+   - POST /api/v1/auth/login (Doctor login)
+
+3. User with patient role signup/login -> primary patient(relation self is created)
+   - POST /api/v1/auth/patient-signup (Patient signup)
+   - POST /api/v1/auth/login (Patient login)
+   - POST /api/v1/mappings/user-patient (Create user-patient relation with "self")
+
+4. Admin signup/login
+   - POST /api/v1/auth/signup (Admin only can create new users)
+   - POST /api/v1/auth/login (Admin login)
+-- based on role user creation flow also creates respective entity(if role is doctor doctor entity is created, if role is patient patient entity is created, if role is hospital hospital entity is created)
+
+5. Admin maps hospital to doctor
+   - POST /api/v1/mappings/hospital-doctor (Create hospital-doctor mapping)
+
+6. Admin maps hospital to user
+   - POST /api/v1/mappings/hospital-patient (Create hospital-patient mapping)
+
+7. Admin maps doctor to user
+   - POST /api/v1/mappings/doctor-patient (Create doctor-patient mapping)
+
+8. Admin creates case-history with documents for primary patient(relation=self)
+   - POST /api/v1/patients/{patient_id}/case-history (Create case history)
+   - POST /api/v1/patients/{patient_id}/case-history/documents (Upload documents)
+
+9. User(patient) login -> add more patient with relation
+   - POST /api/v1/auth/login (Patient login)
+   - POST /api/v1/mappings/user-patient (Create user-patient relation with specific relation)
+
+10. Case-history should be associated with patient not with user
+    - GET /api/v1/patients/{patient_id}/case-history (Get case history)
+
+11. Doctor should be mapped to patient not user
+    - GET /api/v1/mappings/doctor-patient (Get doctor-patient mappings)
+
+12. User selects the patient
+    - GET /api/v1/mappings/user/{user_id}/patients (Get patients for user)
+
+13. Gets the list of all the doctors mapped to selected patient
+    - GET /api/v1/patients/{patient_id}/doctors (Get doctors for patient)
+
+14. List has details of active chat between doctor/patient
+    - GET /api/v1/chats (Get all chats for current user)
+
+15. User starts the chat with AI for the selected patient using websocket API
+    - POST /api/v1/ai/sessions (Create AI session)
+    - WebSocket /api/v1/ai-assistant/ws/{session_id}?token={token} (Connect to AI assistant)
+
+16. AI asks questions to user -> user answers them (websocket API)
+    - WebSocket communication through the established connection
+
+17. AI generates summary
+    - AI automatically generates summary after sufficient questions
+
+18. User reviews and finalizes the summary
+    - PUT /api/v1/ai/sessions/{session_id}/summary (Update AI session summary)
+
+in following format
+{
+    "message": "The AI response text",
+    "isSummary": true
+}
+
+19. User sends the summary to the doctor
+    - POST /api/v1/chats (Create chat with doctor if not exists)
+    - POST /api/v1/messages (Send message with summary to doctor)
+
+20. User can send document/photo as message to the doctor
+    - POST /api/v1/messages (Send message with file_details)
+
+21. Doctor login
+    - POST /api/v1/auth/login (Doctor login)
+
+22. Doctor gets the list of all the connected patients
+    - GET /api/v1/doctors/{doctor_id}/patients (Get patients for doctor)
+
+23. List of patient also have information about active chats
+    - GET /api/v1/chats (Get all chats for doctor)
+
+24. All the messages between doctor and patient are fetched
+    - GET /api/v1/chats/{chat_id}/messages (Get messages for chat)
+
+25. Doctor selects the patient
+    - GET /api/v1/patients/{patient_id} (Get patient details)
+
+26. Messages are marked read
+    - PUT /api/v1/messages/read-status (Update read status for messages)
+    - Doctor can view case history
+      - GET /api/v1/patients/{patient_id}/case-history (Get case history)
+    - Doctor can view reports
+      - GET /api/v1/patients/{patient_id}/reports (Get reports)
+
+27. A call is made to fetch the suggested response (no websocket required)
+    - POST /api/v1/ai/suggested-response (Get suggested response for doctor)
+    -> the call in BE goes to ai with case history and summary as input and suggested response as output
+
+28. Doctor edits the suggested response
+    - Client-side functionality
+
+29. Doctor sends the response to the patient
+    - POST /api/v1/messages (Send message to patient)
+    - Doctor can send document/photo as message to the patient
+      - POST /api/v1/messages (Send message with file_details)
+
+30. On patient side the chat is marked active and they can see the response from doctor
+    - GET /api/v1/chats (Get all chats for patient)
+    - GET /api/v1/chats/{chat_id}/messages (Get messages for chat)
+
+31. Patient selects the chat and messages are marked read
+    - PUT /api/v1/messages/read-status (Update read status for messages)
+
+
+Additional requirements
+1. Admin have access to all the APIs
+    1. Admin can create/update/delete users/doctors/hospitals entity
+       - POST, PUT, DELETE /api/v1/users
+       - POST, PUT, DELETE /api/v1/doctors
+       - POST, PUT, DELETE /api/v1/hospitals
+    2. Admin can view all users/doctors/hospitals
+       - GET /api/v1/users
+       - GET /api/v1/doctors
+       - GET /api/v1/hospitals
+    3. Admin can map/unmap hospital to doctor
+       - POST /api/v1/mappings/hospital-doctor
+       - DELETE /api/v1/mappings/hospital-doctor/{mapping_id}
+    4. Admin can map/unmap hospital to user
+       - POST /api/v1/mappings/hospital-patient
+       - DELETE /api/v1/mappings/hospital-patient/{mapping_id}
+    5. Admin can map/unmap doctor to user
+       - POST /api/v1/mappings/doctor-patient
+       - DELETE /api/v1/mappings/doctor-patient/{mapping_id}
+    6. Admin can create/view case-history with documents
+       - POST, GET /api/v1/patients/{patient_id}/case-history
+       - POST, GET /api/v1/patients/{patient_id}/case-history/documents
+    7. Admin can update case-history with documents
+       - PUT /api/v1/patients/{patient_id}/case-history
+    8. Admin can create/view/update reports with documents
+       - POST, GET, PUT /api/v1/patients/{patient_id}/reports
+       - POST, GET /api/v1/patients/{patient_id}/reports/{report_id}/documents
+2. User(patient role) can only access resources mapped to them
+    1. Can view/create/update/delete patients
+       - GET, POST, PUT, DELETE /api/v1/patients
+    2. Can view case history
+       - GET /api/v1/patients/{patient_id}/case-history
+    3. Can view/create/update reports
+       - GET, POST, PUT /api/v1/patients/{patient_id}/reports
+    4. Can view/create chats they are part of
+       - GET, POST /api/v1/chats
+    5. Can view/send messages they are part of
+       - GET, POST /api/v1/messages
+    6. Can view doctors mapped to them
+       - GET /api/v1/patients/{patient_id}/doctors
+    7. Can view hospitals mapped to them
+       - GET /api/v1/patients/{patient_id}/hospitals
+    8. Can view/update/cancel appointments
+       - GET, PUT /api/v1/appointments/patient/{patient_id}
+       - PUT /api/v1/appointments/{appointment_id}/cancel
+3. Doctor can only access resources mapped to them
+    1. Can view patients mapped to them
+       - GET /api/v1/doctors/{doctor_id}/patients
+    2. Can view case history
+       - GET /api/v1/patients/{patient_id}/case-history
+    3. Can view reports
+       - GET /api/v1/patients/{patient_id}/reports
+    4. Can view chats
+       - GET /api/v1/chats
+    5. Can view/send messages
+       - GET, POST /api/v1/messages
+    6. Can view/update/cancel appointments
+       - GET, PUT /api/v1/appointments/doctor/{doctor_id}
+       - PUT /api/v1/appointments/{appointment_id}/cancel
+4. Hospital can only access resources mapped to them
+    1. Can view doctors mapped to them
+       - GET /api/v1/hospitals/{hospital_id}/doctors
+    2. Can view patients mapped to them
+       - GET /api/v1/hospitals/{hospital_id}/patients
+    3. Can view appointments
+       - GET /api/v1/appointments/hospital/{hospital_id}
+
+
+## Database Schema
+
+### Users
+- id (UUID, primary key)
+- email (unique)
+- hashed_password
+- name
+- role (doctor, patient, admin, hospital)
+- contact
+- address
+- is_active (boolean)
+- profile_id (foreign key to doctor/patient/hospital profile)
+- created_at, updated_at
+
+### Hospitals
+- id (UUID, primary key)
+- name
+- address
+- city
+- state
+- country
+- contact
+- pin_code
+- email (unique)
+- specialities (JSON array)
+- link
+- website
+- created_at, updated_at
+
+### Doctors
+- id (UUID, primary key)
+- name
+- photo (link to image)
+- designation
+- experience (years)
+- details (education, achievements, etc.)
+- contact
+- shift_time_start
+- shift_time_end
+- created_at, updated_at
+
+### Patients
+- id (UUID, primary key)
+- name
+- dob (date of birth)
+- gender
+- contact
+- photo (link to image)
+- created_at, updated_at
+
+### Hospital-Doctor-Mapping
+- id (UUID, primary key)
+- hospital_id (foreign key)
+- doctor_id (foreign key)
+- created_at, updated_at
+
+### Hospital-Patient-Mapping
+- id (UUID, primary key)
+- hospital_id (foreign key)
+- patient_id (foreign key)
+- created_at, updated_at
+
+### Doctor-Patient-Mapping
+- id (UUID, primary key)
+- doctor_id (foreign key)
+- patient_id (foreign key)
+- created_at, updated_at
+
+### User-Patient-Relation
+- id (UUID, primary key)
+- user_id (foreign key)
+- patient_id (foreign key)
+- relation (self, wife, child, husband)
+- created_at, updated_at
+
+### Appointments
+- id (UUID, primary key)
+- doctor_id (foreign key)
+- patient_id (foreign key)
+- time_slot (datetime)
+- hospital_id (foreign key)
+- type (remote, regular, emergency)
+- status
+- extras (JSON)
+- cancelled_by (optional)
+- cancellation_reason (optional)
+- created_at, updated_at
+
+### Chats
+- id (UUID, primary key)
+- doctor_id (foreign key)
+- patient_id (foreign key)
+- is_active_for_doctor (boolean)
+- is_active_for_patient (boolean)
+- created_at, updated_at
+
+### Messages
+- id (UUID, primary key)
+- chat_id (foreign key)
+- sender_id
+- receiver_id
+- message
+- message_type (text, audio, file)
+- file_details (JSON, optional)
+- timestamp
+- is_read (boolean)
+- created_at
+
+### Case Histories
+- id (UUID, primary key)
+- patient_id (foreign key)
+- summary
+- documents (JSON array)
+- created_at, updated_at
+
+### Documents
+- id (UUID, primary key)
+- case_history_id (foreign key)
+- file_name
+- size
+- link
+- uploaded_by (doctor or patient)
+- upload_timestamp
+- created_at
+
+### AI Sessions
+- id (UUID, primary key)
+- chat_id (foreign key)
+- start_timestamp
+- end_timestamp (optional)
+
+### AI Messages
+- id (UUID, primary key)
+- session_id (foreign key)
+- message
+- response
+- timestamp
+
+### Suggestions
+- id (UUID, primary key)
+- problem
+- description
+- created_at

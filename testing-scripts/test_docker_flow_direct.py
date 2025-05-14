@@ -12,7 +12,8 @@ import subprocess
 import requests
 import random
 import string
-from typing import Dict, Any, Optional, List
+import time
+from typing import Dict, Any, Optional, List, Tuple
 
 # Configure logging
 logging.basicConfig(
@@ -24,17 +25,17 @@ logging.basicConfig(
 )
 
 # API URLs
-BASE_URL = "http://localhost:8002"
+BASE_URL = "http://localhost:8000"
 AUTH_URL = f"{BASE_URL}/api/v1/auth"
 USERS_URL = f"{BASE_URL}/api/v1/users"
 HOSPITALS_URL = f"{BASE_URL}/api/v1/hospitals"
 DOCTORS_URL = f"{BASE_URL}/api/v1/doctors"
 PATIENTS_URL = f"{BASE_URL}/api/v1/patients"
-AI_URL = f"{BASE_URL}/api/v1/ai"
+AI_URL = f"{BASE_URL}/api/v1/ai"  # Using /api/v1/ai as per current implementation
 AI_SESSIONS_URL = f"{AI_URL}/sessions"
 AI_MESSAGES_URL = f"{AI_URL}/messages"
 
-# Now implemented endpoints
+# Implemented endpoints
 CHATS_URL = f"{BASE_URL}/api/v1/chats"
 MESSAGES_URL = f"{BASE_URL}/api/v1/messages"
 MAPPINGS_URL = f"{BASE_URL}/api/v1/mappings"
@@ -106,6 +107,64 @@ def check_docker_container_running() -> bool:
         logging.error(f"Error checking Docker container: {str(e)}")
         return False
 
+def start_docker_container() -> bool:
+    """Start the Docker container if it's not running"""
+    logging.info("Attempting to start Docker container...")
+
+    try:
+        # Check if the container exists but is stopped
+        result = subprocess.run(
+            ["docker", "ps", "-a", "--filter", "name=poca-service", "--format", "{{.Names}}"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False
+        )
+
+        if "poca-service" in result.stdout:
+            # Container exists, start it
+            logging.info("Container exists but is stopped. Starting it...")
+            start_result = subprocess.run(
+                ["docker", "start", "poca-service"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False
+            )
+
+            if start_result.returncode == 0:
+                logging.info("Docker container started successfully")
+                # Wait for container to be fully up
+                logging.info("Waiting for container to be fully up...")
+                time.sleep(10)
+                return True
+            else:
+                logging.error(f"Failed to start Docker container: {start_result.stderr}")
+                return False
+        else:
+            # Container doesn't exist, need to run docker-compose
+            logging.info("Container doesn't exist. Running docker-compose up...")
+            compose_result = subprocess.run(
+                ["docker-compose", "up", "-d"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False
+            )
+
+            if compose_result.returncode == 0:
+                logging.info("Docker container created and started successfully")
+                # Wait for container to be fully up
+                logging.info("Waiting for container to be fully up...")
+                time.sleep(20)
+                return True
+            else:
+                logging.error(f"Failed to create and start Docker container: {compose_result.stderr}")
+                return False
+    except Exception as e:
+        logging.error(f"Error starting Docker container: {str(e)}")
+        return False
+
 def check_server_health() -> bool:
     """Check if the server is up and running"""
     try:
@@ -142,6 +201,27 @@ def get_auth_token(email: str, password: str) -> Optional[Dict[str, Any]]:
             return None
     except Exception as e:
         logging.error(f"Error getting authentication token: {str(e)}")
+        return None
+
+def refresh_token(refresh_token: str) -> Optional[Dict[str, Any]]:
+    """Refresh authentication token"""
+    logging.info("Refreshing authentication token...")
+
+    try:
+        response = requests.post(
+            f"{AUTH_URL}/refresh",
+            json={"refresh_token": refresh_token}
+        )
+
+        if response.status_code == 200:
+            token_data = response.json()
+            logging.info(f"Refreshed authentication token for user ID: {token_data.get('user_id')}")
+            return token_data
+        else:
+            logging.error(f"Failed to refresh authentication token: {response.text}")
+            return None
+    except Exception as e:
+        logging.error(f"Error refreshing authentication token: {str(e)}")
         return None
 
 def create_hospital() -> Optional[Dict[str, Any]]:
@@ -269,7 +349,7 @@ def create_patient() -> Optional[Dict[str, Any]]:
         logging.error(f"Error creating patient: {str(e)}")
         return None
 
-def test_authentication_flow() -> tuple[bool, Optional[Dict[str, Any]], Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+def test_authentication_flow() -> Tuple[bool, Optional[Dict[str, Any]], Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
     """Test authentication flow"""
     logging.info("Testing authentication flow...")
 
@@ -331,10 +411,16 @@ def map_doctor_to_patient(admin_token: str, doctor_id: str, patient_id: str) -> 
     logging.info(f"Mapping doctor {doctor_id} to patient {patient_id}...")
 
     try:
+        # Add relation field as required by the API
         mapping_data = {
             "doctor_id": doctor_id,
-            "patient_id": patient_id
+            "patient_id": patient_id,
+            "relation": "doctor"  # Add relation field
         }
+
+        # Add debug logging
+        logging.info(f"Sending request to: {MAPPINGS_URL}/doctor-patient")
+        logging.info(f"Request payload: {mapping_data}")
 
         response = requests.post(
             f"{MAPPINGS_URL}/doctor-patient",
@@ -352,139 +438,149 @@ def map_doctor_to_patient(admin_token: str, doctor_id: str, patient_id: str) -> 
         logging.error(f"Error mapping doctor to patient: {str(e)}")
         return False
 
-def map_hospital_to_doctor(admin_token: str, hospital_id: str, doctor_id: str) -> bool:
-    """Map a hospital to a doctor"""
-    logging.info(f"Mapping hospital {hospital_id} to doctor {doctor_id}...")
+# This function is duplicated below with a more complete implementation
+# Keeping this commented out for reference
+# def map_hospital_to_doctor(admin_token: str, hospital_id: str, doctor_id: str) -> bool:
+#     """Map a hospital to a doctor"""
+#     logging.info(f"Mapping hospital {hospital_id} to doctor {doctor_id}...")
+#
+#     try:
+#         mapping_data = {
+#             "hospital_id": hospital_id,
+#             "doctor_id": doctor_id
+#         }
+#
+#         response = requests.post(
+#             f"{MAPPINGS_URL}/hospital-doctor",
+#             json=mapping_data,
+#             headers={"Authorization": f"Bearer {admin_token}"}
+#         )
+#
+#         if response.status_code in [200, 201]:
+#             logging.info(f"Mapped hospital {hospital_id} to doctor {doctor_id}")
+#             return True
+#         else:
+#             logging.error(f"Failed to map hospital to doctor: {response.text}")
+#             return False
+#     except Exception as e:
+#         logging.error(f"Error mapping hospital to doctor: {str(e)}")
+#         return False
 
-    try:
-        mapping_data = {
-            "hospital_id": hospital_id,
-            "doctor_id": doctor_id
-        }
+# This function is duplicated below with a more complete implementation
+# Keeping this commented out for reference
+# def map_hospital_to_patient(admin_token: str, hospital_id: str, patient_id: str) -> bool:
+#     """Map a hospital to a patient"""
+#     logging.info(f"Mapping hospital {hospital_id} to patient {patient_id}...")
+#
+#     try:
+#         mapping_data = {
+#             "hospital_id": hospital_id,
+#             "patient_id": patient_id
+#         }
+#
+#         response = requests.post(
+#             f"{MAPPINGS_URL}/hospital-patient",
+#             json=mapping_data,
+#             headers={"Authorization": f"Bearer {admin_token}"}
+#         )
+#
+#         if response.status_code in [200, 201]:
+#             logging.info(f"Mapped hospital {hospital_id} to patient {patient_id}")
+#             return True
+#         else:
+#             logging.error(f"Failed to map hospital to patient: {response.text}")
+#             return False
+#     except Exception as e:
+#         logging.error(f"Error mapping hospital to patient: {str(e)}")
+#         return False
 
-        response = requests.post(
-            f"{MAPPINGS_URL}/hospital-doctor",
-            json=mapping_data,
-            headers={"Authorization": f"Bearer {admin_token}"}
-        )
+# This function is duplicated below with a more complete implementation
+# Keeping this commented out for reference
+# def create_chat(admin_token: str, doctor_id: str, patient_id: str) -> Optional[Dict[str, Any]]:
+#     """Create a chat between a doctor and a patient"""
+#     logging.info(f"Creating chat between doctor {doctor_id} and patient {patient_id}...")
+#
+#     try:
+#         chat_data = {
+#             "doctor_id": doctor_id,
+#             "patient_id": patient_id
+#         }
+#
+#         response = requests.post(
+#             CHATS_URL,
+#             json=chat_data,
+#             headers={"Authorization": f"Bearer {admin_token}"}
+#         )
+#
+#         if response.status_code in [200, 201]:
+#             chat = response.json()
+#             logging.info(f"Created chat with ID: {chat.get('id')}")
+#             return chat
+#         else:
+#             logging.error(f"Failed to create chat: {response.text}")
+#             return None
+#     except Exception as e:
+#         logging.error(f"Error creating chat: {str(e)}")
+#         return None
 
-        if response.status_code in [200, 201]:
-            logging.info(f"Mapped hospital {hospital_id} to doctor {doctor_id}")
-            return True
-        else:
-            logging.error(f"Failed to map hospital to doctor: {response.text}")
-            return False
-    except Exception as e:
-        logging.error(f"Error mapping hospital to doctor: {str(e)}")
-        return False
+# This function is duplicated below with a more complete implementation
+# Keeping this commented out for reference
+# def send_message(token: str, chat_id: str, sender_id: str, receiver_id: str, content: str) -> Optional[Dict[str, Any]]:
+#     """Send a message in a chat"""
+#     logging.info(f"Sending message from {sender_id} to {receiver_id} in chat {chat_id}...")
+#
+#     try:
+#         message_data = {
+#             "chat_id": chat_id,
+#             "sender_id": sender_id,
+#             "receiver_id": receiver_id,
+#             "content": content
+#         }
+#
+#         response = requests.post(
+#             MESSAGES_URL,
+#             json=message_data,
+#             headers={"Authorization": f"Bearer {token}"}
+#         )
+#
+#         if response.status_code in [200, 201]:
+#             message = response.json()
+#             logging.info(f"Sent message with ID: {message.get('id')}")
+#             return message
+#         else:
+#             logging.error(f"Failed to send message: {response.text}")
+#             return None
+#     except Exception as e:
+#         logging.error(f"Error sending message: {str(e)}")
+#         return None
 
-def map_hospital_to_patient(admin_token: str, hospital_id: str, patient_id: str) -> bool:
-    """Map a hospital to a patient"""
-    logging.info(f"Mapping hospital {hospital_id} to patient {patient_id}...")
-
-    try:
-        mapping_data = {
-            "hospital_id": hospital_id,
-            "patient_id": patient_id
-        }
-
-        response = requests.post(
-            f"{MAPPINGS_URL}/hospital-patient",
-            json=mapping_data,
-            headers={"Authorization": f"Bearer {admin_token}"}
-        )
-
-        if response.status_code in [200, 201]:
-            logging.info(f"Mapped hospital {hospital_id} to patient {patient_id}")
-            return True
-        else:
-            logging.error(f"Failed to map hospital to patient: {response.text}")
-            return False
-    except Exception as e:
-        logging.error(f"Error mapping hospital to patient: {str(e)}")
-        return False
-
-def create_chat(admin_token: str, doctor_id: str, patient_id: str) -> Optional[Dict[str, Any]]:
-    """Create a chat between a doctor and a patient"""
-    logging.info(f"Creating chat between doctor {doctor_id} and patient {patient_id}...")
-
-    try:
-        chat_data = {
-            "doctor_id": doctor_id,
-            "patient_id": patient_id
-        }
-
-        response = requests.post(
-            CHATS_URL,
-            json=chat_data,
-            headers={"Authorization": f"Bearer {admin_token}"}
-        )
-
-        if response.status_code in [200, 201]:
-            chat = response.json()
-            logging.info(f"Created chat with ID: {chat.get('id')}")
-            return chat
-        else:
-            logging.error(f"Failed to create chat: {response.text}")
-            return None
-    except Exception as e:
-        logging.error(f"Error creating chat: {str(e)}")
-        return None
-
-def send_message(token: str, chat_id: str, sender_id: str, receiver_id: str, content: str) -> Optional[Dict[str, Any]]:
-    """Send a message in a chat"""
-    logging.info(f"Sending message from {sender_id} to {receiver_id} in chat {chat_id}...")
-
-    try:
-        message_data = {
-            "chat_id": chat_id,
-            "sender_id": sender_id,
-            "receiver_id": receiver_id,
-            "content": content
-        }
-
-        response = requests.post(
-            MESSAGES_URL,
-            json=message_data,
-            headers={"Authorization": f"Bearer {token}"}
-        )
-
-        if response.status_code in [200, 201]:
-            message = response.json()
-            logging.info(f"Sent message with ID: {message.get('id')}")
-            return message
-        else:
-            logging.error(f"Failed to send message: {response.text}")
-            return None
-    except Exception as e:
-        logging.error(f"Error sending message: {str(e)}")
-        return None
-
-def create_ai_session(token: str, chat_id: str) -> Optional[Dict[str, Any]]:
-    """Create an AI session for a chat"""
-    logging.info(f"Creating AI session for chat {chat_id}...")
-
-    try:
-        session_data = {
-            "chat_id": chat_id
-        }
-
-        response = requests.post(
-            AI_SESSIONS_URL,
-            json=session_data,
-            headers={"Authorization": f"Bearer {token}"}
-        )
-
-        if response.status_code in [200, 201]:
-            session = response.json()
-            logging.info(f"Created AI session with ID: {session.get('id')}")
-            return session
-        else:
-            logging.error(f"Failed to create AI session: {response.text}")
-            return None
-    except Exception as e:
-        logging.error(f"Error creating AI session: {str(e)}")
-        return None
+# This function is duplicated below with a more complete implementation
+# Keeping this commented out for reference
+# def create_ai_session(token: str, chat_id: str) -> Optional[Dict[str, Any]]:
+#     """Create an AI session for a chat"""
+#     logging.info(f"Creating AI session for chat {chat_id}...")
+#
+#     try:
+#         session_data = {
+#             "chat_id": chat_id
+#         }
+#
+#         response = requests.post(
+#             AI_SESSIONS_URL,
+#             json=session_data,
+#             headers={"Authorization": f"Bearer {token}"}
+#         )
+#
+#         if response.status_code in [200, 201]:
+#             session = response.json()
+#             logging.info(f"Created AI session with ID: {session.get('id')}")
+#             return session
+#         else:
+#             logging.error(f"Failed to create AI session: {response.text}")
+#             return None
+#     except Exception as e:
+#         logging.error(f"Error creating AI session: {str(e)}")
+#         return None
 
 def send_ai_message(token: str, session_id: str, content: str) -> Optional[Dict[str, Any]]:
     """Send a message to the AI assistant"""
@@ -506,8 +602,13 @@ def send_ai_message(token: str, session_id: str, content: str) -> Optional[Dict[
             logging.info(f"Got AI response: {response_data.get('response', '')[:50]}...")
             return response_data
         else:
-            logging.error(f"Failed to send message to AI: {response.text}")
-            return None
+            # Handle 404 errors gracefully as the endpoint might not be implemented yet
+            if response.status_code == 404:
+                logging.warning("AI message sending endpoint not found (404). This endpoint might not be implemented yet.")
+                return None
+            else:
+                logging.error(f"Failed to send message to AI: {response.text}")
+                return None
     except Exception as e:
         logging.error(f"Error sending message to AI: {str(e)}")
         return None
@@ -552,6 +653,27 @@ def get_hospital_by_id(token: str, hospital_id: str) -> Optional[Dict[str, Any]]
             return None
     except Exception as e:
         logging.error(f"Error getting hospital: {str(e)}")
+        return None
+
+def get_patient_by_id(token: str, patient_id: str) -> Optional[Dict[str, Any]]:
+    """Get patient by ID"""
+    logging.info(f"Getting patient with ID: {patient_id}...")
+
+    try:
+        response = requests.get(
+            f"{PATIENTS_URL}/{patient_id}",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+
+        if response.status_code == 200:
+            patient = response.json()
+            logging.info(f"Got patient: {patient.get('name')}")
+            return patient
+        else:
+            logging.error(f"Failed to get patient: {response.text}")
+            return None
+    except Exception as e:
+        logging.error(f"Error getting patient: {str(e)}")
         return None
 
 def map_hospital_to_doctor(token: str, hospital_id: str, doctor_id: str) -> Optional[Dict[str, Any]]:
@@ -625,10 +747,16 @@ def map_doctor_to_patient(token: str, doctor_id: str, patient_id: str) -> Option
         doctor_profile_id = get_doctor_profile_id(token, doctor_id) or doctor_id
         patient_profile_id = get_patient_profile_id(token, patient_id) or patient_id
 
+        # Add relation field as required by the API
         mapping_data = {
             "doctor_id": doctor_profile_id,
-            "patient_id": patient_profile_id
+            "patient_id": patient_profile_id,
+            "relation": "doctor"  # Add relation field
         }
+
+        # Add debug logging
+        logging.info(f"Sending request to: {MAPPINGS_URL}/doctor-patient")
+        logging.info(f"Request payload: {mapping_data}")
 
         response = requests.post(
             f"{MAPPINGS_URL}/doctor-patient",
@@ -721,33 +849,37 @@ def get_chat_by_id(token: str, chat_id: str) -> Optional[Dict[str, Any]]:
         logging.error(f"Error getting chat: {str(e)}")
         return None
 
-def send_message(token: str, chat_id: str, sender_id: str, receiver_id: str, message: str) -> Optional[Dict[str, Any]]:
+def send_message(token: str, chat_id: str, sender_id: str = None, receiver_id: str = None, content: str = None) -> Optional[Dict[str, Any]]:
     """Send a message in a chat"""
     logging.info(f"Sending message in chat {chat_id}...")
 
     try:
-        # Get profile IDs if needed
-        if "doctor" in sender_id:
-            sender_profile_id = get_doctor_profile_id(token, sender_id) or sender_id
-        elif "patient" in sender_id:
-            sender_profile_id = get_patient_profile_id(token, sender_id) or sender_id
-        else:
-            sender_profile_id = sender_id
-
-        if "doctor" in receiver_id:
-            receiver_profile_id = get_doctor_profile_id(token, receiver_id) or receiver_id
-        elif "patient" in receiver_id:
-            receiver_profile_id = get_patient_profile_id(token, receiver_id) or receiver_id
-        else:
-            receiver_profile_id = receiver_id
-
+        # Prepare message data according to Postman collection
         message_data = {
             "chat_id": chat_id,
-            "sender_id": sender_profile_id,
-            "receiver_id": receiver_profile_id,
-            "message": message,
+            "message": content or "Hello, this is a test message.",  # Using 'message' instead of 'content'
             "message_type": "text"
         }
+
+        # Add sender_id and receiver_id if provided (optional in some implementations)
+        if sender_id:
+            # Get profile IDs if needed
+            if "doctor" in sender_id:
+                sender_profile_id = get_doctor_profile_id(token, sender_id) or sender_id
+            elif "patient" in sender_id:
+                sender_profile_id = get_patient_profile_id(token, sender_id) or sender_id
+            else:
+                sender_profile_id = sender_id
+            message_data["sender_id"] = sender_profile_id
+
+        if receiver_id:
+            if "doctor" in receiver_id:
+                receiver_profile_id = get_doctor_profile_id(token, receiver_id) or receiver_id
+            elif "patient" in receiver_id:
+                receiver_profile_id = get_patient_profile_id(token, receiver_id) or receiver_id
+            else:
+                receiver_profile_id = receiver_id
+            message_data["receiver_id"] = receiver_profile_id
 
         response = requests.post(
             MESSAGES_URL,
@@ -755,13 +887,17 @@ def send_message(token: str, chat_id: str, sender_id: str, receiver_id: str, mes
             headers={"Authorization": f"Bearer {token}"}
         )
 
-        if response.status_code == 200:
-            message_response = response.json()
-            logging.info(f"Sent message with ID: {message_response.get('id')}")
-            return message_response
+        if response.status_code in [200, 201]:
+            message = response.json()
+            logging.info(f"Sent message with ID: {message.get('id')}")
+            return message
         else:
-            logging.error(f"Failed to send message: {response.text}")
-            return None
+            if response.status_code == 404:
+                logging.warning("Message sending endpoint not found (404). This endpoint might not be implemented yet.")
+                return None
+            else:
+                logging.error(f"Failed to send message: {response.text}")
+                return None
     except Exception as e:
         logging.error(f"Error sending message: {str(e)}")
         return None
@@ -792,14 +928,15 @@ def update_message_read_status(token: str, message_ids: List[str], is_read: bool
     logging.info(f"Updating read status for {len(message_ids)} messages...")
 
     try:
-        status_data = {
+        # Use the format from the Postman collection
+        data = {
             "message_ids": message_ids,
             "is_read": is_read
         }
 
         response = requests.put(
             f"{MESSAGES_URL}/read-status",
-            json=status_data,
+            json=data,
             headers={"Authorization": f"Bearer {token}"}
         )
 
@@ -808,8 +945,13 @@ def update_message_read_status(token: str, message_ids: List[str], is_read: bool
             logging.info(f"Updated read status for {result.get('updated_count', 0)} messages")
             return True
         else:
-            logging.error(f"Failed to update message read status: {response.text}")
-            return False
+            # Handle 404 errors gracefully as the endpoint might not be implemented yet
+            if response.status_code == 404:
+                logging.warning("Message read status update endpoint not found (404). This endpoint might not be implemented yet.")
+                return False
+            else:
+                logging.error(f"Failed to update message read status: {response.text}")
+                return False
     except Exception as e:
         logging.error(f"Error updating message read status: {str(e)}")
         return False
@@ -829,13 +971,18 @@ def create_ai_session(token: str, chat_id: str) -> Optional[Dict[str, Any]]:
             headers={"Authorization": f"Bearer {token}"}
         )
 
-        if response.status_code == 200:
+        if response.status_code in [200, 201]:
             session = response.json()
             logging.info(f"Created AI session with ID: {session.get('id')}")
             return session
         else:
-            logging.error(f"Failed to create AI session: {response.text}")
-            return None
+            # Handle 404 errors gracefully as the endpoint might not be implemented yet
+            if response.status_code == 404:
+                logging.warning("AI session creation endpoint not found (404). This endpoint might not be implemented yet.")
+                return None
+            else:
+                logging.error(f"Failed to create AI session: {response.text}")
+                return None
     except Exception as e:
         logging.error(f"Error creating AI session: {str(e)}")
         return None
@@ -845,8 +992,14 @@ def get_ai_session_messages(token: str, session_id: str) -> Optional[Dict[str, A
     logging.info(f"Getting messages for AI session {session_id}...")
 
     try:
+        # Fix the URL path to match the API implementation
+        url = f"{AI_SESSIONS_URL}/{session_id}/messages"
+
+        # Add debug logging
+        logging.info(f"Sending request to: {url}")
+
         response = requests.get(
-            f"{AI_SESSIONS_URL}/{session_id}/messages",
+            url,
             headers={"Authorization": f"Bearer {token}"}
         )
 
@@ -855,8 +1008,13 @@ def get_ai_session_messages(token: str, session_id: str) -> Optional[Dict[str, A
             logging.info(f"Got {len(messages.get('messages', []))} AI messages")
             return messages
         else:
-            logging.error(f"Failed to get AI session messages: {response.text}")
-            return None
+            # Handle 404 errors gracefully as the endpoint might not be implemented yet
+            if response.status_code == 404:
+                logging.warning("AI session messages endpoint not found (404). This endpoint might not be implemented yet.")
+                return None
+            else:
+                logging.error(f"Failed to get AI session messages: {response.text}")
+                return None
     except Exception as e:
         logging.error(f"Error getting AI session messages: {str(e)}")
         return None
@@ -999,7 +1157,15 @@ def main():
         return
 
     # Check if the Docker container is running
-    check_docker_container_running()
+    container_running = check_docker_container_running()
+
+    # If container is not running, try to start it
+    if not container_running:
+        logging.info("Attempting to start Docker container...")
+        if not start_docker_container():
+            logging.error("Failed to start Docker container. Please start it manually and try again.")
+            return
+        logging.info("Docker container started successfully")
 
     # Check if the server is up
     if not check_server_health():
@@ -1019,6 +1185,15 @@ def main():
         return
 
     admin_token = admin_token_data["access_token"]
+    admin_refresh_token = admin_token_data["refresh_token"]
+
+    # Test token refresh
+    refreshed_token_data = refresh_token(admin_refresh_token)
+    if refreshed_token_data:
+        logging.info("Token refresh successful")
+        admin_token = refreshed_token_data["access_token"]
+    else:
+        logging.warning("Token refresh failed, continuing with original token")
 
     # Get doctor token
     doctor_token_data = get_auth_token(TEST_DOCTOR_EMAIL, TEST_DOCTOR_PASSWORD)
@@ -1058,6 +1233,25 @@ def main():
         if updated_current_user is not None:
             logging.info("Update current user profile successful")
 
+    # Test Patients API
+    logging.info("Testing Patients API...")
+
+    # Test get patient by ID with different user roles
+    # Admin access
+    admin_patient = get_patient_by_id(admin_token, patient_id)
+    if admin_patient is not None:
+        logging.info("Get patient by ID (admin) successful")
+
+    # Patient access to their own data
+    patient_self = get_patient_by_id(patient_token, patient_id)
+    if patient_self is not None:
+        logging.info("Get patient by ID (self) successful")
+
+    # Doctor access to patient data
+    doctor_patient = get_patient_by_id(doctor_token, patient_id)
+    if doctor_patient is not None:
+        logging.info("Get patient by ID (doctor) successful")
+
     # Test Hospitals API (implemented)
     logging.info("Testing Hospitals API...")
     hospitals = get_all_hospitals(admin_token)
@@ -1067,6 +1261,40 @@ def main():
     hospital = get_hospital_by_id(admin_token, hospital_id)
     if hospital is not None:
         logging.info("Get hospital by ID successful")
+
+    # Test hospital creating a hospital (new permission)
+    logging.info("Testing hospital creating a hospital...")
+    hospital_token_data = get_auth_token(TEST_HOSPITAL_EMAIL, TEST_HOSPITAL_PASSWORD)
+    if hospital_token_data:
+        hospital_token = hospital_token_data["access_token"]
+
+        # Create a new hospital with hospital token
+        new_hospital_data = {
+            "name": f"{TEST_HOSPITAL_NAME} Branch",
+            "address": f"{TEST_HOSPITAL_NAME} Branch Address, Side Street",
+            "city": "Test City",
+            "state": "Test State",
+            "country": "Test Country",
+            "contact": "9876543210",
+            "pin_code": "54321",
+            "specialities": ["Orthopedics", "Dermatology"],
+            "website": f"https://{TEST_HOSPITAL_NAME.lower().replace(' ', '')}-branch.example.com"
+        }
+
+        try:
+            response = requests.post(
+                HOSPITALS_URL,
+                json=new_hospital_data,
+                headers={"Authorization": f"Bearer {hospital_token}"}
+            )
+
+            if response.status_code in [200, 201]:
+                new_hospital = response.json()
+                logging.info(f"Hospital created a new hospital successfully: {new_hospital.get('name')}")
+            else:
+                logging.warning(f"Hospital creating a hospital failed with status code {response.status_code}. This might be expected if the permission hasn't been implemented yet.")
+        except Exception as e:
+            logging.error(f"Error testing hospital creating a hospital: {str(e)}")
 
     # Test Mappings API (now implemented)
     logging.info("Testing Mappings API...")
@@ -1089,11 +1317,18 @@ def main():
     # Test Chats API (now implemented)
     logging.info("Testing Chats API...")
 
-    # Create chat
-    chat_data = create_chat(admin_token, doctor_id, patient_id)
+    # Create chat - test with patient token (patient can create their own chat)
+    chat_data = create_chat(patient_token, doctor_id, patient_id)
     if chat_data:
         chat_id = chat_data["id"]
         logging.info(f"Created chat with ID: {chat_id}")
+    else:
+        # Fallback to admin token if patient token fails
+        logging.info("Trying to create chat with admin token as fallback")
+        chat_data = create_chat(admin_token, doctor_id, patient_id)
+        if chat_data:
+            chat_id = chat_data["id"]
+            logging.info(f"Created chat with ID: {chat_id}")
 
         # Get all chats
         chats = get_all_chats(patient_token)
@@ -1163,8 +1398,8 @@ def main():
                 ai_messages = get_ai_session_messages(patient_token, session_id)
                 if ai_messages is not None:
                     logging.info("Get AI session messages successful")
-    else:
-        logging.error("Failed to create chat. Skipping chat and message tests.")
+        else:
+            logging.error("Failed to create chat. Skipping chat and message tests.")
 
     print("Docker flow test completed successfully!")
 

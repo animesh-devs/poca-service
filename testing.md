@@ -177,10 +177,23 @@ curl -X POST "http://localhost:8000/api/v1/messages" \
   }'
 ```
 
+### WebSocket Chat Connection
+
+```
+# Connect to the WebSocket endpoint using a WebSocket client
+ws://localhost:8000/api/v1/chats/ws/CHAT_ID?token=YOUR_ACCESS_TOKEN
+
+# Send a message (JSON format)
+{
+  "content": "Hello, this is a real-time message",
+  "message_type": "text"
+}
+```
+
 ### Create AI Session
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/ai-assistant/sessions" \
+curl -X POST "http://localhost:8000/api/v1/ai/sessions" \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -191,7 +204,7 @@ curl -X POST "http://localhost:8000/api/v1/ai-assistant/sessions" \
 ### Send Message to AI
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/ai-assistant/sessions/SESSION_ID/messages" \
+curl -X POST "http://localhost:8000/api/v1/ai/messages" \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{

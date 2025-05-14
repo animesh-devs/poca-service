@@ -13,11 +13,15 @@ from app.api import (
     hospitals,
     ai,
     patients,
+    patients_router,
+    doctors,
     mappings,
     chats,
-    messages
+    messages,
+    appointments,
+    suggestions
 )
-from app.websockets import ai_assistant
+from app.websockets import ai_assistant, chat
 from app.errors import http_exception_handler, validation_exception_handler
 
 # Configure logging
@@ -56,12 +60,17 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.include_router(auth.router, prefix=f"{settings.API_V1_PREFIX}/auth", tags=["Authentication"])
 app.include_router(users.router, prefix=f"{settings.API_V1_PREFIX}/users", tags=["Users"])
 app.include_router(hospitals.router, prefix=f"{settings.API_V1_PREFIX}/hospitals", tags=["Hospitals"])
-app.include_router(patients.router, prefix=f"{settings.API_V1_PREFIX}/patients", tags=["Patients"])
+app.include_router(patients.router, prefix=f"{settings.API_V1_PREFIX}/patients", tags=["Patient Case History"])
+app.include_router(patients_router.router, prefix=f"{settings.API_V1_PREFIX}/patients", tags=["Patients"])
+app.include_router(doctors.router, prefix=f"{settings.API_V1_PREFIX}/doctors", tags=["Doctors"])
 app.include_router(ai.router, prefix=f"{settings.API_V1_PREFIX}/ai", tags=["AI Assistant"])
 app.include_router(ai_assistant.router, prefix=f"{settings.API_V1_PREFIX}/ai-assistant", tags=["AI Assistant WebSocket"])
+app.include_router(chat.router, prefix=f"{settings.API_V1_PREFIX}/chats", tags=["Chat WebSocket"])
 app.include_router(mappings.router, prefix=f"{settings.API_V1_PREFIX}/mappings", tags=["Mappings"])
 app.include_router(chats.router, prefix=f"{settings.API_V1_PREFIX}/chats", tags=["Chats"])
 app.include_router(messages.router, prefix=f"{settings.API_V1_PREFIX}/messages", tags=["Messages"])
+app.include_router(appointments.router, prefix=f"{settings.API_V1_PREFIX}/appointments", tags=["Appointments"])
+app.include_router(suggestions.router, prefix=f"{settings.API_V1_PREFIX}/suggestions", tags=["Suggestions"])
 
 @app.get("/")
 def read_root():

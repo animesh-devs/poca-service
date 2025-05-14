@@ -264,10 +264,9 @@ Create a comprehensive backend service for doctor-patient communication with AI 
 - PUT /api/v1/messages/{message_id}/read (update read status)
 
 ### AI Assistant
-- POST /api/v1/ai-assistant/sessions (create AI session)
-- GET /api/v1/ai-assistant/sessions/{session_id} (get AI session)
-- GET /api/v1/ai-assistant/sessions/{session_id}/messages (get AI session messages)
-- POST /api/v1/ai-assistant/sessions/{session_id}/messages (send message to AI assistant)
+- POST /api/v1/ai/sessions (create AI session)
+- GET /api/v1/ai/sessions/{session_id}/messages (get AI session messages)
+- POST /api/v1/ai/messages (send message to AI assistant)
 - WebSocket /api/v1/ai-assistant/ws/{session_id} (real-time AI chat)
 
 ### Suggestions

@@ -1,0 +1,130 @@
+# API Endpoints and Role-Based Access Control
+
+## 1. Health Checks
+- **GET /** - Public (No authentication required)
+- **GET /health** - Public (No authentication required)
+
+## 2. Authentication
+- **POST /api/v1/auth/login** - Public (No authentication required)
+- **POST /api/v1/auth/refresh** - Public (No authentication required)
+- **POST /api/v1/auth/doctor-signup** - Public (No authentication required)
+- **POST /api/v1/auth/patient-signup** - Public (No authentication required)
+- **POST /api/v1/auth/hospital-signup** - Public (No authentication required)
+- **POST /api/v1/auth/signup** - Admin only
+
+## 3. Users
+- **GET /api/v1/users** - Admin only
+- **GET /api/v1/users/{user_id}** - All authenticated users
+- **PUT /api/v1/users/{user_id}** - Admin or the user themselves
+- **GET /api/v1/users/me** - All authenticated users
+- **PUT /api/v1/users/me** - All authenticated users
+
+## 4. Hospitals
+- **GET /api/v1/hospitals** - All authenticated users
+- **GET /api/v1/hospitals/{hospital_id}** - All authenticated users
+- **POST /api/v1/hospitals** - Admin or hostital
+- **PUT /api/v1/hospitals/{hospital_id}** - Admin or the hospital itself
+- **GET /api/v1/hospitals/{hospital_id}/patients** - Admin, the hospital itself, or doctors in the hospital
+- **GET /api/v1/hospitals/{hospital_id}/doctors** - All authenticated users
+
+## 5. Doctors
+- **GET /api/v1/doctors** - All authenticated users
+- **GET /api/v1/doctors/{doctor_id}** - All authenticated users
+- **PUT /api/v1/doctors/{doctor_id}** - Admin or the doctor themselves
+- **GET /api/v1/doctors/{doctor_id}/patients** - Admin, the doctor themselves
+- **GET /api/v1/doctors/{doctor_id}/hospitals** - All authenticated users
+
+## 6. Patients
+- **GET /api/v1/patients** - Admin only
+- **GET /api/v1/patients/{patient_id}** - All authenticated users
+- **GET /api/v1/patients/{patient_id}/doctors** - All authenticated users
+- **PUT /api/v1/patients/{patient_id}** - Admin or the patient themselves
+- **GET /api/v1/patients/{patient_id}/case-history** - Admin, doctors treating the patient, or the patient themselves
+- **POST /api/v1/patients/{patient_id}/case-history** - Admin, doctors treating the patient
+- **PUT /api/v1/patients/{patient_id}/case-history** - Admin, doctors treating the patient
+- **GET /api/v1/patients/{patient_id}/documents** - Admin, doctors treating the patient, or the patient themselves
+- **GET /api/v1/patients/{patient_id}/reports** - Admin, doctors treating the patient, or the patient themselves
+- **GET /api/v1/patients/{patient_id}/reports/{report_id}** - Admin, doctors treating the patient, or the patient themselves
+- **POST /api/v1/patients/{patient_id}/reports** - Admin, doctors treating the patient, or the patient themselves
+- **PUT /api/v1/patients/{patient_id}/reports/{report_id}** - Admin, doctors treating the patient, or the patient themselves
+- **POST /api/v1/patients/{patient_id}/reports/{report_id}/documents** - Admin, doctors treating the patient, or the patient themselves
+- **POST /api/v1/patients/{patient_id}/case-history/documents** - Admin, doctors treating the patient, or the patient themselves
+
+## 7. Mappings
+- **POST /api/v1/mappings/hospital-doctor** - Admin only
+- **DELETE /api/v1/mappings/hospital-doctor/{mapping_id}** - Admin only
+- **POST /api/v1/mappings/hospital-patient** - Admin only
+- **DELETE /api/v1/mappings/hospital-patient/{mapping_id}** - Admin only
+- **POST /api/v1/mappings/doctor-patient** - Admin only
+- **DELETE /api/v1/mappings/doctor-patient/{mapping_id}** - Admin only
+- **POST /api/v1/mappings/user-patient** - All authenticated users
+- **PUT /api/v1/mappings/user-patient/{mapping_id}** - Admin or the user who created the relation
+- **DELETE /api/v1/mappings/user-patient/{mapping_id}** - Admin or the user who created the relation
+
+## 8. Chats
+- **GET /api/v1/chats** - All authenticated users (returns only chats relevant to the user)
+- **GET /api/v1/chats/{chat_id}** - Admin, or users who are part of the chat
+- **POST /api/v1/chats** - Admin, or users who are part of the chat
+- **GET /api/v1/chats/{chat_id}/messages** - Admin, or users who are part of the chat
+- **PUT /api/v1/chats/{chat_id}/deactivate** - Admin, or users who are part of the chat
+- **DELETE /api/v1/chats/{chat_id}** - Admin only
+- **GET /api/v1/chats/ws/{chat_id}** - Admin, or users who are part of the chat
+
+## 9. Messages
+- **POST /api/v1/messages** - All authenticated users (can only send to chats they're part of)
+- **PUT /api/v1/messages/read-status** - All authenticated users (can only update messages in their chats)
+- **PUT /api/v1/messages/{message_id}/read** - All authenticated users (can only update messages in their chats)
+- **GET /api/v1/messages/chat/{chat_id}** - Admin, or users who are part of the chat
+
+## 10. Appointments
+- **POST /api/v1/appointments** - All authenticated users
+- **GET /api/v1/appointments** - Admin only
+- **GET /api/v1/appointments/{appointment_id}** - Admin, or users who are part of the appointment
+- **PUT /api/v1/appointments/{appointment_id}** - Admin, or users who are part of the appointment
+- **DELETE /api/v1/appointments/{appointment_id}** - Admin, or users who are part of the appointment
+- **PUT /api/v1/appointments/{appointment_id}/cancel** - Admin, or users who are part of the appointment
+- **PUT /api/v1/appointments/{appointment_id}/status** - Admin, or the doctor in the appointment
+- **GET /api/v1/appointments/doctor/{doctor_id}** - Admin, or the doctor themselves
+- **GET /api/v1/appointments/patient/{patient_id}** - Admin, doctors treating the patient, or the patient themselves
+- **GET /api/v1/appointments/hospital/{hospital_id}** - Admin, or the hospital itself
+
+## 11. Suggestions
+- **POST /api/v1/suggestions** - Admins or Doctors only
+- **GET /api/v1/suggestions** - Admin only (all suggestions), Patients (suggestions for their doctors)
+- **GET /api/v1/suggestions/{suggestion_id}** - Admin, or the doctor who created the suggestion
+- **PUT /api/v1/suggestions/{suggestion_id}** - Admin, or the doctor who created the suggestion
+- **DELETE /api/v1/suggestions/{suggestion_id}** - Admin, or the doctor who created the suggestion
+
+## 12. AI Assistant
+- **POST /api/v1/ai/sessions** - Admin, All authenticated users
+- **POST /api/v1/ai/messages** - Admin, All authenticated users
+- **GET /api/v1/ai/sessions/{session_id}/messages** - Admin, All authenticated users who are part of the session
+- **PUT /api/v1/ai/sessions/{session_id}/end** - Admin, All authenticated users who are part of the session
+- **PUT /api/v1/ai/sessions/{session_id}/summary** - Admin, All authenticated users who are part of the session
+- **GET /api/v1/ai-assistant/ws/{session_id}** - Admin, All authenticated users who are part of the session
+- **POST /api/v1/ai/suggested-response** - Admin, Doctors only
+
+## Summary of Role-Based Access
+
+1. **Admin** - Has access to all endpoints and can perform all operations
+2. **Doctor** - Can access:
+   - Their own profile and related data
+   - Patients they are treating
+   - Chats they are part of
+   - Appointments they are involved in
+   - Create and manage suggestions
+   - Use AI assistant features
+   - View hospitals they are associated with
+
+3. **Patient** - Can access:
+   - Their own profile and related data
+   - Doctors treating them
+   - Chats they are part of
+   - Appointments they are involved in
+   - Use AI assistant features
+   - View hospitals they are associated with
+
+4. **Hospital** - Can access:
+   - Their own profile and related data
+   - Doctors and patients associated with them
+   - Appointments at their facility

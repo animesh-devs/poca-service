@@ -7,6 +7,8 @@ from app.db.database import get_db
 from app.models.ai import AISession, AIMessage
 from app.models.chat import Chat, Message
 from app.models.user import User, UserRole
+from app.models.doctor import Doctor
+from app.models.patient import Patient
 from app.schemas.ai import (
     AISessionCreate, AISessionResponse,
     AIMessageCreate, AIMessageResponse, AIMessageListResponse,
@@ -150,7 +152,17 @@ async def create_ai_message(
         pass  # Admin has access to all chats
     # Doctor users should have their profile_id match the chat's doctor_id
     elif current_user.role == UserRole.DOCTOR:
-        if current_user.profile_id != chat.doctor_id:
+        has_access = False
+        # Check if profile_id matches doctor_id
+        if current_user.profile_id and current_user.profile_id == chat.doctor_id:
+            has_access = True
+        # Check if user_id matches doctor's user_id
+        else:
+            doctor = db.query(Doctor).filter(Doctor.id == chat.doctor_id).first()
+            if doctor and doctor.user_id == current_user.id:
+                has_access = True
+
+        if not has_access:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=create_error_response(
@@ -161,7 +173,17 @@ async def create_ai_message(
             )
     # Patient users should have their profile_id match the chat's patient_id
     elif current_user.role == UserRole.PATIENT:
-        if current_user.profile_id != chat.patient_id:
+        has_access = False
+        # Check if profile_id matches patient_id
+        if current_user.profile_id and current_user.profile_id == chat.patient_id:
+            has_access = True
+        # Check if user_id matches patient's user_id
+        else:
+            patient = db.query(Patient).filter(Patient.id == chat.patient_id).first()
+            if patient and patient.user_id == current_user.id:
+                has_access = True
+
+        if not has_access:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=create_error_response(

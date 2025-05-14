@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 from app.models.user import UserRole
@@ -45,6 +45,16 @@ class PatientSignup(BaseModel):
     gender: Optional[str] = None
     contact: Optional[str] = None
     photo: Optional[str] = None
+    age: Optional[int] = None
+    blood_group: Optional[str] = None
+    height: Optional[int] = None
+    weight: Optional[int] = None
+    allergies: Optional[List[str]] = None
+    medications: Optional[List[str]] = None
+    conditions: Optional[List[str]] = None
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_number: Optional[str] = None
+    address: Optional[str] = None
 
 class HospitalSignup(BaseModel):
     email: EmailStr

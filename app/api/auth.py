@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 from jose import jwt, JWTError
 from typing import Any
+import logging
 
 from app.db.database import get_db
 from app.models.user import User, UserRole
@@ -177,6 +178,7 @@ async def patient_signup(
         gender=patient_data.gender,
         contact=patient_data.contact,
         photo=patient_data.photo
+        # Note: Additional fields like age, blood_group, etc. are stored in the patient's case history
     )
 
     db.add(db_patient)
@@ -191,12 +193,54 @@ async def patient_signup(
         name=patient_data.name,
         role=UserRole.PATIENT,
         contact=patient_data.contact,
+        address=patient_data.address,
         profile_id=db_patient.id
     )
 
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
+
+    # Create initial case history with additional patient data if provided
+    if any([
+        patient_data.age, patient_data.blood_group, patient_data.height,
+        patient_data.weight, patient_data.allergies, patient_data.medications,
+        patient_data.conditions, patient_data.emergency_contact_name,
+        patient_data.emergency_contact_number
+    ]):
+        from app.models.case_history import CaseHistory
+
+        # Prepare summary with additional patient data
+        summary_parts = []
+        if patient_data.age:
+            summary_parts.append(f"Age: {patient_data.age}")
+        if patient_data.blood_group:
+            summary_parts.append(f"Blood Group: {patient_data.blood_group}")
+        if patient_data.height:
+            summary_parts.append(f"Height: {patient_data.height} cm")
+        if patient_data.weight:
+            summary_parts.append(f"Weight: {patient_data.weight} kg")
+        if patient_data.allergies:
+            summary_parts.append(f"Allergies: {', '.join(patient_data.allergies)}")
+        if patient_data.medications:
+            summary_parts.append(f"Medications: {', '.join(patient_data.medications)}")
+        if patient_data.conditions:
+            summary_parts.append(f"Conditions: {', '.join(patient_data.conditions)}")
+        if patient_data.emergency_contact_name:
+            summary_parts.append(f"Emergency Contact: {patient_data.emergency_contact_name}")
+        if patient_data.emergency_contact_number:
+            summary_parts.append(f"Emergency Contact Number: {patient_data.emergency_contact_number}")
+
+        summary = "\n".join(summary_parts)
+
+        db_case_history = CaseHistory(
+            patient_id=db_patient.id,
+            summary=summary
+        )
+
+        db.add(db_case_history)
+        db.commit()
+        db.refresh(db_case_history)
 
     # Create access and refresh tokens
     access_token = create_access_token(
@@ -221,71 +265,84 @@ async def hospital_signup(
     """
     Create a new hospital account
     """
-    # Check if user with this email already exists
-    db_user = db.query(User).filter(User.email == hospital_data.email).first()
-    if db_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=create_error_response(
+    try:
+        # Check if user with this email already exists
+        db_user = db.query(User).filter(User.email == hospital_data.email).first()
+        if db_user:
+            raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                message="Email already registered",
-                error_code=ErrorCode.RES_002
+                detail=create_error_response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message="Email already registered",
+                    error_code=ErrorCode.RES_002
+                )
+            )
+
+        # Create hospital profile
+        db_hospital = Hospital(
+            name=hospital_data.name,
+            address=hospital_data.address,
+            city=hospital_data.city,
+            state=hospital_data.state,
+            country=hospital_data.country,
+            contact=hospital_data.contact,
+            pin_code=hospital_data.pin_code,
+            email=hospital_data.email,
+            specialities=hospital_data.specialities,
+            website=hospital_data.website
+        )
+
+        db.add(db_hospital)
+        db.commit()
+        db.refresh(db_hospital)
+
+        # Create user account
+        hashed_password = get_password_hash(hospital_data.password)
+        db_user = User(
+            email=hospital_data.email,
+            hashed_password=hashed_password,
+            name=hospital_data.name,
+            role=UserRole.HOSPITAL,
+            contact=hospital_data.contact,
+            address=hospital_data.address,
+            profile_id=db_hospital.id
+        )
+
+        # Link the hospital to the user
+        db_hospital.user_id = db_user.id
+
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+        db.refresh(db_hospital)
+
+        # Create access and refresh tokens
+        access_token = create_access_token(
+            data={"sub": db_user.id},
+            expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        )
+        refresh_token = create_refresh_token(data={"sub": db_user.id})
+
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+            "user_id": db_user.id,
+            "role": db_user.role
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=create_error_response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred: {str(e)}",
+                error_code=ErrorCode.SRV_001
             )
         )
 
-    # Create hospital profile
-    db_hospital = Hospital(
-        name=hospital_data.name,
-        address=hospital_data.address,
-        city=hospital_data.city,
-        state=hospital_data.state,
-        country=hospital_data.country,
-        contact=hospital_data.contact,
-        pin_code=hospital_data.pin_code,
-        email=hospital_data.email,
-        specialities=hospital_data.specialities,
-        website=hospital_data.website
-    )
-
-    db.add(db_hospital)
-    db.commit()
-    db.refresh(db_hospital)
-
-    # Create user account
-    hashed_password = get_password_hash(hospital_data.password)
-    db_user = User(
-        email=hospital_data.email,
-        hashed_password=hashed_password,
-        name=hospital_data.name,
-        role=UserRole.HOSPITAL,
-        contact=hospital_data.contact,
-        address=hospital_data.address,
-        profile_id=db_hospital.id
-    )
-
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-
-    # Create access and refresh tokens
-    access_token = create_access_token(
-        data={"sub": db_user.id},
-        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
-    refresh_token = create_refresh_token(data={"sub": db_user.id})
-
-    return {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-        "user_id": db_user.id,
-        "role": db_user.role
-    }
-
 # Simple in-memory rate limiting for failed login attempts
 # In a production environment, this should be replaced with a Redis-based solution
-from datetime import datetime, timedelta
-import logging
 
 # Track failed login attempts: {email: [(timestamp, ip_address), ...]}
 failed_login_attempts = {}
@@ -310,7 +367,7 @@ async def login(
 
     # Check for too many failed login attempts
     email = form_data.username
-    current_time = datetime.utcnow()
+    current_time = datetime.now(timezone.utc)
 
     if email in failed_login_attempts:
         # Clean up old attempts (older than lockout duration)
@@ -401,7 +458,7 @@ async def login(
 
 @router.post("/refresh", response_model=Token)
 async def refresh_token(
-    token_data: RefreshToken,
+    refresh_data: RefreshToken,
     db: Session = Depends(get_db)
 ) -> Any:
     """
@@ -410,12 +467,12 @@ async def refresh_token(
     try:
         # Decode the refresh token
         payload = jwt.decode(
-            token_data.refresh_token, settings.SECRET_KEY, algorithms=["HS256"]
+            refresh_data.refresh_token, settings.SECRET_KEY, algorithms=["HS256"]
         )
-        token_data = TokenPayload(**payload)
+        token_payload = TokenPayload(**payload)
 
         # Check if token is a refresh token
-        if token_data.type != "refresh":
+        if token_payload.type != "refresh":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=create_error_response(
@@ -426,7 +483,7 @@ async def refresh_token(
             )
 
         # Get user from database
-        user = db.query(User).filter(User.id == token_data.sub).first()
+        user = db.query(User).filter(User.id == token_payload.sub).first()
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -456,17 +513,28 @@ async def refresh_token(
 
         return {
             "access_token": access_token,
-            "refresh_token": token_data.refresh_token,
+            "refresh_token": refresh_data.refresh_token,
             "token_type": "bearer",
             "user_id": user.id,
             "role": user.role
         }
-    except JWTError:
+    except JWTError as e:
+        logging.error(f"JWT error during token refresh: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=create_error_response(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 message="Invalid token",
                 error_code=ErrorCode.AUTH_003
+            )
+        )
+    except Exception as e:
+        logging.error(f"Unexpected error during token refresh: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=create_error_response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message="An unexpected error occurred",
+                error_code=ErrorCode.SERVER_000
             )
         )

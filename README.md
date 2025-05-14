@@ -187,9 +187,10 @@ The API documentation is available at `/api/v1/docs` when the service is running
 #### Authentication
 - `POST /api/v1/auth/login` - User login
 - `POST /api/v1/auth/refresh` - Refresh access token
-- `POST /api/v1/auth/doctor/signup` - Doctor signup
-- `POST /api/v1/auth/patient/signup` - Patient signup
-- `POST /api/v1/auth/hospital/signup` - Hospital signup
+- `POST /api/v1/auth/doctor-signup` - Doctor signup
+- `POST /api/v1/auth/patient-signup` - Patient signup
+- `POST /api/v1/auth/hospital-signup` - Hospital signup
+- `POST /api/v1/auth/signup` - Create a new user (admin only)
 
 #### Users
 - `GET /api/v1/users` - Get all users (admin only)
@@ -224,9 +225,12 @@ The API documentation is available at `/api/v1/docs` when the service is running
 - `POST /api/v1/mappings/hospital-doctor` - Map a hospital to a doctor
 - `POST /api/v1/mappings/hospital-patient` - Map a hospital to a patient
 - `POST /api/v1/mappings/doctor-patient` - Map a doctor to a patient
+- `POST /api/v1/mappings/user-patient` - Create user-patient relation
+- `PUT /api/v1/mappings/user-patient/{relation_id}` - Update user-patient relation
 - `DELETE /api/v1/mappings/hospital-doctor/{mapping_id}` - Delete a hospital-doctor mapping
 - `DELETE /api/v1/mappings/hospital-patient/{mapping_id}` - Delete a hospital-patient mapping
 - `DELETE /api/v1/mappings/doctor-patient/{mapping_id}` - Delete a doctor-patient mapping
+- `DELETE /api/v1/mappings/user-patient/{relation_id}` - Delete user-patient relation
 
 #### Chats
 - `POST /api/v1/chats` - Create a new chat
@@ -234,17 +238,45 @@ The API documentation is available at `/api/v1/docs` when the service is running
 - `GET /api/v1/chats/{chat_id}` - Get a specific chat
 - `PUT /api/v1/chats/{chat_id}/deactivate` - Deactivate a chat
 - `DELETE /api/v1/chats/{chat_id}` - Delete a chat (admin only)
+- `WebSocket /api/v1/chats/ws/{chat_id}?token={authToken}` - Real-time chat communication
 
 #### Messages
 - `POST /api/v1/messages` - Send a message
-- `GET /api/v1/messages/chat/{chat_id}` - Get all messages for a chat
-- `PUT /api/v1/messages/read-status` - Update read status for messages
+- `GET /api/v1/messages/chat/{chat_id}` - Get all messages for a chat (primary endpoint)
+- `GET /api/v1/chats/{chat_id}/messages` - Get all messages for a chat (alternative endpoint, same functionality)
+- `PUT /api/v1/messages/read-status` - Update read status for multiple messages
+- `PUT /api/v1/messages/{message_id}/read` - Update read status for a single message
+
+> **Note**: Both `GET /api/v1/messages/chat/{chat_id}` and `GET /api/v1/chats/{chat_id}/messages` provide the same functionality. The first is the primary endpoint, while the second is provided as an alternative for convenience.
+
+#### Appointments
+- `POST /api/v1/appointments` - Create a new appointment
+- `GET /api/v1/appointments` - List all appointments (admin only)
+- `GET /api/v1/appointments/{appointment_id}` - Get appointment details
+- `PUT /api/v1/appointments/{appointment_id}` - Update appointment
+- `DELETE /api/v1/appointments/{appointment_id}` - Cancel appointment
+- `PUT /api/v1/appointments/{appointment_id}/cancel` - Cancel appointment with reason
+- `PUT /api/v1/appointments/{appointment_id}/status` - Update appointment status
+- `GET /api/v1/appointments/doctor/{doctor_id}` - Get all appointments for a doctor
+- `GET /api/v1/appointments/patient/{patient_id}` - Get all appointments for a patient
+- `GET /api/v1/appointments/hospital/{hospital_id}` - Get all appointments for a hospital
+
+#### Suggestions
+- `POST /api/v1/suggestions` - Create a new suggestion (doctor only)
+- `GET /api/v1/suggestions` - List all suggestions (admin only)
+- `GET /api/v1/suggestions?doctor_id={doctor_id}` - List suggestions for a specific doctor
+- `GET /api/v1/suggestions/{suggestion_id}` - Get suggestion details
+- `PUT /api/v1/suggestions/{suggestion_id}` - Update suggestion
+- `DELETE /api/v1/suggestions/{suggestion_id}` - Delete suggestion
 
 #### AI Assistant
 - `POST /api/v1/ai/sessions` - Create a new AI session
 - `GET /api/v1/ai/sessions/{session_id}` - Get an AI session
 - `POST /api/v1/ai/messages` - Send a message to AI
 - `GET /api/v1/ai/sessions/{session_id}/messages` - Get all messages for an AI session
+- `PUT /api/v1/ai/sessions/{session_id}/end` - End an AI session
+- `POST /api/v1/ai/suggested-response` - Generate a suggested response for a doctor based on a patient summary
+- `WebSocket /api/v1/ai-assistant/ws/{aiSessionId}?token={authToken}` - Real-time AI assistant communication
 
 ## 📝 License
 
