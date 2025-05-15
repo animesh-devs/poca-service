@@ -10,6 +10,13 @@
       "description": "Base URL for HTTP connections"
     },
     {
+      "key": "wsBaseUrl",
+      "value": "ws://localhost:8000",
+      "type": "default",
+      "enabled": true,
+      "description": "Base URL for WebSocket connections (non-secure)"
+    },
+    {
       "key": "wssBaseUrl",
       "value": "wss://localhost:8000",
       "type": "default",

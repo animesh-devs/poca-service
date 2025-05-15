@@ -78,8 +78,9 @@ For testing the AI Assistant WebSocket endpoint:
 2. Copy the `aiSessionId` from the response
 3. In Postman, open the "POCA Service WebSocket APIs" collection
 4. Select the "AI Assistant WebSocket" request
-5. The WebSocket URL should be: `wss://localhost:8000/api/v1/ai-assistant/ws/{aiSessionId}?token={authToken}`
+5. The WebSocket URL should be: `ws://localhost:8000/api/v1/ai-assistant/ws/{aiSessionId}?token={authToken}`
    - The `aiSessionId` and `authToken` variables will be automatically filled from your environment
+   - For secure connections, use `wss://` instead of `ws://`
 6. Connect to the WebSocket
 7. Send messages in JSON format:
    ```json
@@ -97,8 +98,9 @@ For testing the Chat WebSocket endpoint (for doctor-patient communication):
 2. Copy the `chatId` from the response
 3. In Postman, open the "POCA Service WebSocket APIs" collection
 4. Select the "Chat WebSocket" request
-5. The WebSocket URL should be: `wss://localhost:8000/api/v1/chats/ws/{chatId}?token={authToken}`
+5. The WebSocket URL should be: `ws://localhost:8000/api/v1/chats/ws/{chatId}?token={authToken}`
    - The `chatId` and `authToken` variables will be automatically filled from your environment
+   - For secure connections, use `wss://` instead of `ws://`
 6. Connect to the WebSocket
 7. Send messages in JSON format:
    ```json
@@ -109,7 +111,7 @@ For testing the Chat WebSocket endpoint (for doctor-patient communication):
    ```
 8. All participants in the same chat room will receive the messages
 
-> **Note**: WebSocket connections require the WSS protocol (secure WebSockets). The environment is configured with a `wssBaseUrl` variable that includes this protocol.
+> **Note**: WebSocket connections can use either the `ws://` protocol (non-secure) or the `wss://` protocol (secure). The environment is configured with both `wsBaseUrl` and `wssBaseUrl` variables. For local testing, `ws://` is usually sufficient, but for production environments, `wss://` is recommended.
 
 ## Environment Variables
 
