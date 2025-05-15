@@ -54,7 +54,7 @@ async def websocket_chat_endpoint(
             # Check if the patient is part of this chat
             if current_user.profile_id and current_user.profile_id == chat.patient_id:
                 has_access = True
-        
+
         if not has_access:
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return
@@ -127,6 +127,16 @@ async def websocket_chat_endpoint(
                     is_read=False
                 )
 
+                # Update is_active flags based on who is sending the message
+                # If doctor is sending, set is_active_for_patient=True and is_active_for_doctor=False
+                # If patient is sending, set is_active_for_doctor=True and is_active_for_patient=False
+                if current_user.role == UserRole.DOCTOR:
+                    chat.is_active_for_patient = True
+                    chat.is_active_for_doctor = False
+                elif current_user.role == UserRole.PATIENT:
+                    chat.is_active_for_doctor = True
+                    chat.is_active_for_patient = False
+
                 db.add(db_message)
                 db.commit()
                 db.refresh(db_message)
@@ -144,7 +154,7 @@ async def websocket_chat_endpoint(
                         "is_read": db_message.is_read
                     }
                 }
-                
+
                 # Send to all clients in the chat
                 connected_clients = manager.get_connected_clients(chat_id)
                 for connected_client in connected_clients:

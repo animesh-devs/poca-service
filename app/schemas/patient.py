@@ -25,7 +25,7 @@ class PatientResponse(PatientBase):
     id: str
     created_at: datetime
     updated_at: Optional[datetime] = None
-    
+
     class Config:
         from_attributes = True
 
@@ -33,10 +33,11 @@ class PatientListItem(BaseModel):
     id: str
     name: str
     gender: Optional[Gender] = None
+    dob: Optional[date] = None
+    contact: Optional[str] = None
     photo: Optional[str] = None
-    chat_id: Optional[str] = None
-    is_active_chat: Optional[bool] = None
-    
+    relation: Optional[str] = None
+
     class Config:
         from_attributes = True
 

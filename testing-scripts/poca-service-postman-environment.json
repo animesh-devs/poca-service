@@ -4,105 +4,129 @@
   "values": [
     {
       "key": "baseUrl",
-      "value": "http://localhost:8000",
+      "value": "localhost:8000",
       "type": "default",
-      "enabled": true
+      "enabled": true,
+      "description": "Base URL for both HTTP and WebSocket connections (protocol specified separately)"
     },
     {
       "key": "authToken",
       "value": "",
       "type": "secret",
-      "enabled": true
+      "enabled": true,
+      "description": "Authentication token"
     },
     {
       "key": "refreshToken",
       "value": "",
       "type": "secret",
-      "enabled": true
+      "enabled": true,
+      "description": "Refresh token"
     },
     {
       "key": "userId",
       "value": "",
       "type": "default",
-      "enabled": true
+      "enabled": true,
+      "description": "Current user ID"
     },
     {
       "key": "userRole",
       "value": "",
       "type": "default",
-      "enabled": true
+      "enabled": true,
+      "description": "Current user role"
     },
     {
       "key": "hospitalId",
       "value": "",
       "type": "default",
-      "enabled": true
+      "enabled": true,
+      "description": "Hospital ID for testing"
     },
     {
       "key": "doctorId",
       "value": "",
       "type": "default",
-      "enabled": true
+      "enabled": true,
+      "description": "Doctor ID for testing"
     },
     {
       "key": "patientId",
       "value": "",
       "type": "default",
-      "enabled": true
+      "enabled": true,
+      "description": "Patient ID for testing"
     },
     {
       "key": "chatId",
       "value": "",
       "type": "default",
-      "enabled": true
+      "enabled": true,
+      "description": "Chat ID for testing"
     },
     {
       "key": "messageId",
       "value": "",
       "type": "default",
-      "enabled": true
+      "enabled": true,
+      "description": "Message ID for testing"
     },
     {
       "key": "aiSessionId",
       "value": "",
       "type": "default",
-      "enabled": true
+      "enabled": true,
+      "description": "AI Session ID for testing"
     },
     {
       "key": "reportId",
       "value": "",
       "type": "default",
-      "enabled": true
+      "enabled": true,
+      "description": "Report ID for testing"
     },
     {
       "key": "mappingId",
       "value": "",
       "type": "default",
-      "enabled": true
+      "enabled": true,
+      "description": "Mapping ID for testing"
     },
     {
       "key": "caseHistoryId",
       "value": "",
       "type": "default",
-      "enabled": true
+      "enabled": true,
+      "description": "Case History ID for testing"
     },
     {
       "key": "appointmentId",
       "value": "",
       "type": "default",
-      "enabled": true
+      "enabled": true,
+      "description": "Appointment ID for testing"
     },
     {
       "key": "suggestionId",
       "value": "",
       "type": "default",
-      "enabled": true
+      "enabled": true,
+      "description": "Suggestion ID for testing"
     },
     {
       "key": "userEntityId",
       "value": "",
       "type": "default",
-      "enabled": true
+      "enabled": true,
+      "description": "Current user entity ID (used in user-entity-id header)"
+    },
+    {
+      "key": "receiverId",
+      "value": "",
+      "type": "default",
+      "enabled": true,
+      "description": "Receiver ID for messaging"
     }
   ],
   "_postman_variable_scope": "environment"

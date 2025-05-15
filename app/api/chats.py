@@ -89,9 +89,7 @@ async def create_chat(
     # Check if chat already exists
     existing_chat = db.query(Chat).filter(
         Chat.doctor_id == chat_data.doctor_id,
-        Chat.patient_id == chat_data.patient_id,
-        Chat.is_active_for_doctor == True,
-        Chat.is_active_for_patient == True
+        Chat.patient_id == chat_data.patient_id
     ).first()
 
     if existing_chat:
@@ -99,7 +97,7 @@ async def create_chat(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=create_error_response(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                message="Active chat already exists between this doctor and patient",
+                message="Chat already exists between this doctor and patient",
                 error_code=ErrorCode.RES_002
             )
         )
@@ -129,17 +127,15 @@ async def get_chats(
         chats = db.query(Chat).offset(skip).limit(limit).all()
         total = db.query(Chat).count()
     elif current_user.role == UserRole.DOCTOR:
-        # Doctors can see their chats that are active for doctors
+        # Doctors can see all their chats
         if current_user.profile_id:
             # Use profile_id directly if available
             doctor_id = current_user.profile_id
             chats = db.query(Chat).filter(
-                Chat.doctor_id == doctor_id,
-                Chat.is_active_for_doctor == True
+                Chat.doctor_id == doctor_id
             ).offset(skip).limit(limit).all()
             total = db.query(Chat).filter(
-                Chat.doctor_id == doctor_id,
-                Chat.is_active_for_doctor == True
+                Chat.doctor_id == doctor_id
             ).count()
         else:
             # Try to find doctor profile
@@ -154,25 +150,21 @@ async def get_chats(
                     )
                 )
             chats = db.query(Chat).filter(
-                Chat.doctor_id == doctor.id,
-                Chat.is_active_for_doctor == True
+                Chat.doctor_id == doctor.id
             ).offset(skip).limit(limit).all()
             total = db.query(Chat).filter(
-                Chat.doctor_id == doctor.id,
-                Chat.is_active_for_doctor == True
+                Chat.doctor_id == doctor.id
             ).count()
     elif current_user.role == UserRole.PATIENT:
-        # Patients can see their chats that are active for patients
+        # Patients can see all their chats
         if current_user.profile_id:
             # Use profile_id directly if available
             patient_id = current_user.profile_id
             chats = db.query(Chat).filter(
-                Chat.patient_id == patient_id,
-                Chat.is_active_for_patient == True
+                Chat.patient_id == patient_id
             ).offset(skip).limit(limit).all()
             total = db.query(Chat).filter(
-                Chat.patient_id == patient_id,
-                Chat.is_active_for_patient == True
+                Chat.patient_id == patient_id
             ).count()
         else:
             # Try to find patient profile by user_id
@@ -192,12 +184,10 @@ async def get_chats(
                     )
                 )
             chats = db.query(Chat).filter(
-                Chat.patient_id == patient.id,
-                Chat.is_active_for_patient == True
+                Chat.patient_id == patient.id
             ).offset(skip).limit(limit).all()
             total = db.query(Chat).filter(
-                Chat.patient_id == patient.id,
-                Chat.is_active_for_patient == True
+                Chat.patient_id == patient.id
             ).count()
     else:
         # Hospitals and other roles don't have chats
@@ -567,6 +557,218 @@ async def delete_chat(
 
     db.delete(chat)
     db.commit()
+
+@router.get("/patient/{patient_id}", response_model=ChatListResponse)
+async def get_patient_chats(
+    patient_id: str,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    user_entity_id: Optional[str] = Depends(get_user_entity_id)
+) -> Any:
+    """
+    Get all chats where a specific patient is a participant
+
+    This endpoint returns all chats where the specified patient is a participant.
+    Access is restricted to:
+    - Admins
+    - The patient themselves
+    - Doctors who have a chat with this patient
+    """
+    try:
+        # Check if patient exists
+        patient = db.query(Patient).filter(Patient.id == patient_id).first()
+        if not patient:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="Patient not found",
+                    error_code=ErrorCode.RES_001
+                )
+            )
+
+        # Check permissions
+        has_permission = False
+
+        if current_user.role == UserRole.ADMIN:
+            # Admins can access any patient's chats
+            has_permission = True
+        elif current_user.role == UserRole.PATIENT:
+            # Patients can only access their own chats
+            # Check if user_entity_id matches patient_id
+            if user_entity_id == patient_id:
+                has_permission = True
+        elif current_user.role == UserRole.DOCTOR:
+            # Doctors can access chats where they are a participant with this patient
+            # This will be checked by the query below
+            has_permission = True
+
+        if not has_permission:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=create_error_response(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    message="Not enough permissions",
+                    error_code=ErrorCode.AUTH_004
+                )
+            )
+
+        # Get all chats for this patient
+        if current_user.role == UserRole.ADMIN:
+            # Admins can see all chats for this patient
+            chats = db.query(Chat).filter(
+                Chat.patient_id == patient_id
+            ).offset(skip).limit(limit).all()
+
+            total = db.query(Chat).filter(
+                Chat.patient_id == patient_id
+            ).count()
+        elif current_user.role == UserRole.PATIENT:
+            # Patients can see all their chats
+            chats = db.query(Chat).filter(
+                Chat.patient_id == patient_id
+            ).offset(skip).limit(limit).all()
+
+            total = db.query(Chat).filter(
+                Chat.patient_id == patient_id
+            ).count()
+        elif current_user.role == UserRole.DOCTOR:
+            # Doctors can only see chats where they are a participant with this patient
+            doctor_id = user_entity_id
+
+            chats = db.query(Chat).filter(
+                Chat.patient_id == patient_id,
+                Chat.doctor_id == doctor_id
+            ).offset(skip).limit(limit).all()
+
+            total = db.query(Chat).filter(
+                Chat.patient_id == patient_id,
+                Chat.doctor_id == doctor_id
+            ).count()
+        else:
+            # Other roles don't have access to chats
+            chats = []
+            total = 0
+
+        return {"chats": chats, "total": total}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=create_error_response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred: {str(e)}",
+                error_code=ErrorCode.SRV_001
+            )
+        )
+
+@router.get("/doctor/{doctor_id}", response_model=ChatListResponse)
+async def get_doctor_chats(
+    doctor_id: str,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    user_entity_id: Optional[str] = Depends(get_user_entity_id)
+) -> Any:
+    """
+    Get all chats where a specific doctor is a participant
+
+    This endpoint returns all chats where the specified doctor is a participant.
+    Access is restricted to:
+    - Admins
+    - The doctor themselves
+    - Patients who have a chat with this doctor
+    """
+    try:
+        # Check if doctor exists
+        doctor = db.query(Doctor).filter(Doctor.id == doctor_id).first()
+        if not doctor:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="Doctor not found",
+                    error_code=ErrorCode.RES_001
+                )
+            )
+
+        # Check permissions
+        has_permission = False
+
+        if current_user.role == UserRole.ADMIN:
+            # Admins can access any doctor's chats
+            has_permission = True
+        elif current_user.role == UserRole.DOCTOR:
+            # Doctors can only access their own chats
+            # Check if user_entity_id matches doctor_id
+            if user_entity_id == doctor_id:
+                has_permission = True
+        elif current_user.role == UserRole.PATIENT:
+            # Patients can access chats where they are a participant with this doctor
+            # This will be checked by the query below
+            has_permission = True
+
+        if not has_permission:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=create_error_response(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    message="Not enough permissions",
+                    error_code=ErrorCode.AUTH_004
+                )
+            )
+
+        # Get all chats for this doctor
+        if current_user.role == UserRole.ADMIN:
+            # Admins can see all chats for this doctor
+            chats = db.query(Chat).filter(
+                Chat.doctor_id == doctor_id
+            ).offset(skip).limit(limit).all()
+
+            total = db.query(Chat).filter(
+                Chat.doctor_id == doctor_id
+            ).count()
+        elif current_user.role == UserRole.DOCTOR:
+            # Doctors can see all their chats
+            chats = db.query(Chat).filter(
+                Chat.doctor_id == doctor_id
+            ).offset(skip).limit(limit).all()
+
+            total = db.query(Chat).filter(
+                Chat.doctor_id == doctor_id
+            ).count()
+        elif current_user.role == UserRole.PATIENT:
+            # Patients can only see chats where they are a participant with this doctor
+            patient_id = user_entity_id
+
+            chats = db.query(Chat).filter(
+                Chat.doctor_id == doctor_id,
+                Chat.patient_id == patient_id
+            ).offset(skip).limit(limit).all()
+
+            total = db.query(Chat).filter(
+                Chat.doctor_id == doctor_id,
+                Chat.patient_id == patient_id
+            ).count()
+        else:
+            # Other roles don't have access to chats
+            chats = []
+            total = 0
+
+        return {"chats": chats, "total": total}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=create_error_response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred: {str(e)}",
+                error_code=ErrorCode.SRV_001
+            )
+        )
 
 @router.get("/{chat_id}/messages", response_model=MessageListResponse)
 async def get_chat_messages(

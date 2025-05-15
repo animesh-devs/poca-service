@@ -44,7 +44,8 @@
               "raw": "{{baseUrl}}",
               "host": [
                 "{{baseUrl}}"
-              ]
+              ],
+              "protocol": "http"
             },
             "description": "Get API information"
           },
@@ -59,6 +60,7 @@
               "host": [
                 "{{baseUrl}}"
               ],
+              "protocol": "http",
               "path": [
                 "health"
               ]
@@ -1555,7 +1557,7 @@
                 "{{userId}}"
               ]
             },
-            "description": "Get all patients associated with a user who has the patient role"
+            "description": "Get all patients linked to a user through user-patient relations. The response includes patient information (id, name, gender, dob, contact, photo, relation) without chat information, as a patient can have multiple chats."
           },
           "response": []
         }
@@ -1868,7 +1870,7 @@
                 "patients"
               ]
             },
-            "description": "Get all patients related to a user"
+            "description": "Get all patients related to a user through user-patient relations. The response includes patient information (id, name, gender, dob, contact, photo, relation) without chat information, as a patient can have multiple chats."
           },
           "response": []
         }
@@ -2020,6 +2022,68 @@
               ]
             },
             "description": "Get all messages for a chat"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Patient Chats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "user-entity-id",
+                "value": "{{userEntityId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chats/patient/{{patientId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chats",
+                "patient",
+                "{{patientId}}"
+              ]
+            },
+            "description": "Get all chats where a specific patient is a participant. Access is restricted to admins, the patient themselves, and doctors who have a chat with this patient."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Doctor Chats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "user-entity-id",
+                "value": "{{userEntityId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chats/doctor/{{doctorId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chats",
+                "doctor",
+                "{{doctorId}}"
+              ]
+            },
+            "description": "Get all chats where a specific doctor is a participant. Access is restricted to admins, the doctor themselves, and patients who have a chat with this doctor."
           },
           "response": []
         },

@@ -6,12 +6,10 @@ from app.db.database import get_db
 from app.models.user import User, UserRole
 from app.models.patient import Patient
 from app.models.hospital import Hospital
-from app.models.doctor import Doctor
-from app.models.chat import Chat
 from app.models.mapping import HospitalPatientMapping, DoctorPatientMapping, UserPatientRelation
 from app.schemas.patient import PatientUpdate, PatientResponse, PatientListResponse, PatientListItem
 from app.schemas.hospital import HospitalListItem
-from app.dependencies import get_current_user, get_admin_user, get_patient_user
+from app.dependencies import get_current_user
 from app.errors import ErrorCode, create_error_response
 
 router = APIRouter()
@@ -345,7 +343,10 @@ async def get_user_patients(
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """
-    Get all patients associated with a user who has the patient role
+    Get all patients linked to a user through user-patient relations.
+
+    The response includes patient information (id, name, gender, dob, contact, photo, relation)
+    without chat information, as a patient can have multiple chats.
     """
     try:
         # Check if user exists
@@ -396,31 +397,26 @@ async def get_user_patients(
         # Query for patients
         patients = db.query(Patient).filter(Patient.id.in_(patient_ids)).all()
 
-        # For each patient, check if there's an active chat
+        # Create patient list items with additional fields
         patient_list_items = []
         for patient in patients:
-            # Check for active chats
-            chat = None
-            is_active_chat = False
-
-            # For patients, look for chats with doctors
-            chat = db.query(Chat).filter(
-                Chat.patient_id == patient.id,
-                Chat.is_active_for_patient == True,
-                Chat.is_active_for_doctor == True
+            # Find the relation for this patient
+            relation = db.query(UserPatientRelation).filter(
+                UserPatientRelation.user_id == user_id,
+                UserPatientRelation.patient_id == patient.id
             ).first()
 
-            if chat:
-                is_active_chat = True
+            relation_type = relation.relation.value if relation else None
 
             # Create PatientListItem
             patient_item = PatientListItem(
                 id=patient.id,
                 name=patient.name,
                 gender=patient.gender,
+                dob=patient.dob,
+                contact=patient.contact,
                 photo=patient.photo,
-                chat_id=chat.id if chat else None,
-                is_active_chat=is_active_chat
+                relation=relation_type
             )
             patient_list_items.append(patient_item)
 

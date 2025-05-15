@@ -43,6 +43,7 @@
           "host": [
             "{{baseUrl}}"
           ],
+          "protocol": "ws",
           "path": [
             "api",
             "v1",
@@ -71,6 +72,7 @@
           "host": [
             "{{baseUrl}}"
           ],
+          "protocol": "ws",
           "path": [
             "api",
             "v1",
@@ -93,7 +95,8 @@
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://localhost:8000"
+      "value": "localhost:8000",
+      "description": "Base URL for both HTTP and WebSocket connections (protocol specified separately)"
     }
   ]
 }

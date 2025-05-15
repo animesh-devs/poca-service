@@ -40,16 +40,8 @@ async def create_message(
                 )
             )
 
-        # Check if chat is active for both doctor and patient
-        if not (chat.is_active_for_doctor and chat.is_active_for_patient):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=create_error_response(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    message="Cannot send message to inactive chat",
-                    error_code=ErrorCode.BIZ_001
-                )
-            )
+        # No need to check if chat is active for both doctor and patient
+        # as is_active_for_doctor and is_active_for_patient are only for UI purposes
 
         # Check if user has access to this chat
         if current_user.role == UserRole.ADMIN:
@@ -159,6 +151,16 @@ async def create_message(
             message_type=message_data.message_type,
             file_details=message_data.file_details
         )
+
+        # Update is_active flags based on who is sending the message
+        # If doctor is sending, set is_active_for_patient=True and is_active_for_doctor=False
+        # If patient is sending, set is_active_for_doctor=True and is_active_for_patient=False
+        if current_user.role == UserRole.DOCTOR:
+            chat.is_active_for_patient = True
+            chat.is_active_for_doctor = False
+        elif current_user.role == UserRole.PATIENT:
+            chat.is_active_for_doctor = True
+            chat.is_active_for_patient = False
 
         db.add(db_message)
         db.commit()
