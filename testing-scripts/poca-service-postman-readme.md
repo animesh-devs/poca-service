@@ -68,7 +68,7 @@ Follow this sequence to test the complete flow:
 
 ### WebSocket Testing
 
-The POCA service provides two WebSocket endpoints for real-time communication:
+The POCA service provides two WebSocket endpoints for real-time communication. For WebSocket testing, use the separate "POCA Service WebSocket APIs" collection.
 
 #### AI Assistant WebSocket
 
@@ -76,18 +76,18 @@ For testing the AI Assistant WebSocket endpoint:
 
 1. Create an AI session using the "Create AI Session" request
 2. Copy the `aiSessionId` from the response
-3. In Postman, click on "New" > "WebSocket Request"
-4. Enter the WebSocket URL: `ws://localhost:8000/api/v1/ai-assistant/ws/{aiSessionId}?token={authToken}`
-   - Replace `{aiSessionId}` with the actual session ID
-   - Replace `{authToken}` with the actual token
-5. Connect to the WebSocket
-6. Send messages in JSON format:
+3. In Postman, open the "POCA Service WebSocket APIs" collection
+4. Select the "AI Assistant WebSocket" request
+5. The WebSocket URL should be: `wss://localhost:8000/api/v1/ai-assistant/ws/{aiSessionId}?token={authToken}`
+   - The `aiSessionId` and `authToken` variables will be automatically filled from your environment
+6. Connect to the WebSocket
+7. Send messages in JSON format:
    ```json
    {
      "message": "Hello, I'm not feeling well today."
    }
    ```
-7. The AI will process your message and stream responses back in real-time
+8. The AI will process your message and stream responses back in real-time
 
 #### Chat WebSocket
 
@@ -95,19 +95,21 @@ For testing the Chat WebSocket endpoint (for doctor-patient communication):
 
 1. Create a chat using the "Create Chat" request or use an existing chat
 2. Copy the `chatId` from the response
-3. In Postman, click on "New" > "WebSocket Request"
-4. Enter the WebSocket URL: `ws://localhost:8000/api/v1/chats/ws/{chatId}?token={authToken}`
-   - Replace `{chatId}` with the actual chat ID
-   - Replace `{authToken}` with the actual token
-5. Connect to the WebSocket
-6. Send messages in JSON format:
+3. In Postman, open the "POCA Service WebSocket APIs" collection
+4. Select the "Chat WebSocket" request
+5. The WebSocket URL should be: `wss://localhost:8000/api/v1/chats/ws/{chatId}?token={authToken}`
+   - The `chatId` and `authToken` variables will be automatically filled from your environment
+6. Connect to the WebSocket
+7. Send messages in JSON format:
    ```json
    {
      "content": "Hello, this is a real-time message",
      "message_type": "text"
    }
    ```
-7. All participants in the same chat room will receive the messages
+8. All participants in the same chat room will receive the messages
+
+> **Note**: WebSocket connections require the WSS protocol (secure WebSockets). The environment is configured with a `wssBaseUrl` variable that includes this protocol.
 
 ## Environment Variables
 

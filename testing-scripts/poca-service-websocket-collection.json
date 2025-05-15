@@ -39,11 +39,10 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "{{baseUrl}}/api/v1/chats/ws/{{chatId}}?token={{authToken}}",
+          "raw": "{{wssBaseUrl}}/api/v1/chats/ws/{{chatId}}?token={{authToken}}",
           "host": [
-            "{{baseUrl}}"
+            "{{wssBaseUrl}}"
           ],
-          "protocol": "ws",
           "path": [
             "api",
             "v1",
@@ -68,11 +67,10 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "{{baseUrl}}/api/v1/ai-assistant/ws/{{aiSessionId}}?token={{authToken}}",
+          "raw": "{{wssBaseUrl}}/api/v1/ai-assistant/ws/{{aiSessionId}}?token={{authToken}}",
           "host": [
-            "{{baseUrl}}"
+            "{{wssBaseUrl}}"
           ],
-          "protocol": "ws",
           "path": [
             "api",
             "v1",
@@ -97,6 +95,11 @@
       "key": "baseUrl",
       "value": "localhost:8000",
       "description": "Base URL for both HTTP and WebSocket connections (protocol specified separately)"
+    },
+    {
+      "key": "wssBaseUrl",
+      "value": "wss://localhost:8000",
+      "description": "Base URL for secure WebSocket connections"
     }
   ]
 }

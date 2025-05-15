@@ -192,17 +192,28 @@ curl -X POST "http://localhost:8000/api/v1/ai-assistant/sessions/SESSION_ID/mess
 
 ## WebSocket Testing
 
-For WebSocket testing, you can use tools like [websocat](https://github.com/vi/websocat) or browser-based WebSocket clients.
+For WebSocket testing, you can use tools like [websocat](https://github.com/vi/websocat), browser-based WebSocket clients, or the Postman WebSocket client.
+
+### Using Postman
+
+1. Import the "POCA Service WebSocket APIs" collection
+2. Use the pre-configured WebSocket requests with the WSS protocol
+
+### Using websocat or other tools
+
+When using command-line tools or custom clients, make sure to use the WSS protocol:
 
 ### Chat WebSocket
 ```bash
-websocat "ws://localhost:8000/api/v1/chats/ws/CHAT_ID?token=YOUR_ACCESS_TOKEN"
+websocat "wss://localhost:8000/api/v1/chats/ws/CHAT_ID?token=YOUR_ACCESS_TOKEN"
 ```
 
 ### AI Assistant WebSocket
 ```bash
-websocat "ws://localhost:8000/api/v1/ai-assistant/ws/SESSION_ID?token=YOUR_ACCESS_TOKEN"
+websocat "wss://localhost:8000/api/v1/ai-assistant/ws/SESSION_ID?token=YOUR_ACCESS_TOKEN"
 ```
+
+> **Note**: If you're testing locally with a self-signed certificate, you may need to use the `--insecure` flag with websocat or equivalent options in other tools.
 
 ## Automated Test Scripts
 

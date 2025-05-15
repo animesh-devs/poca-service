@@ -4,10 +4,17 @@
   "values": [
     {
       "key": "baseUrl",
-      "value": "localhost:8000",
+      "value": "http://localhost:8000",
       "type": "default",
       "enabled": true,
-      "description": "Base URL for both HTTP and WebSocket connections (protocol specified separately)"
+      "description": "Base URL for HTTP connections"
+    },
+    {
+      "key": "wssBaseUrl",
+      "value": "wss://localhost:8000",
+      "type": "default",
+      "enabled": true,
+      "description": "Base URL for secure WebSocket connections"
     },
     {
       "key": "authToken",
