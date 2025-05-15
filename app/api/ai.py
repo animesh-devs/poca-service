@@ -1,20 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Optional, Dict, Any
+from typing import Dict
 from datetime import datetime
 
 from app.db.database import get_db
 from app.models.ai import AISession, AIMessage
-from app.models.chat import Chat, Message
+from app.models.chat import Chat
 from app.models.user import User, UserRole
-from app.models.doctor import Doctor
-from app.models.patient import Patient
 from app.schemas.ai import (
     AISessionCreate, AISessionResponse,
     AIMessageCreate, AIMessageResponse, AIMessageListResponse,
     AISummaryUpdate, AISummaryResponse, AISuggestedResponseRequest, AISuggestedResponseResponse
 )
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, get_user_entity_id
 from app.services.ai import get_ai_service
 from app.errors import ErrorCode, create_error_response
 
@@ -24,9 +22,15 @@ router = APIRouter()
 async def create_ai_session(
     session_data: AISessionCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ):
-    """Create a new AI session"""
+    """
+    Create a new AI session
+
+    This endpoint uses the user_entity_id header to determine which entity (doctor, patient)
+    the user is operating as. This simplifies permission checks.
+    """
     try:
         # Ensure chat_id is a valid UUID
         from uuid import UUID
@@ -41,73 +45,91 @@ async def create_ai_session(
             )
         )
 
-    # Check if the chat exists
-    chat = db.query(Chat).filter(Chat.id == chat_id).first()
-    if not chat:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=create_error_response(
+    try:
+        # Check if the chat exists
+        chat = db.query(Chat).filter(Chat.id == chat_id).first()
+        if not chat:
+            raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                message="Chat not found",
-                error_code=ErrorCode.RES_001
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="Chat not found",
+                    error_code=ErrorCode.RES_001
+                )
             )
+
+        # Check if the user has access to the chat
+        # Admin users have access to all chats
+        if current_user.role == UserRole.ADMIN:
+            pass  # Admin has access to all chats
+        # Doctor users should have their entity_id match the chat's doctor_id
+        elif current_user.role == UserRole.DOCTOR:
+            if user_entity_id != chat.doctor_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="You don't have access to this chat",
+                        error_code=ErrorCode.AUTH_004
+                    )
+                )
+        # Patient users should have their entity_id match the chat's patient_id
+        elif current_user.role == UserRole.PATIENT:
+            if user_entity_id != chat.patient_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="You don't have access to this chat",
+                        error_code=ErrorCode.AUTH_004
+                    )
+                )
+        # Hospital users don't have access to chats directly
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=create_error_response(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    message="You don't have access to this chat",
+                    error_code=ErrorCode.AUTH_004
+                )
+            )
+
+        # Create new AI session
+        db_session = AISession(
+            chat_id=chat_id
         )
 
-    # Check if the user has access to the chat
-    # Admin users have access to all chats
-    if current_user.role == UserRole.ADMIN:
-        pass  # Admin has access to all chats
-    # Doctor users should have their profile_id match the chat's doctor_id
-    elif current_user.role == UserRole.DOCTOR:
-        if current_user.profile_id != chat.doctor_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=create_error_response(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    message="You don't have access to this chat",
-                    error_code=ErrorCode.AUTH_004
-                )
-            )
-    # Patient users should have their profile_id match the chat's patient_id
-    elif current_user.role == UserRole.PATIENT:
-        if current_user.profile_id != chat.patient_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=create_error_response(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    message="You don't have access to this chat",
-                    error_code=ErrorCode.AUTH_004
-                )
-            )
-    # Hospital users don't have access to chats directly
-    else:
+        db.add(db_session)
+        db.commit()
+        db.refresh(db_session)
+
+        return db_session
+
+    except Exception as e:
+        db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=create_error_response(
-                status_code=status.HTTP_403_FORBIDDEN,
-                message="You don't have access to this chat",
-                error_code=ErrorCode.AUTH_004
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred: {str(e)}",
+                error_code=ErrorCode.SRV_001
             )
         )
-
-    # Create new AI session
-    db_session = AISession(
-        chat_id=chat_id
-    )
-
-    db.add(db_session)
-    db.commit()
-    db.refresh(db_session)
-
-    return db_session
 
 @router.post("/messages", response_model=AIMessageResponse)
 async def create_ai_message(
     message_data: AIMessageCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ):
-    """Create a new AI message and get a response"""
+    """
+    Create a new AI message and get a response
+
+    This endpoint uses the user_entity_id header to determine which entity (doctor, patient)
+    the user is operating as. This simplifies permission checks.
+    """
     try:
         # Ensure session_id is a valid UUID
         from uuid import UUID
@@ -122,47 +144,59 @@ async def create_ai_message(
             )
         )
 
-    # Check if the session exists
-    session = db.query(AISession).filter(AISession.id == session_id).first()
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=create_error_response(
+    try:
+        # Check if the session exists
+        session = db.query(AISession).filter(AISession.id == session_id).first()
+        if not session:
+            raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                message="AI session not found",
-                error_code=ErrorCode.RES_001
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="AI session not found",
+                    error_code=ErrorCode.RES_001
+                )
             )
-        )
 
-    # Get the associated chat to check user access
-    chat = db.query(Chat).filter(Chat.id == session.chat_id).first()
-    if not chat:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=create_error_response(
+        # Get the associated chat to check user access
+        chat = db.query(Chat).filter(Chat.id == session.chat_id).first()
+        if not chat:
+            raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                message="Chat not found for this AI session",
-                error_code=ErrorCode.RES_001
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="Chat not found for this AI session",
+                    error_code=ErrorCode.RES_001
+                )
             )
-        )
 
-    # Check if the user has access to the chat
-    # Admin users have access to all chats
-    if current_user.role == UserRole.ADMIN:
-        pass  # Admin has access to all chats
-    # Doctor users should have their profile_id match the chat's doctor_id
-    elif current_user.role == UserRole.DOCTOR:
-        has_access = False
-        # Check if profile_id matches doctor_id
-        if current_user.profile_id and current_user.profile_id == chat.doctor_id:
-            has_access = True
-        # Check if user_id matches doctor's user_id
+        # Check if the user has access to the chat
+        # Admin users have access to all chats
+        if current_user.role == UserRole.ADMIN:
+            pass  # Admin has access to all chats
+        # Doctor users should have their entity_id match the chat's doctor_id
+        elif current_user.role == UserRole.DOCTOR:
+            if user_entity_id != chat.doctor_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="You don't have access to this chat",
+                        error_code=ErrorCode.AUTH_004
+                    )
+                )
+        # Patient users should have their entity_id match the chat's patient_id
+        elif current_user.role == UserRole.PATIENT:
+            if user_entity_id != chat.patient_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="You don't have access to this chat",
+                        error_code=ErrorCode.AUTH_004
+                    )
+                )
+        # Hospital users don't have access to chats directly
         else:
-            doctor = db.query(Doctor).filter(Doctor.id == chat.doctor_id).first()
-            if doctor and doctor.user_id == current_user.id:
-                has_access = True
-
-        if not has_access:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=create_error_response(
@@ -171,80 +205,60 @@ async def create_ai_message(
                     error_code=ErrorCode.AUTH_004
                 )
             )
-    # Patient users should have their profile_id match the chat's patient_id
-    elif current_user.role == UserRole.PATIENT:
-        has_access = False
-        # Check if profile_id matches patient_id
-        if current_user.profile_id and current_user.profile_id == chat.patient_id:
-            has_access = True
-        # Check if user_id matches patient's user_id
-        else:
-            patient = db.query(Patient).filter(Patient.id == chat.patient_id).first()
-            if patient and patient.user_id == current_user.id:
-                has_access = True
 
-        if not has_access:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=create_error_response(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    message="You don't have access to this chat",
-                    error_code=ErrorCode.AUTH_004
-                )
-            )
-    # Hospital users don't have access to chats directly
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=create_error_response(
-                status_code=status.HTTP_403_FORBIDDEN,
-                message="You don't have access to this chat",
-                error_code=ErrorCode.AUTH_004
-            )
+        # Create new AI message
+        db_message = AIMessage(
+            session_id=session_id,
+            message=message_data.message
         )
 
-    # Create new AI message
-    db_message = AIMessage(
-        session_id=session_id,
-        message=message_data.message
-    )
+        db.add(db_message)
+        db.commit()
+        db.refresh(db_message)
 
-    db.add(db_message)
-    db.commit()
-    db.refresh(db_message)
+        # Get previous messages for context
+        previous_messages = db.query(AIMessage).filter(
+            AIMessage.session_id == session_id,
+            AIMessage.id != db_message.id
+        ).order_by(AIMessage.timestamp.asc()).all()
 
-    # Get previous messages for context
-    previous_messages = db.query(AIMessage).filter(
-        AIMessage.session_id == session_id,
-        AIMessage.id != db_message.id
-    ).order_by(AIMessage.timestamp.asc()).all()
+        context = []
+        for prev_msg in previous_messages:
+            if prev_msg.message:
+                context.append({"role": "user", "content": prev_msg.message})
+            if prev_msg.response:
+                context.append({"role": "assistant", "content": prev_msg.response})
 
-    context = []
-    for prev_msg in previous_messages:
-        if prev_msg.message:
-            context.append({"role": "user", "content": prev_msg.message})
-        if prev_msg.response:
-            context.append({"role": "assistant", "content": prev_msg.response})
+        # Generate AI response
+        ai_service = get_ai_service()
+        response_data = await ai_service.generate_response(message_data.message, context)
 
-    # Generate AI response
-    ai_service = get_ai_service()
-    response_data = await ai_service.generate_response(message_data.message, context)
+        # Handle response based on type
+        if isinstance(response_data, dict):
+            # Store the message part in the database
+            db_message.response = response_data.get("message", "")
+            # Store whether this is a summary
+            db_message.is_summary = response_data.get("isSummary", False)
+        else:
+            # Fallback for string responses
+            db_message.response = response_data
+            db_message.is_summary = False
 
-    # Handle response based on type
-    if isinstance(response_data, dict):
-        # Store the message part in the database
-        db_message.response = response_data.get("message", "")
-        # Store whether this is a summary
-        db_message.is_summary = response_data.get("isSummary", False)
-    else:
-        # Fallback for string responses
-        db_message.response = response_data
-        db_message.is_summary = False
+        db.commit()
+        db.refresh(db_message)
 
-    db.commit()
-    db.refresh(db_message)
+        return db_message
 
-    return db_message
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=create_error_response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred: {str(e)}",
+                error_code=ErrorCode.SRV_001
+            )
+        )
 
 @router.get("/sessions/{session_id}/messages", response_model=AIMessageListResponse)
 async def get_ai_messages(
@@ -252,9 +266,15 @@ async def get_ai_messages(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ):
-    """Get all messages for an AI session"""
+    """
+    Get all messages for an AI session
+
+    This endpoint uses the user_entity_id header to determine which entity (doctor, patient)
+    the user is operating as. This simplifies permission checks.
+    """
     try:
         # Ensure session_id is a valid UUID
         from uuid import UUID
@@ -269,37 +289,59 @@ async def get_ai_messages(
             )
         )
 
-    # Check if the session exists
-    session = db.query(AISession).filter(AISession.id == session_id).first()
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=create_error_response(
+    try:
+        # Check if the session exists
+        session = db.query(AISession).filter(AISession.id == session_id).first()
+        if not session:
+            raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                message="AI session not found",
-                error_code=ErrorCode.RES_001
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="AI session not found",
+                    error_code=ErrorCode.RES_001
+                )
             )
-        )
 
-    # Get the associated chat to check user access
-    chat = db.query(Chat).filter(Chat.id == session.chat_id).first()
-    if not chat:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=create_error_response(
+        # Get the associated chat to check user access
+        chat = db.query(Chat).filter(Chat.id == session.chat_id).first()
+        if not chat:
+            raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                message="Chat not found for this AI session",
-                error_code=ErrorCode.RES_001
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="Chat not found for this AI session",
+                    error_code=ErrorCode.RES_001
+                )
             )
-        )
 
-    # Check if the user has access to the chat
-    # Admin users have access to all chats
-    if current_user.role == UserRole.ADMIN:
-        pass  # Admin has access to all chats
-    # Doctor users should have their profile_id match the chat's doctor_id
-    elif current_user.role == UserRole.DOCTOR:
-        if current_user.profile_id != chat.doctor_id:
+        # Check if the user has access to the chat
+        # Admin users have access to all chats
+        if current_user.role == UserRole.ADMIN:
+            pass  # Admin has access to all chats
+        # Doctor users should have their entity_id match the chat's doctor_id
+        elif current_user.role == UserRole.DOCTOR:
+            if user_entity_id != chat.doctor_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="You don't have access to this chat",
+                        error_code=ErrorCode.AUTH_004
+                    )
+                )
+        # Patient users should have their entity_id match the chat's patient_id
+        elif current_user.role == UserRole.PATIENT:
+            if user_entity_id != chat.patient_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="You don't have access to this chat",
+                        error_code=ErrorCode.AUTH_004
+                    )
+                )
+        # Hospital users don't have access to chats directly
+        else:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=create_error_response(
@@ -308,44 +350,40 @@ async def get_ai_messages(
                     error_code=ErrorCode.AUTH_004
                 )
             )
-    # Patient users should have their profile_id match the chat's patient_id
-    elif current_user.role == UserRole.PATIENT:
-        if current_user.profile_id != chat.patient_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=create_error_response(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    message="You don't have access to this chat",
-                    error_code=ErrorCode.AUTH_004
-                )
-            )
-    # Hospital users don't have access to chats directly
-    else:
+
+        # Get messages
+        messages = db.query(AIMessage).filter(
+            AIMessage.session_id == session_id
+        ).order_by(AIMessage.timestamp.asc()).offset(skip).limit(limit).all()
+
+        total = db.query(AIMessage).filter(AIMessage.session_id == session_id).count()
+
+        return {"messages": messages, "total": total}
+
+    except Exception as e:
+        db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=create_error_response(
-                status_code=status.HTTP_403_FORBIDDEN,
-                message="You don't have access to this chat",
-                error_code=ErrorCode.AUTH_004
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred: {str(e)}",
+                error_code=ErrorCode.SRV_001
             )
         )
-
-    # Get messages
-    messages = db.query(AIMessage).filter(
-        AIMessage.session_id == session_id
-    ).order_by(AIMessage.timestamp.asc()).offset(skip).limit(limit).all()
-
-    total = db.query(AIMessage).filter(AIMessage.session_id == session_id).count()
-
-    return {"messages": messages, "total": total}
 
 @router.get("/sessions/{session_id}", response_model=AISessionResponse)
 async def get_ai_session(
     session_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ):
-    """Get an AI session by ID"""
+    """
+    Get an AI session by ID
+
+    This endpoint uses the user_entity_id header to determine which entity (doctor, patient)
+    the user is operating as. This simplifies permission checks.
+    """
     try:
         # Ensure session_id is a valid UUID
         from uuid import UUID
@@ -360,37 +398,59 @@ async def get_ai_session(
             )
         )
 
-    # Check if the session exists
-    session = db.query(AISession).filter(AISession.id == session_id).first()
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=create_error_response(
+    try:
+        # Check if the session exists
+        session = db.query(AISession).filter(AISession.id == session_id).first()
+        if not session:
+            raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                message="AI session not found",
-                error_code=ErrorCode.RES_001
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="AI session not found",
+                    error_code=ErrorCode.RES_001
+                )
             )
-        )
 
-    # Get the associated chat to check user access
-    chat = db.query(Chat).filter(Chat.id == session.chat_id).first()
-    if not chat:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=create_error_response(
+        # Get the associated chat to check user access
+        chat = db.query(Chat).filter(Chat.id == session.chat_id).first()
+        if not chat:
+            raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                message="Chat not found for this AI session",
-                error_code=ErrorCode.RES_001
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="Chat not found for this AI session",
+                    error_code=ErrorCode.RES_001
+                )
             )
-        )
 
-    # Check if the user has access to the chat
-    # Admin users have access to all chats
-    if current_user.role == UserRole.ADMIN:
-        pass  # Admin has access to all chats
-    # Doctor users should have their profile_id match the chat's doctor_id
-    elif current_user.role == UserRole.DOCTOR:
-        if current_user.profile_id != chat.doctor_id:
+        # Check if the user has access to the chat
+        # Admin users have access to all chats
+        if current_user.role == UserRole.ADMIN:
+            pass  # Admin has access to all chats
+        # Doctor users should have their entity_id match the chat's doctor_id
+        elif current_user.role == UserRole.DOCTOR:
+            if user_entity_id != chat.doctor_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="You don't have access to this chat",
+                        error_code=ErrorCode.AUTH_004
+                    )
+                )
+        # Patient users should have their entity_id match the chat's patient_id
+        elif current_user.role == UserRole.PATIENT:
+            if user_entity_id != chat.patient_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="You don't have access to this chat",
+                        error_code=ErrorCode.AUTH_004
+                    )
+                )
+        # Hospital users don't have access to chats directly
+        else:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=create_error_response(
@@ -399,37 +459,33 @@ async def get_ai_session(
                     error_code=ErrorCode.AUTH_004
                 )
             )
-    # Patient users should have their profile_id match the chat's patient_id
-    elif current_user.role == UserRole.PATIENT:
-        if current_user.profile_id != chat.patient_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=create_error_response(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    message="You don't have access to this chat",
-                    error_code=ErrorCode.AUTH_004
-                )
-            )
-    # Hospital users don't have access to chats directly
-    else:
+
+        return session
+
+    except Exception as e:
+        db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=create_error_response(
-                status_code=status.HTTP_403_FORBIDDEN,
-                message="You don't have access to this chat",
-                error_code=ErrorCode.AUTH_004
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred: {str(e)}",
+                error_code=ErrorCode.SRV_001
             )
         )
-
-    return session
 
 @router.put("/sessions/{session_id}/end", response_model=AISessionResponse)
 async def end_ai_session(
     session_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ):
-    """End an AI session"""
+    """
+    End an AI session
+
+    This endpoint uses the user_entity_id header to determine which entity (doctor, patient)
+    the user is operating as. This simplifies permission checks.
+    """
     try:
         # Ensure session_id is a valid UUID
         from uuid import UUID
@@ -444,37 +500,59 @@ async def end_ai_session(
             )
         )
 
-    # Check if the session exists
-    session = db.query(AISession).filter(AISession.id == session_id).first()
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=create_error_response(
+    try:
+        # Check if the session exists
+        session = db.query(AISession).filter(AISession.id == session_id).first()
+        if not session:
+            raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                message="AI session not found",
-                error_code=ErrorCode.RES_001
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="AI session not found",
+                    error_code=ErrorCode.RES_001
+                )
             )
-        )
 
-    # Get the associated chat to check user access
-    chat = db.query(Chat).filter(Chat.id == session.chat_id).first()
-    if not chat:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=create_error_response(
+        # Get the associated chat to check user access
+        chat = db.query(Chat).filter(Chat.id == session.chat_id).first()
+        if not chat:
+            raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                message="Chat not found for this AI session",
-                error_code=ErrorCode.RES_001
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="Chat not found for this AI session",
+                    error_code=ErrorCode.RES_001
+                )
             )
-        )
 
-    # Check if the user has access to the chat
-    # Admin users have access to all chats
-    if current_user.role == UserRole.ADMIN:
-        pass  # Admin has access to all chats
-    # Doctor users should have their profile_id match the chat's doctor_id
-    elif current_user.role == UserRole.DOCTOR:
-        if current_user.profile_id != chat.doctor_id:
+        # Check if the user has access to the chat
+        # Admin users have access to all chats
+        if current_user.role == UserRole.ADMIN:
+            pass  # Admin has access to all chats
+        # Doctor users should have their entity_id match the chat's doctor_id
+        elif current_user.role == UserRole.DOCTOR:
+            if user_entity_id != chat.doctor_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="You don't have access to this chat",
+                        error_code=ErrorCode.AUTH_004
+                    )
+                )
+        # Patient users should have their entity_id match the chat's patient_id
+        elif current_user.role == UserRole.PATIENT:
+            if user_entity_id != chat.patient_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="You don't have access to this chat",
+                        error_code=ErrorCode.AUTH_004
+                    )
+                )
+        # Hospital users don't have access to chats directly
+        else:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=create_error_response(
@@ -483,42 +561,38 @@ async def end_ai_session(
                     error_code=ErrorCode.AUTH_004
                 )
             )
-    # Patient users should have their profile_id match the chat's patient_id
-    elif current_user.role == UserRole.PATIENT:
-        if current_user.profile_id != chat.patient_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=create_error_response(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    message="You don't have access to this chat",
-                    error_code=ErrorCode.AUTH_004
-                )
-            )
-    # Hospital users don't have access to chats directly
-    else:
+
+        session.end_timestamp = datetime.now()
+        db.commit()
+        db.refresh(session)
+
+        return session
+
+    except Exception as e:
+        db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=create_error_response(
-                status_code=status.HTTP_403_FORBIDDEN,
-                message="You don't have access to this chat",
-                error_code=ErrorCode.AUTH_004
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred: {str(e)}",
+                error_code=ErrorCode.SRV_001
             )
         )
-
-    session.end_timestamp = datetime.now()
-    db.commit()
-    db.refresh(session)
-
-    return session
 
 @router.put("/sessions/{session_id}/summary", response_model=AISummaryResponse)
 async def update_ai_summary(
     session_id: str,
     summary_data: AISummaryUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ):
-    """Update the summary for an AI session"""
+    """
+    Update the summary for an AI session
+
+    This endpoint uses the user_entity_id header to determine which entity (doctor, patient)
+    the user is operating as. This simplifies permission checks.
+    """
     try:
         # Ensure session_id is a valid UUID
         from uuid import UUID
@@ -533,37 +607,59 @@ async def update_ai_summary(
             )
         )
 
-    # Check if the session exists
-    session = db.query(AISession).filter(AISession.id == session_id).first()
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=create_error_response(
+    try:
+        # Check if the session exists
+        session = db.query(AISession).filter(AISession.id == session_id).first()
+        if not session:
+            raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                message="AI session not found",
-                error_code=ErrorCode.RES_001
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="AI session not found",
+                    error_code=ErrorCode.RES_001
+                )
             )
-        )
 
-    # Get the associated chat to check user access
-    chat = db.query(Chat).filter(Chat.id == session.chat_id).first()
-    if not chat:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=create_error_response(
+        # Get the associated chat to check user access
+        chat = db.query(Chat).filter(Chat.id == session.chat_id).first()
+        if not chat:
+            raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                message="Chat not found for this AI session",
-                error_code=ErrorCode.RES_001
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="Chat not found for this AI session",
+                    error_code=ErrorCode.RES_001
+                )
             )
-        )
 
-    # Check if the user has access to the chat
-    # Admin users have access to all chats
-    if current_user.role == UserRole.ADMIN:
-        pass  # Admin has access to all chats
-    # Doctor users should have their profile_id match the chat's doctor_id
-    elif current_user.role == UserRole.DOCTOR:
-        if current_user.profile_id != chat.doctor_id:
+        # Check if the user has access to the chat
+        # Admin users have access to all chats
+        if current_user.role == UserRole.ADMIN:
+            pass  # Admin has access to all chats
+        # Doctor users should have their entity_id match the chat's doctor_id
+        elif current_user.role == UserRole.DOCTOR:
+            if user_entity_id != chat.doctor_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="You don't have access to this chat",
+                        error_code=ErrorCode.AUTH_004
+                    )
+                )
+        # Patient users should have their entity_id match the chat's patient_id
+        elif current_user.role == UserRole.PATIENT:
+            if user_entity_id != chat.patient_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="You don't have access to this chat",
+                        error_code=ErrorCode.AUTH_004
+                    )
+                )
+        # Hospital users don't have access to chats directly
+        else:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=create_error_response(
@@ -572,66 +668,62 @@ async def update_ai_summary(
                     error_code=ErrorCode.AUTH_004
                 )
             )
-    # Patient users should have their profile_id match the chat's patient_id
-    elif current_user.role == UserRole.PATIENT:
-        if current_user.profile_id != chat.patient_id:
+
+        # Get the last message in the session
+        last_message = db.query(AIMessage).filter(
+            AIMessage.session_id == session_id
+        ).order_by(AIMessage.timestamp.desc()).first()
+
+        if not last_message:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
+                status_code=status.HTTP_404_NOT_FOUND,
                 detail=create_error_response(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    message="You don't have access to this chat",
-                    error_code=ErrorCode.AUTH_004
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="No messages found in the session",
+                    error_code=ErrorCode.RES_001
                 )
             )
-    # Hospital users don't have access to chats directly
-    else:
+
+        # Update the last message with the edited summary
+        last_message.response = summary_data.summary
+        last_message.is_summary = True  # Mark this as a summary
+        db.commit()
+        db.refresh(last_message)
+
+        # Create a response object
+        summary_response = {
+            "id": last_message.id,
+            "session_id": session_id,
+            "summary": last_message.response,
+            "timestamp": last_message.timestamp
+        }
+
+        return summary_response
+
+    except Exception as e:
+        db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=create_error_response(
-                status_code=status.HTTP_403_FORBIDDEN,
-                message="You don't have access to this chat",
-                error_code=ErrorCode.AUTH_004
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred: {str(e)}",
+                error_code=ErrorCode.SRV_001
             )
         )
-
-    # Get the last message in the session
-    last_message = db.query(AIMessage).filter(
-        AIMessage.session_id == session_id
-    ).order_by(AIMessage.timestamp.desc()).first()
-
-    if not last_message:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=create_error_response(
-                status_code=status.HTTP_404_NOT_FOUND,
-                message="No messages found in the session",
-                error_code=ErrorCode.RES_001
-            )
-        )
-
-    # Update the last message with the edited summary
-    last_message.response = summary_data.summary
-    last_message.is_summary = True  # Mark this as a summary
-    db.commit()
-    db.refresh(last_message)
-
-    # Create a response object
-    summary_response = {
-        "id": last_message.id,
-        "session_id": session_id,
-        "summary": last_message.response,
-        "timestamp": last_message.timestamp
-    }
-
-    return summary_response
 
 @router.post("/suggested-response", response_model=AISuggestedResponseResponse)
 async def generate_suggested_response(
     request_data: AISuggestedResponseRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ):
-    """Generate a suggested response for a doctor based on a patient summary"""
+    """
+    Generate a suggested response for a doctor based on a patient summary
+
+    This endpoint uses the user_entity_id header to determine which entity (doctor, patient)
+    the user is operating as. This simplifies permission checks.
+    """
     try:
         # Ensure session_id is a valid UUID
         from uuid import UUID
@@ -646,87 +738,99 @@ async def generate_suggested_response(
             )
         )
 
-    # Check if the session exists
-    session = db.query(AISession).filter(AISession.id == session_id).first()
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=create_error_response(
+    try:
+        # Check if the session exists
+        session = db.query(AISession).filter(AISession.id == session_id).first()
+        if not session:
+            raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                message="AI session not found",
-                error_code=ErrorCode.RES_001
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="AI session not found",
+                    error_code=ErrorCode.RES_001
+                )
             )
-        )
 
-    # Get the chat associated with the session
-    chat = db.query(Chat).filter(Chat.id == session.chat_id).first()
-    if not chat:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=create_error_response(
+        # Get the chat associated with the session
+        chat = db.query(Chat).filter(Chat.id == session.chat_id).first()
+        if not chat:
+            raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                message="Chat not found for this AI session",
-                error_code=ErrorCode.RES_001
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="Chat not found for this AI session",
+                    error_code=ErrorCode.RES_001
+                )
             )
-        )
 
-    # Check if the user has access to the chat
-    # Admin users have access to all chats
-    if current_user.role == UserRole.ADMIN:
-        pass  # Admin has access to all chats
-    # Doctor users should have their profile_id match the chat's doctor_id
-    elif current_user.role == UserRole.DOCTOR:
-        if current_user.profile_id != chat.doctor_id:
+        # Check if the user has access to the chat
+        # Admin users have access to all chats
+        if current_user.role == UserRole.ADMIN:
+            pass  # Admin has access to all chats
+        # Doctor users should have their entity_id match the chat's doctor_id
+        elif current_user.role == UserRole.DOCTOR:
+            if user_entity_id != chat.doctor_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="You don't have access to this chat",
+                        error_code=ErrorCode.AUTH_004
+                    )
+                )
+        # Only doctors and admins can generate suggested responses
+        else:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=create_error_response(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    message="You don't have access to this chat",
+                    message="Only doctors can generate suggested responses",
                     error_code=ErrorCode.AUTH_004
                 )
             )
-    # Only doctors and admins can generate suggested responses
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=create_error_response(
-                status_code=status.HTTP_403_FORBIDDEN,
-                message="Only doctors can generate suggested responses",
-                error_code=ErrorCode.AUTH_004
-            )
+
+        # Generate a suggested response using the AI service
+        ai_service = get_ai_service()
+
+        # Create a system prompt for the doctor's suggested response
+        doctor_prompt = "You are a medical professional. Based on the patient's summary, provide a thoughtful, professional response. Include possible diagnoses, recommended next steps, and any advice you would give to the patient. Be empathetic and clear."
+
+        context = [
+            {"role": "system", "content": doctor_prompt},
+            {"role": "user", "content": f"Patient summary: {request_data.summary}"}
+        ]
+
+        suggested_response = await ai_service.generate_response("Please provide a suggested response to this patient summary.", context)
+
+        # Create a new AI message for the suggested response
+        db_message = AIMessage(
+            session_id=session_id,
+            message=f"Patient summary: {request_data.summary}",
+            response=suggested_response,
+            is_summary=False  # This is not a summary, it's a suggested response
         )
 
-    # Generate a suggested response using the AI service
-    ai_service = get_ai_service()
+        db.add(db_message)
+        db.commit()
+        db.refresh(db_message)
 
-    # Create a system prompt for the doctor's suggested response
-    doctor_prompt = "You are a medical professional. Based on the patient's summary, provide a thoughtful, professional response. Include possible diagnoses, recommended next steps, and any advice you would give to the patient. Be empathetic and clear."
+        # Create a response object
+        response_data = {
+            "id": db_message.id,
+            "session_id": session_id,
+            "suggested_response": suggested_response,
+            "timestamp": db_message.timestamp
+        }
 
-    context = [
-        {"role": "system", "content": doctor_prompt},
-        {"role": "user", "content": f"Patient summary: {request_data.summary}"}
-    ]
+        return response_data
 
-    suggested_response = await ai_service.generate_response("Please provide a suggested response to this patient summary.", context)
-
-    # Create a new AI message for the suggested response
-    db_message = AIMessage(
-        session_id=session_id,
-        message=f"Patient summary: {request_data.summary}",
-        response=suggested_response,
-        is_summary=False  # This is not a summary, it's a suggested response
-    )
-
-    db.add(db_message)
-    db.commit()
-    db.refresh(db_message)
-
-    # Create a response object
-    response_data = {
-        "id": db_message.id,
-        "session_id": session_id,
-        "suggested_response": suggested_response,
-        "timestamp": db_message.timestamp
-    }
-
-    return response_data
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=create_error_response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred: {str(e)}",
+                error_code=ErrorCode.SRV_001
+            )
+        )

@@ -2156,37 +2156,9 @@
             "description": "Delete a chat (admin only)"
           },
           "response": []
-        },
-        {
-          "name": "WebSocket Connection",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/chats/ws/{{chatId}}?token={{authToken}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "chats",
-                "ws",
-                "{{chatId}}"
-              ],
-              "query": [
-                {
-                  "key": "token",
-                  "value": "{{authToken}}"
-                }
-              ]
-            },
-            "description": "WebSocket endpoint for real-time chat between users (doctor-patient). This endpoint allows for bidirectional communication in a specific chat room. To use this in Postman, switch to the WebSocket client mode and connect to this URL. Messages should be sent in JSON format with a structure like: {\"content\": \"Hello, this is a real-time message\", \"message_type\": \"text\"}. All participants in the same chat room will receive the messages."
-          },
-          "response": []
         }
       ],
-      "description": "Chat management endpoints, including REST APIs and WebSocket for real-time communication between users"
+      "description": "Chat management endpoints for communication between users"
     },
     {
       "name": "Appointments",
@@ -3067,35 +3039,6 @@
           },
           "response": []
         },
-
-        {
-          "name": "WebSocket Connection",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/ai-assistant/ws/{{aiSessionId}}?token={{authToken}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "ai-assistant",
-                "ws",
-                "{{aiSessionId}}"
-              ],
-              "query": [
-                {
-                  "key": "token",
-                  "value": "{{authToken}}"
-                }
-              ]
-            },
-            "description": "WebSocket endpoint for real-time AI chat. This endpoint allows for bidirectional communication with the AI assistant in a specific session. First create an AI session using the 'Create AI Session' endpoint to get a session ID. To use this in Postman, switch to the WebSocket client mode and connect to this URL. Messages should be sent in JSON format with a structure like: {\"message\": \"What are the symptoms of the flu?\"}. The AI will process your message and stream responses back in real-time."
-          },
-          "response": []
-        },
         {
           "name": "Update AI Session Summary",
           "request": {
@@ -3167,7 +3110,7 @@
           "response": []
         }
       ],
-      "description": "AI assistant endpoints, including REST APIs and WebSocket for real-time communication with the AI"
+      "description": "AI assistant endpoints for communication with the AI"
     }
   ],
   "variable": [

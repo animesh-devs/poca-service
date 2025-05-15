@@ -1,0 +1,99 @@
+{
+  "info": {
+    "name": "POCA Service WebSocket APIs",
+    "description": "WebSocket endpoints for the POCA (Patient-Doctor Chat Assistant) service",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Add user-entity-id header to all requests if it exists in the environment",
+          "const userEntityId = pm.environment.get('userEntityId');",
+          "const userRole = pm.environment.get('userRole');",
+          "",
+          "if (userEntityId) {",
+          "    // Add or update the user-entity-id header",
+          "    pm.request.headers.upsert({",
+          "        key: 'user-entity-id',",
+          "        value: userEntityId",
+          "    });",
+          "    console.log(`[${pm.info.requestName}] Added user-entity-id header: ${userEntityId} (Role: ${userRole || 'unknown'})`);",
+          "} else {",
+          "    console.warn(`[${pm.info.requestName}] No userEntityId found in environment. The user-entity-id header will not be added.`);",
+          "    console.warn('Available environment variables:', Object.keys(pm.environment.toObject()).join(', '));",
+          "}",
+          "",
+          "// Log all headers for debugging",
+          "console.log(`[${pm.info.requestName}] Request headers:`, pm.request.headers.all().map(h => `${h.key}: ${h.value}`).join(', '));"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Chat WebSocket",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/chats/ws/{{chatId}}?token={{authToken}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "chats",
+            "ws",
+            "{{chatId}}"
+          ],
+          "query": [
+            {
+              "key": "token",
+              "value": "{{authToken}}"
+            }
+          ]
+        },
+        "description": "WebSocket endpoint for real-time chat between users (doctor-patient). This endpoint allows for bidirectional communication in a specific chat room. To use this in Postman, switch to the WebSocket client mode and connect to this URL. Messages should be sent in JSON format with a structure like: {\"content\": \"Hello, this is a real-time message\", \"message_type\": \"text\"}. All participants in the same chat room will receive the messages."
+      },
+      "response": []
+    },
+    {
+      "name": "AI Assistant WebSocket",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/ai-assistant/ws/{{aiSessionId}}?token={{authToken}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "ai-assistant",
+            "ws",
+            "{{aiSessionId}}"
+          ],
+          "query": [
+            {
+              "key": "token",
+              "value": "{{authToken}}"
+            }
+          ]
+        },
+        "description": "WebSocket endpoint for real-time AI chat. This endpoint allows for bidirectional communication with the AI assistant in a specific session. First create an AI session using the 'Create AI Session' endpoint to get a session ID. To use this in Postman, switch to the WebSocket client mode and connect to this URL. Messages should be sent in JSON format with a structure like: {\"message\": \"What are the symptoms of the flu?\"}. The AI will process your message and stream responses back in real-time."
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000"
+    }
+  ]
+}
