@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional
 from app.db.database import get_db
 from app.models.ai import AISession, AIMessage
 from app.models.chat import Chat
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.dependencies import get_current_user_ws
 from app.services.ai import get_ai_service
 from app.websockets.connection_manager import manager
@@ -24,23 +24,108 @@ async def websocket_ai_endpoint(
     websocket: WebSocket,
     session_id: str,
     token: str = None,
+    user_entity_id: str = None,
     db: Session = Depends(get_db)
 ):
     """WebSocket endpoint for real-time AI chat"""
     # Authenticate user
     try:
         if not token:
+            logger.warning("WebSocket connection attempt without token")
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return
 
         current_user = await get_current_user_ws(token, db)
         if not current_user:
+            logger.warning("WebSocket authentication failed")
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return
+
+        # Extract user-entity-id from headers
+        headers = dict(websocket.headers)
+        logger.info(f"WebSocket headers: {headers}")
+
+        # Get user-entity-id from query params if not in headers
+        if not user_entity_id:
+            user_entity_id = headers.get("user-entity-id")
+
+        logger.info(f"User entity ID: {user_entity_id}, User role: {current_user.role}")
+
+        # If user_entity_id is not provided, try to determine it
+        if not user_entity_id:
+            if current_user.role in [UserRole.DOCTOR, UserRole.HOSPITAL] and current_user.profile_id:
+                user_entity_id = current_user.profile_id
+                logger.info(f"Using profile_id {user_entity_id} for user {current_user.id}")
+            elif current_user.role == UserRole.PATIENT:
+                # Try to find a "self" relation first
+                from app.models.mapping import UserPatientRelation, RelationType
+                self_relation = db.query(UserPatientRelation).filter(
+                    UserPatientRelation.user_id == current_user.id,
+                    UserPatientRelation.relation == RelationType.SELF
+                ).first()
+
+                if self_relation:
+                    user_entity_id = self_relation.patient_id
+                    logger.info(f"Using self relation patient ID {user_entity_id} for user {current_user.id}")
+                else:
+                    # Try to find any relation
+                    any_relation = db.query(UserPatientRelation).filter(
+                        UserPatientRelation.user_id == current_user.id
+                    ).first()
+
+                    if any_relation:
+                        user_entity_id = any_relation.patient_id
+                        logger.info(f"Using patient relation {user_entity_id} for user {current_user.id}")
+            elif current_user.role == UserRole.ADMIN:
+                user_entity_id = current_user.id
+                logger.info(f"Using admin user ID {user_entity_id} as entity ID")
 
         # Check if the session exists
         session = db.query(AISession).filter(AISession.id == session_id).first()
         if not session:
+            logger.warning(f"AI session not found: {session_id}")
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
+
+        # Get the associated chat to check user access
+        chat = db.query(Chat).filter(Chat.id == session.chat_id).first()
+        if not chat:
+            logger.warning(f"Chat not found for AI session: {session_id}")
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
+
+        # Check if the user has access to the chat
+        has_access = False
+
+        if current_user.role == UserRole.ADMIN:
+            # Admin has access to all chats
+            has_access = True
+            logger.info(f"Admin user {current_user.id} accessing AI session {session_id}")
+        elif current_user.role == UserRole.DOCTOR:
+            # Check if the doctor is part of this chat
+            if user_entity_id and user_entity_id == chat.doctor_id:
+                has_access = True
+                logger.info(f"Doctor {user_entity_id} accessing AI session {session_id}")
+        elif current_user.role == UserRole.PATIENT:
+            # Check if the patient is part of this chat
+            if user_entity_id and user_entity_id == chat.patient_id:
+                has_access = True
+                logger.info(f"Patient {user_entity_id} accessing AI session {session_id}")
+            else:
+                # Check if the user has a relation with the patient in this chat
+                from app.models.mapping import UserPatientRelation
+                relation = db.query(UserPatientRelation).filter(
+                    UserPatientRelation.user_id == current_user.id,
+                    UserPatientRelation.patient_id == chat.patient_id
+                ).first()
+
+                if relation:
+                    has_access = True
+                    logger.info(f"User {current_user.id} with relation to patient {chat.patient_id} accessing AI session {session_id}")
+
+        if not has_access:
+            logger.warning(f"User {current_user.id} (role: {current_user.role}, entity_id: {user_entity_id}) denied access to AI session {session_id}")
+            logger.warning(f"Chat details - doctor_id: {chat.doctor_id}, patient_id: {chat.patient_id}")
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return
 

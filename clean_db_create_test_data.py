@@ -25,7 +25,8 @@ from app.models.mapping import (
     UserPatientRelation,
     RelationType
 )
-from app.models.chat import Chat
+from app.models.chat import Chat, Message, MessageType
+from app.models.ai import AISession, AIMessage
 from app.api.auth import get_password_hash
 
 # Store credentials and entity information for output
@@ -37,7 +38,9 @@ credentials = {
     "hospital_doctor_mappings": [],
     "hospital_patient_mappings": [],
     "doctor_patient_mappings": [],
-    "chats": []
+    "chats": [],
+    "ai_sessions": [],
+    "ai_messages": []
 }
 
 def clean_db():
@@ -339,7 +342,8 @@ def create_test_data():
                         id=chat_id,
                         doctor_id=doctor.id,
                         patient_id=patient_id,
-                        is_active=True
+                        is_active_for_doctor=True,
+                        is_active_for_patient=True
                     )
                     db.add(chat)
 
@@ -349,8 +353,92 @@ def create_test_data():
                         "doctor_id": doctor.id,
                         "doctor_name": doctor.name,
                         "patient_id": patient_id,
-                        "patient_name": patient_name
+                        "patient_name": patient_name,
+                        "is_active_for_doctor": True,
+                        "is_active_for_patient": True
                     })
+
+                    # Create some initial messages for the chat
+                    doctor_message_id = str(uuid.uuid4())
+                    doctor_message = Message(
+                        id=doctor_message_id,
+                        chat_id=chat_id,
+                        sender_id=doctor.id,
+                        receiver_id=patient_id,
+                        message=f"Hello {patient_first_name}, how can I help you today?",
+                        message_type=MessageType.TEXT,
+                        is_read=True
+                    )
+                    db.add(doctor_message)
+
+                    patient_message_id = str(uuid.uuid4())
+                    patient_message = Message(
+                        id=patient_message_id,
+                        chat_id=chat_id,
+                        sender_id=patient_id,
+                        receiver_id=doctor.id,
+                        message=f"Hi Dr. {doctor_last_name}, I've been having some symptoms I'd like to discuss.",
+                        message_type=MessageType.TEXT,
+                        is_read=False
+                    )
+                    db.add(patient_message)
+
+                    # Create an AI session for some chats (every other chat)
+                    if (i + j) % 2 == 0:
+                        ai_session_id = str(uuid.uuid4())
+                        ai_session = AISession(
+                            id=ai_session_id,
+                            chat_id=chat_id
+                        )
+                        db.add(ai_session)
+
+                        # Store AI session information
+                        credentials["ai_sessions"].append({
+                            "id": ai_session_id,
+                            "chat_id": chat_id,
+                            "doctor_id": doctor.id,
+                            "doctor_name": doctor.name,
+                            "patient_id": patient_id,
+                            "patient_name": patient_name
+                        })
+
+                        # Create some AI messages
+                        ai_message_id = str(uuid.uuid4())
+                        ai_message = AIMessage(
+                            id=ai_message_id,
+                            session_id=ai_session_id,
+                            message="What symptoms have you been experiencing?",
+                            response="I've been analyzing your symptoms and have some initial thoughts to share with your doctor.",
+                            is_summary=False
+                        )
+                        db.add(ai_message)
+
+                        ai_summary_id = str(uuid.uuid4())
+                        ai_summary = AIMessage(
+                            id=ai_summary_id,
+                            session_id=ai_session_id,
+                            message="Can you provide a summary of my condition?",
+                            response=f"Based on our conversation, {patient_first_name} has been experiencing symptoms that may indicate a minor condition. Recommend further evaluation by Dr. {doctor_last_name}.",
+                            is_summary=True
+                        )
+                        db.add(ai_summary)
+
+                        # Store AI message information
+                        credentials["ai_messages"].append({
+                            "id": ai_message_id,
+                            "session_id": ai_session_id,
+                            "message": "What symptoms have you been experiencing?",
+                            "response": "I've been analyzing your symptoms and have some initial thoughts to share with your doctor.",
+                            "is_summary": False
+                        })
+
+                        credentials["ai_messages"].append({
+                            "id": ai_summary_id,
+                            "session_id": ai_session_id,
+                            "message": "Can you provide a summary of my condition?",
+                            "response": f"Based on our conversation, {patient_first_name} has been experiencing symptoms that may indicate a minor condition. Recommend further evaluation by Dr. {doctor_last_name}.",
+                            "is_summary": True
+                        })
 
             credentials["patients"].append({
                 "name": patient_user_name,
@@ -433,6 +521,27 @@ def print_credentials():
         print(f"  Chat ID: {chat['id']}")
         print(f"    Doctor: {chat['doctor_name']} (ID: {chat['doctor_id']})")
         print(f"    Patient: {chat['patient_name']} (ID: {chat['patient_id']})")
+        print(f"    Active for Doctor: {chat['is_active_for_doctor']}")
+        print(f"    Active for Patient: {chat['is_active_for_patient']}")
+        print()
+
+    print("\nAI Sessions:")
+    for session in credentials.get("ai_sessions", []):
+        print(f"  AI Session ID: {session['id']}")
+        print(f"    Chat ID: {session['chat_id']}")
+        print(f"    Doctor: {session['doctor_name']} (ID: {session['doctor_id']})")
+        print(f"    Patient: {session['patient_name']} (ID: {session['patient_id']})")
+
+        # Find messages for this session
+        session_messages = [msg for msg in credentials.get("ai_messages", []) if msg["session_id"] == session["id"]]
+        if session_messages:
+            print(f"    Messages ({len(session_messages)}):")
+            for i, msg in enumerate(session_messages):
+                print(f"      Message {i+1}:")
+                print(f"        ID: {msg['id']}")
+                print(f"        User: {msg['message']}")
+                print(f"        AI: {msg['response']}")
+                print(f"        Is Summary: {msg['is_summary']}")
         print()
 
 if __name__ == "__main__":
