@@ -13,10 +13,11 @@ from app.models.patient import Patient
 from app.models.hospital import Hospital
 from app.schemas.auth import (
     Token, TokenPayload, UserCreate, UserLogin, RefreshToken,
-    DoctorSignup, PatientSignup, HospitalSignup, AdminSignup
+    DoctorSignup, PatientSignup, HospitalSignup, AdminSignup,
+    ResetPassword
 )
 from app.dependencies import (
-    get_admin_user, create_access_token, create_refresh_token
+    get_admin_user, create_access_token, create_refresh_token, get_current_user
 )
 from app.config import settings
 from app.errors import ErrorCode, create_error_response
@@ -523,6 +524,35 @@ async def login(
         "user_id": user.id,
         "role": user.role
     }
+
+@router.post("/reset-password")
+async def reset_password(
+    password_data: ResetPassword,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> Any:
+    """
+    Reset user password using the old password
+    """
+    # Verify the old password
+    if not verify_password(password_data.old_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=create_error_response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message="Incorrect old password",
+                error_code=ErrorCode.AUTH_001
+            )
+        )
+
+    # Hash the new password
+    hashed_password = get_password_hash(password_data.new_password)
+
+    # Update the user's password
+    current_user.hashed_password = hashed_password
+    db.commit()
+
+    return {"message": "Password reset successfully"}
 
 @router.post("/refresh", response_model=Token)
 async def refresh_token(

@@ -442,6 +442,40 @@
           "response": []
         },
         {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"old_password\": \"password123\",\n  \"new_password\": \"newpassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/reset-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "reset-password"
+              ]
+            },
+            "description": "Reset user password using the old password"
+          },
+          "response": []
+        },
+        {
           "name": "Admin Signup",
           "event": [
             {
@@ -993,6 +1027,41 @@
     {
       "name": "Patients",
       "item": [
+        {
+          "name": "Admin Create Patient",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"New Patient\",\n  \"dob\": \"1990-01-01\",\n  \"gender\": \"male\",\n  \"contact\": \"+1234567890\",\n  \"photo\": null,\n  \"email\": \"newpatient@example.com\",\n  \"password\": \"patient123\",\n  \"user_name\": \"New Patient User\",\n  \"user_contact\": \"+1234567890\",\n  \"relation_type\": \"self\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients/admin/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "patients",
+                "admin",
+                "create"
+              ]
+            },
+            "description": "Create a new patient with user account (admin only)"
+          },
+          "response": []
+        },
         {
           "name": "Get All Patients",
           "request": {

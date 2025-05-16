@@ -137,7 +137,7 @@ The collection is organized into the following categories:
    - Root, Health Check
 
 2. **Authentication**
-   - Login, Refresh Token, Doctor Signup, Patient Signup, Hospital Signup
+   - Login, Refresh Token, Reset Password, Doctor Signup, Patient Signup, Hospital Signup
 
 3. **Users**
    - Get All Users, Get User by ID, Update User
@@ -149,7 +149,7 @@ The collection is organized into the following categories:
    - Get All Doctors, Get Doctor by ID, Update Doctor
 
 6. **Patients**
-   - Get All Patients, Get Patient by ID, Update Patient
+   - Admin Create Patient, Get All Patients, Get Patient by ID, Update Patient
 
 7. **Mappings**
    - Map Hospital to Doctor, Map Hospital to Patient, Map Doctor to Patient

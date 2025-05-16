@@ -9,13 +9,14 @@ from app.db.database import get_db
 from app.models.user import User, UserRole
 from app.models.patient import Patient
 from app.models.doctor import Doctor
-from app.models.mapping import DoctorPatientMapping
+from app.models.mapping import DoctorPatientMapping, UserPatientRelation
 from app.models.case_history import CaseHistory, Document, UploadedBy
 from app.models.report import Report, PatientReportMapping, ReportDocument, ReportType
-from app.schemas.patient import PatientResponse
+from app.schemas.patient import PatientResponse, PatientCreate, AdminPatientCreate
 from app.schemas.case_history import CaseHistoryCreate, CaseHistoryUpdate, CaseHistoryResponse, DocumentCreate, DocumentResponse
 from app.schemas.report import ReportCreate, ReportUpdate, ReportResponse, ReportListResponse, ReportDocumentCreate, ReportDocumentResponse
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, get_admin_user
+from app.api.auth import get_password_hash
 from app.errors import ErrorCode, create_error_response
 
 router = APIRouter()
@@ -1049,3 +1050,86 @@ async def upload_case_history_document(
         upload_timestamp=db_document.upload_timestamp,
         created_at=db_document.created_at
     )
+
+@router.post("/admin/create", response_model=PatientResponse)
+async def admin_create_patient(
+    patient_data: AdminPatientCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_admin_user)
+) -> Any:
+    """
+    Create a new patient with user account (admin only)
+    """
+    try:
+        # Check if user with this email already exists
+        db_user = db.query(User).filter(User.email == patient_data.email).first()
+        if db_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=create_error_response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message="Email already registered",
+                    error_code=ErrorCode.RES_002
+                )
+            )
+
+        # Create patient profile
+        db_patient = Patient(
+            name=patient_data.name,
+            dob=patient_data.dob,
+            gender=patient_data.gender,
+            contact=patient_data.contact,
+            photo=patient_data.photo
+        )
+
+        db.add(db_patient)
+        db.flush()  # Flush to get the ID
+
+        # Create user account
+        hashed_password = get_password_hash(patient_data.password)
+        db_user = User(
+            email=patient_data.email,
+            hashed_password=hashed_password,
+            name=patient_data.user_name,
+            role=UserRole.PATIENT,
+            contact=patient_data.user_contact,
+            profile_id=db_patient.id
+        )
+
+        db.add(db_user)
+        db.flush()  # Flush to get the ID
+
+        # Link the patient to the user
+        db_patient.user_id = db_user.id
+
+        # Create user-patient relation
+        relation = UserPatientRelation(
+            user_id=db_user.id,
+            patient_id=db_patient.id,
+            relation=patient_data.relation_type
+        )
+
+        db.add(relation)
+        db.commit()
+        db.refresh(db_patient)
+
+        return PatientResponse(
+            id=db_patient.id,
+            name=db_patient.name,
+            dob=db_patient.dob,
+            gender=db_patient.gender,
+            contact=db_patient.contact,
+            photo=db_patient.photo,
+            created_at=db_patient.created_at,
+            updated_at=db_patient.updated_at
+        )
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=create_error_response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred: {str(e)}",
+                error_code=ErrorCode.SRV_001
+            )
+        )
