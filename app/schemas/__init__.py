@@ -45,3 +45,6 @@ from app.schemas.report import (
     ReportDocumentBase, ReportDocumentCreate, ReportDocumentResponse,
     PatientReportMappingCreate, PatientReportMappingResponse
 )
+from app.schemas.document import (
+    FileDocumentBase, FileDocumentCreate, FileDocumentResponse, FileDocumentListResponse
+)

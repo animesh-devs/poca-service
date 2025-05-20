@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
 from sqlalchemy.orm import Session
-from typing import Any
+from typing import Any, Optional
+from uuid import uuid4
 
 from app.db.database import get_db
 from app.models.user import User, UserRole
-from app.models.chat import Chat, Message
+from app.models.chat import Chat, Message, MessageType
+from app.models.document import FileDocument, DocumentType, UploadedBy
 from app.schemas.chat import (
     MessageCreate, MessageResponse, MessageListResponse,
     ReadStatusUpdate
@@ -370,6 +372,229 @@ async def update_read_status(
         db.commit()
 
         return {"success": True, "updated_count": len(messages)}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=create_error_response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred: {str(e)}",
+                error_code=ErrorCode.SRV_001
+            )
+        )
+
+@router.post("/with-attachment", response_model=MessageResponse)
+async def create_message_with_attachment(
+    chat_id: str = Form(...),
+    receiver_id: str = Form(...),
+    message: str = Form(...),
+    message_type: MessageType = Form(MessageType.TEXT),
+    file: Optional[UploadFile] = File(None),
+    document_id: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
+) -> Any:
+    """
+    Create a new message with an attachment (document or image)
+
+    This endpoint supports two ways to attach files:
+    1. Upload a new file directly
+    2. Reference an existing document by ID
+
+    The message_type should be one of: text, audio, file, image, document
+    """
+    try:
+        # Check if chat exists
+        chat = db.query(Chat).filter(Chat.id == chat_id).first()
+        if not chat:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="Chat not found",
+                    error_code=ErrorCode.RES_001
+                )
+            )
+
+        # Check permissions based on user role
+        is_admin = current_user.role == UserRole.ADMIN
+        is_doctor = current_user.role == UserRole.DOCTOR
+        is_patient = current_user.role == UserRole.PATIENT
+
+        # Set sender_id to the entity ID
+        sender_id = user_entity_id
+
+        # Verify permissions and receiver_id
+        if is_doctor:
+            # Verify sender ID matches the doctor's entity ID
+            if sender_id != chat.doctor_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=create_error_response(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        message="Sender ID does not match authenticated user",
+                        error_code=ErrorCode.BIZ_001
+                    )
+                )
+
+            # Verify receiver ID matches the patient's ID
+            if receiver_id != chat.patient_id:
+                # Check if receiver_id is a user_id and get the patient profile
+                patient_user = db.query(User).filter(User.id == receiver_id).first()
+                if patient_user and patient_user.role == UserRole.PATIENT and patient_user.profile_id == chat.patient_id:
+                    # Update receiver_id to use the profile_id
+                    receiver_id = chat.patient_id
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=create_error_response(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            message="Receiver ID does not match chat patient",
+                            error_code=ErrorCode.BIZ_001
+                        )
+                    )
+        elif is_patient:
+            # Verify sender ID matches the patient's entity ID
+            if sender_id != chat.patient_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=create_error_response(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        message="Sender ID does not match authenticated user",
+                        error_code=ErrorCode.BIZ_001
+                    )
+                )
+
+            # Verify receiver ID matches the doctor's ID
+            if receiver_id != chat.doctor_id:
+                # Check if receiver_id is a user_id and get the doctor profile
+                doctor_user = db.query(User).filter(User.id == receiver_id).first()
+                if doctor_user and doctor_user.role == UserRole.DOCTOR and doctor_user.profile_id == chat.doctor_id:
+                    # Update receiver_id to use the profile_id
+                    receiver_id = chat.doctor_id
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=create_error_response(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            message="Receiver ID does not match chat doctor",
+                            error_code=ErrorCode.BIZ_001
+                        )
+                    )
+        elif is_admin:
+            # Admin can send messages as any user
+            pass
+        else:
+            # Hospitals and other roles don't have access to chats
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=create_error_response(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    message="Not enough permissions",
+                    error_code=ErrorCode.AUTH_004
+                )
+            )
+
+        # Handle file attachment
+        file_details = None
+
+        if file and document_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=create_error_response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message="Cannot provide both file and document_id",
+                    error_code=ErrorCode.BIZ_001
+                )
+            )
+
+        if file:
+            # Upload a new file
+            file_content = await file.read()
+            file_size = len(file_content)
+
+            # In a real application, you would upload this file to a storage service
+            # and get a link to the uploaded file. For this example, we'll create a dummy link.
+            file_link = f"https://example.com/files/{uuid4()}/{file.filename}"
+
+            # Determine uploaded_by_role based on current user's role
+            if current_user.role == UserRole.DOCTOR:
+                uploaded_by_role = UploadedBy.DOCTOR
+            elif current_user.role == UserRole.ADMIN:
+                uploaded_by_role = UploadedBy.ADMIN
+            else:
+                uploaded_by_role = UploadedBy.PATIENT
+
+            # Create a document record
+            doc_type = DocumentType.OTHER
+            if message_type == MessageType.IMAGE:
+                doc_type = DocumentType.OTHER  # You might want to add an IMAGE type to DocumentType
+            elif message_type == MessageType.DOCUMENT:
+                doc_type = DocumentType.OTHER
+
+            db_document = FileDocument(
+                file_name=file.filename,
+                size=file_size,
+                link=file_link,
+                document_type=doc_type,
+                uploaded_by=current_user.id,
+                uploaded_by_role=uploaded_by_role,
+                remark=f"Attached to message in chat {chat_id}"
+            )
+
+            db.add(db_document)
+            db.commit()
+            db.refresh(db_document)
+
+            # Create file details for the message
+            file_details = {
+                "document_id": db_document.id,
+                "file_name": db_document.file_name,
+                "size": db_document.size,
+                "link": db_document.link,
+                "uploaded_by": db_document.uploaded_by,
+                "upload_timestamp": db_document.upload_timestamp.isoformat()
+            }
+
+        elif document_id:
+            # Use an existing document
+            db_document = db.query(FileDocument).filter(FileDocument.id == document_id).first()
+            if not db_document:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=create_error_response(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        message="Document not found",
+                        error_code=ErrorCode.RES_001
+                    )
+                )
+
+            # Create file details for the message
+            file_details = {
+                "document_id": db_document.id,
+                "file_name": db_document.file_name,
+                "size": db_document.size,
+                "link": db_document.link,
+                "uploaded_by": db_document.uploaded_by,
+                "upload_timestamp": db_document.upload_timestamp.isoformat()
+            }
+
+        # Create new message
+        db_message = Message(
+            chat_id=chat_id,
+            sender_id=sender_id,
+            receiver_id=receiver_id,
+            message=message,
+            message_type=message_type,
+            file_details=file_details
+        )
+
+        db.add(db_message)
+        db.commit()
+        db.refresh(db_message)
+
+        return db_message
     except Exception as e:
         db.rollback()
         raise HTTPException(

@@ -10,8 +10,9 @@ from app.models.user import User, UserRole
 from app.models.patient import Patient
 from app.models.doctor import Doctor
 from app.models.mapping import DoctorPatientMapping, UserPatientRelation
-from app.models.case_history import CaseHistory, Document, UploadedBy
+from app.models.case_history import CaseHistory, Document, UploadedBy as CaseHistoryUploadedBy
 from app.models.report import Report, PatientReportMapping, ReportDocument, ReportType
+from app.models.document import FileDocument, DocumentType, UploadedBy
 from app.schemas.patient import PatientResponse, PatientCreate, AdminPatientCreate
 from app.schemas.case_history import CaseHistoryCreate, CaseHistoryUpdate, CaseHistoryResponse, DocumentCreate, DocumentResponse
 from app.schemas.report import ReportCreate, ReportUpdate, ReportResponse, ReportListResponse, ReportDocumentCreate, ReportDocumentResponse
@@ -851,11 +852,16 @@ async def upload_report_document(
     report_id: str,
     file: UploadFile = File(...),
     remark: str = Form(None),
+    document_id: str = Form(None),  # New parameter to support using pre-uploaded documents
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """
     Upload a document for a patient's report
+
+    This endpoint now supports two workflows:
+    1. Upload a new document directly (traditional way)
+    2. Link an existing document by providing document_id (new way to avoid cyclic dependency)
     """
     # Check if user is admin, doctor, or the patient themselves
     is_admin = current_user.role == UserRole.ADMIN
@@ -899,23 +905,60 @@ async def upload_report_document(
             )
         )
 
-    # Read file content
-    file_content = await file.read()
-    file_size = len(file_content)
+    # Handle the two different workflows
+    if document_id:
+        # Workflow 2: Link an existing document
+        # Check if the document exists
+        file_document = db.query(FileDocument).filter(FileDocument.id == document_id).first()
+        if not file_document:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="Document not found",
+                    error_code=ErrorCode.RES_001
+                )
+            )
 
-    # In a real application, you would upload this file to a storage service
-    # and get a link to the uploaded file. For this example, we'll create a dummy link.
-    file_link = f"https://example.com/files/{report_id}/{file.filename}"
+        # Update the document type and entity_id
+        file_document.document_type = DocumentType.REPORT
+        file_document.entity_id = report_id
 
-    # Create report document
-    db_document = ReportDocument(
-        report_id=report_id,
-        file_name=file.filename,
-        size=file_size,
-        link=file_link,
-        uploaded_by=current_user.id,
-        remark=remark
-    )
+        if remark:
+            file_document.remark = remark
+
+        db.commit()
+        db.refresh(file_document)
+
+        # Create a traditional report document record for backward compatibility
+        db_document = ReportDocument(
+            report_id=report_id,
+            file_name=file_document.file_name,
+            size=file_document.size,
+            link=file_document.link,
+            uploaded_by=current_user.id,
+            remark=file_document.remark
+        )
+
+    else:
+        # Workflow 1: Upload a new document directly
+        # Read file content
+        file_content = await file.read()
+        file_size = len(file_content)
+
+        # In a real application, you would upload this file to a storage service
+        # and get a link to the uploaded file. For this example, we'll create a dummy link.
+        file_link = f"https://example.com/files/{report_id}/{file.filename}"
+
+        # Create report document
+        db_document = ReportDocument(
+            report_id=report_id,
+            file_name=file.filename,
+            size=file_size,
+            link=file_link,
+            uploaded_by=current_user.id,
+            remark=remark
+        )
 
     db.add(db_document)
     db.commit()
@@ -940,11 +983,16 @@ async def upload_case_history_document(
     file: UploadFile = File(...),
     remark: str = Form(None),
     case_history_id: str = Form(None),
+    document_id: str = Form(None),  # New parameter to support using pre-uploaded documents
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """
     Upload a document for a patient's case history
+
+    This endpoint now supports two workflows:
+    1. Upload a new document directly (traditional way)
+    2. Link an existing document by providing document_id (new way to avoid cyclic dependency)
     """
     # Check if user is admin, doctor, or the patient themselves
     is_admin = current_user.role == UserRole.ADMIN
@@ -1006,25 +1054,64 @@ async def upload_case_history_document(
                 )
             )
 
-    # Read file content
-    file_content = await file.read()
-    file_size = len(file_content)
+    # Handle the two different workflows
+    if document_id:
+        # Workflow 2: Link an existing document
+        # Check if the document exists
+        file_document = db.query(FileDocument).filter(FileDocument.id == document_id).first()
+        if not file_document:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="Document not found",
+                    error_code=ErrorCode.RES_001
+                )
+            )
 
-    # In a real application, you would upload this file to a storage service
-    # and get a link to the uploaded file. For this example, we'll create a dummy link.
-    file_link = f"https://example.com/files/{case_history_id}/{file.filename}"
+        # Update the document type and entity_id
+        file_document.document_type = DocumentType.CASE_HISTORY
+        file_document.entity_id = case_history_id
 
-    # Create document
-    db_document = Document(
-        case_history_id=case_history_id,
-        file_name=file.filename,
-        size=file_size,
-        link=file_link,
-        uploaded_by=UploadedBy.DOCTOR if current_user.role == UserRole.DOCTOR else (
-            UploadedBy.ADMIN if current_user.role == UserRole.ADMIN else UploadedBy.PATIENT
-        ),
-        remark=remark
-    )
+        if remark:
+            file_document.remark = remark
+
+        db.commit()
+        db.refresh(file_document)
+
+        # Create a traditional document record for backward compatibility
+        db_document = Document(
+            case_history_id=case_history_id,
+            file_name=file_document.file_name,
+            size=file_document.size,
+            link=file_document.link,
+            uploaded_by=CaseHistoryUploadedBy.DOCTOR if current_user.role == UserRole.DOCTOR else (
+                CaseHistoryUploadedBy.ADMIN if current_user.role == UserRole.ADMIN else CaseHistoryUploadedBy.PATIENT
+            ),
+            remark=file_document.remark
+        )
+
+    else:
+        # Workflow 1: Upload a new document directly
+        # Read file content
+        file_content = await file.read()
+        file_size = len(file_content)
+
+        # In a real application, you would upload this file to a storage service
+        # and get a link to the uploaded file. For this example, we'll create a dummy link.
+        file_link = f"https://example.com/files/{case_history_id}/{file.filename}"
+
+        # Create document
+        db_document = Document(
+            case_history_id=case_history_id,
+            file_name=file.filename,
+            size=file_size,
+            link=file_link,
+            uploaded_by=CaseHistoryUploadedBy.DOCTOR if current_user.role == UserRole.DOCTOR else (
+                CaseHistoryUploadedBy.ADMIN if current_user.role == UserRole.ADMIN else CaseHistoryUploadedBy.PATIENT
+            ),
+            remark=remark
+        )
 
     db.add(db_document)
     db.commit()

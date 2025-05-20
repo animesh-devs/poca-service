@@ -20,7 +20,8 @@ from app.api import (
     chats,
     messages,
     appointments,
-    suggestions
+    suggestions,
+    documents
 )
 from app.websockets import ai_assistant, chat
 from app.errors import http_exception_handler, validation_exception_handler
@@ -75,6 +76,7 @@ app.include_router(chats.router, prefix=f"{settings.API_V1_PREFIX}/chats", tags=
 app.include_router(messages.router, prefix=f"{settings.API_V1_PREFIX}/messages", tags=["Messages"])
 app.include_router(appointments.router, prefix=f"{settings.API_V1_PREFIX}/appointments", tags=["Appointments"])
 app.include_router(suggestions.router, prefix=f"{settings.API_V1_PREFIX}/suggestions", tags=["Suggestions"])
+app.include_router(documents.router, prefix=f"{settings.API_V1_PREFIX}/documents", tags=["Documents"])
 
 @app.get("/")
 def read_root():

@@ -10,7 +10,8 @@ from app.models.mapping import (
 )
 from app.models.appointment import Appointment, AppointmentType, AppointmentStatus
 from app.models.chat import Chat, Message, MessageType
-from app.models.case_history import CaseHistory, Document, UploadedBy
+from app.models.case_history import CaseHistory, Document, UploadedBy as CaseHistoryUploadedBy
 from app.models.ai import AISession, AIMessage
 from app.models.suggestion import Suggestion
 from app.models.report import Report, PatientReportMapping, ReportDocument, ReportType
+from app.models.document import FileDocument, DocumentType, UploadedBy

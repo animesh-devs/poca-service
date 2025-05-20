@@ -10,6 +10,8 @@ class MessageType(str, enum.Enum):
     TEXT = "text"
     AUDIO = "audio"
     FILE = "file"
+    IMAGE = "image"
+    DOCUMENT = "document"
 
 class Chat(Base):
     __tablename__ = "chats"
