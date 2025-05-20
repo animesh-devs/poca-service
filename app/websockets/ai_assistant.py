@@ -232,13 +232,6 @@ async def websocket_ai_endpoint(
                 }
                 await manager.send_message(ws_response, session_id, client_id)
 
-                # If this is a summary, send a notification
-                if is_summary:
-                    summary_notification = {
-                        "type": "summary",
-                        "content": "AI has generated a summary. You can edit it and send it to the doctor."
-                    }
-                    await manager.send_message(summary_notification, session_id, client_id)
 
         except WebSocketDisconnect:
             manager.disconnect(session_id, client_id)
