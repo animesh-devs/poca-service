@@ -15,4 +15,4 @@ COPY . .
 EXPOSE 8000
 
 # Command to run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["bash", "-c", "python init_db.py --force && python3 ./clean_db_create_test_data.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
