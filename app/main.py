@@ -6,6 +6,7 @@ import uvicorn
 import logging
 
 from app.config import settings
+from app.utils.passlib_patch import patch_passlib_bcrypt
 from app.db.database import engine, Base
 from app.api import (
     auth,
@@ -29,6 +30,9 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
+
+# Apply passlib patch for bcrypt 4.0.0+ compatibility
+patch_passlib_bcrypt()
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
