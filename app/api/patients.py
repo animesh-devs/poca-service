@@ -1,21 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import Any, List, Optional
-from uuid import uuid4
-import json
-import base64
+from typing import Any, List
 
 from app.db.database import get_db
 from app.models.user import User, UserRole
 from app.models.patient import Patient
 from app.models.doctor import Doctor
 from app.models.mapping import DoctorPatientMapping, UserPatientRelation
-from app.models.case_history import CaseHistory, Document, UploadedBy as CaseHistoryUploadedBy
+from app.models.case_history import CaseHistory, Document, UploadedBy
 from app.models.report import Report, PatientReportMapping, ReportDocument, ReportType
-from app.models.document import FileDocument, DocumentType, UploadedBy
-from app.schemas.patient import PatientResponse, PatientCreate, AdminPatientCreate
-from app.schemas.case_history import CaseHistoryCreate, CaseHistoryUpdate, CaseHistoryResponse, DocumentCreate, DocumentResponse
-from app.schemas.report import ReportCreate, ReportUpdate, ReportResponse, ReportListResponse, ReportDocumentCreate, ReportDocumentResponse
+from app.models.document import FileDocument, DocumentType
+from app.schemas.patient import PatientResponse, AdminPatientCreate
+from app.schemas.case_history import CaseHistoryCreate, CaseHistoryUpdate, CaseHistoryResponse, DocumentResponse
+from app.schemas.report import ReportCreate, ReportUpdate, ReportResponse, ReportListResponse, ReportDocumentResponse
 from app.dependencies import get_current_user, get_admin_user
 from app.api.auth import get_password_hash
 from app.errors import ErrorCode, create_error_response
@@ -224,15 +221,48 @@ async def create_case_history(
     db_case_history = CaseHistory(
         patient_id=patient_id,
         summary=case_history_data.summary,
-        documents=case_history_data.documents  # Store document IDs as JSON array
+        documents=case_history_data.documents or []  # Store document IDs as JSON array
     )
 
     db.add(db_case_history)
     db.commit()
     db.refresh(db_case_history)
 
-    # Get documents for this case history (if any)
-    documents = db.query(Document).filter(
+    # Process document IDs if provided
+    case_history_documents = []
+    if case_history_data.documents:
+        for doc_id in case_history_data.documents:
+            # Get the document from the FileDocument table
+            file_document = db.query(FileDocument).filter(FileDocument.id == doc_id).first()
+            if file_document:
+                # Create a case history document record
+                uploaded_by_role = UploadedBy.DOCTOR if current_user.role == UserRole.DOCTOR else (
+                    UploadedBy.ADMIN if current_user.role == UserRole.ADMIN else UploadedBy.PATIENT
+                )
+
+                case_doc = Document(
+                    case_history_id=db_case_history.id,
+                    file_name=file_document.file_name,
+                    size=file_document.size,
+                    link=file_document.link,
+                    uploaded_by=uploaded_by_role,
+                    remark=file_document.remark
+                )
+
+                db.add(case_doc)
+                case_history_documents.append(case_doc)
+
+                # Update the file document with the case history ID and type
+                file_document.entity_id = db_case_history.id
+                file_document.document_type = DocumentType.CASE_HISTORY
+
+        if case_history_documents:
+            db.commit()
+            for doc in case_history_documents:
+                db.refresh(doc)
+
+    # Get all documents for this case history
+    all_documents = db.query(Document).filter(
         Document.case_history_id == db_case_history.id
     ).all()
 
@@ -244,7 +274,7 @@ async def create_case_history(
         documents=db_case_history.documents,
         created_at=db_case_history.created_at,
         updated_at=db_case_history.updated_at,
-        document_files=[DocumentResponse.model_validate(doc) for doc in documents]
+        document_files=[DocumentResponse.model_validate(doc) for doc in all_documents]
     )
 
 @router.put("/{patient_id}/case-history", response_model=CaseHistoryResponse)
@@ -741,6 +771,40 @@ async def create_patient_report(
     db.commit()
     db.refresh(db_mapping)
 
+    # Process document IDs if provided
+    report_documents = []
+    if report_data.document_ids:
+        for doc_id in report_data.document_ids:
+            # Get the document from the FileDocument table
+            file_document = db.query(FileDocument).filter(FileDocument.id == doc_id).first()
+            if file_document:
+                # Create a report document record
+                report_doc = ReportDocument(
+                    report_id=db_report.id,
+                    file_name=file_document.file_name,
+                    size=file_document.size,
+                    link=file_document.link,
+                    uploaded_by=current_user.id,
+                    remark=file_document.remark
+                )
+
+                db.add(report_doc)
+                report_documents.append(report_doc)
+
+                # Update the file document with the report ID and type
+                file_document.entity_id = db_report.id
+                file_document.document_type = DocumentType.REPORT
+
+        if report_documents:
+            db.commit()
+            for doc in report_documents:
+                db.refresh(doc)
+
+    # Get all report documents
+    all_report_documents = db.query(ReportDocument).filter(
+        ReportDocument.report_id == db_report.id
+    ).all()
+
     # Construct response
     return ReportResponse(
         id=db_report.id,
@@ -749,7 +813,7 @@ async def create_patient_report(
         report_type=db_report.report_type,
         created_at=db_report.created_at,
         updated_at=db_report.updated_at,
-        report_documents=[]
+        report_documents=[ReportDocumentResponse.model_validate(doc) for doc in all_report_documents]
     )
 
 @router.put("/{patient_id}/reports/{report_id}", response_model=ReportResponse)
@@ -846,297 +910,9 @@ async def update_patient_report(
         report_documents=[ReportDocumentResponse.model_validate(doc) for doc in report_documents]
     )
 
-@router.post("/{patient_id}/reports/{report_id}/documents", response_model=ReportDocumentResponse)
-async def upload_report_document(
-    patient_id: str,
-    report_id: str,
-    file: UploadFile = File(...),
-    remark: str = Form(None),
-    document_id: str = Form(None),  # New parameter to support using pre-uploaded documents
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-) -> Any:
-    """
-    Upload a document for a patient's report
 
-    This endpoint now supports two workflows:
-    1. Upload a new document directly (traditional way)
-    2. Link an existing document by providing document_id (new way to avoid cyclic dependency)
-    """
-    # Check if user is admin, doctor, or the patient themselves
-    is_admin = current_user.role == UserRole.ADMIN
-    is_doctor = current_user.role == UserRole.DOCTOR
-    is_patient_owner = current_user.role == UserRole.PATIENT and current_user.profile_id == patient_id
 
-    if not (is_admin or is_doctor or is_patient_owner):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=create_error_response(
-                status_code=status.HTTP_403_FORBIDDEN,
-                message="Not enough permissions",
-                error_code=ErrorCode.AUTH_004
-            )
-        )
-    # Check if patient exists
-    patient = db.query(Patient).filter(Patient.id == patient_id).first()
-    if not patient:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=create_error_response(
-                status_code=status.HTTP_404_NOT_FOUND,
-                message="Patient not found",
-                error_code=ErrorCode.RES_001
-            )
-        )
 
-    # Check if report exists and belongs to this patient
-    mapping = db.query(PatientReportMapping).filter(
-        PatientReportMapping.patient_id == patient_id,
-        PatientReportMapping.report_id == report_id
-    ).first()
-
-    if not mapping:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=create_error_response(
-                status_code=status.HTTP_404_NOT_FOUND,
-                message="Report not found for this patient",
-                error_code=ErrorCode.RES_001
-            )
-        )
-
-    # Handle the two different workflows
-    if document_id:
-        # Workflow 2: Link an existing document
-        # Check if the document exists
-        file_document = db.query(FileDocument).filter(FileDocument.id == document_id).first()
-        if not file_document:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=create_error_response(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    message="Document not found",
-                    error_code=ErrorCode.RES_001
-                )
-            )
-
-        # Update the document type and entity_id
-        file_document.document_type = DocumentType.REPORT
-        file_document.entity_id = report_id
-
-        if remark:
-            file_document.remark = remark
-
-        db.commit()
-        db.refresh(file_document)
-
-        # Create a traditional report document record for backward compatibility
-        db_document = ReportDocument(
-            report_id=report_id,
-            file_name=file_document.file_name,
-            size=file_document.size,
-            link=file_document.link,
-            uploaded_by=current_user.id,
-            remark=file_document.remark
-        )
-
-    else:
-        # Workflow 1: Upload a new document directly
-        # Read file content
-        file_content = await file.read()
-        file_size = len(file_content)
-
-        # In a real application, you would upload this file to a storage service
-        # and get a link to the uploaded file. For this example, we'll create a dummy link.
-        file_link = f"https://example.com/files/{report_id}/{file.filename}"
-
-        # Create report document
-        db_document = ReportDocument(
-            report_id=report_id,
-            file_name=file.filename,
-            size=file_size,
-            link=file_link,
-            uploaded_by=current_user.id,
-            remark=remark
-        )
-
-    db.add(db_document)
-    db.commit()
-    db.refresh(db_document)
-
-    # Construct response
-    return ReportDocumentResponse(
-        id=db_document.id,
-        report_id=db_document.report_id,
-        file_name=db_document.file_name,
-        size=db_document.size,
-        link=db_document.link,
-        uploaded_by=db_document.uploaded_by,
-        remark=db_document.remark,
-        upload_timestamp=db_document.upload_timestamp,
-        created_at=db_document.created_at
-    )
-
-@router.post("/{patient_id}/case-history/documents", response_model=DocumentResponse)
-async def upload_case_history_document(
-    patient_id: str,
-    file: UploadFile = File(...),
-    remark: str = Form(None),
-    case_history_id: str = Form(None),
-    document_id: str = Form(None),  # New parameter to support using pre-uploaded documents
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-) -> Any:
-    """
-    Upload a document for a patient's case history
-
-    This endpoint now supports two workflows:
-    1. Upload a new document directly (traditional way)
-    2. Link an existing document by providing document_id (new way to avoid cyclic dependency)
-    """
-    # Check if user is admin, doctor, or the patient themselves
-    is_admin = current_user.role == UserRole.ADMIN
-    is_doctor = current_user.role == UserRole.DOCTOR
-    is_patient_owner = current_user.role == UserRole.PATIENT and current_user.profile_id == patient_id
-
-    if not (is_admin or is_doctor or is_patient_owner):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=create_error_response(
-                status_code=status.HTTP_403_FORBIDDEN,
-                message="Not enough permissions",
-                error_code=ErrorCode.AUTH_004
-            )
-        )
-
-    # Check if patient exists
-    patient = db.query(Patient).filter(Patient.id == patient_id).first()
-    if not patient:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=create_error_response(
-                status_code=status.HTTP_404_NOT_FOUND,
-                message="Patient not found",
-                error_code=ErrorCode.RES_001
-            )
-        )
-
-    # If case_history_id is not provided, get the most recent case history
-    if not case_history_id:
-        case_history = db.query(CaseHistory).filter(
-            CaseHistory.patient_id == patient_id
-        ).order_by(CaseHistory.created_at.desc()).first()
-
-        if not case_history:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=create_error_response(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    message="Case history not found for this patient",
-                    error_code=ErrorCode.RES_001
-                )
-            )
-        case_history_id = case_history.id
-    else:
-        # Check if case history exists and belongs to this patient
-        case_history = db.query(CaseHistory).filter(
-            CaseHistory.id == case_history_id,
-            CaseHistory.patient_id == patient_id
-        ).first()
-
-        if not case_history:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=create_error_response(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    message="Case history not found for this patient",
-                    error_code=ErrorCode.RES_001
-                )
-            )
-
-    # Handle the two different workflows
-    if document_id:
-        # Workflow 2: Link an existing document
-        # Check if the document exists
-        file_document = db.query(FileDocument).filter(FileDocument.id == document_id).first()
-        if not file_document:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=create_error_response(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    message="Document not found",
-                    error_code=ErrorCode.RES_001
-                )
-            )
-
-        # Update the document type and entity_id
-        file_document.document_type = DocumentType.CASE_HISTORY
-        file_document.entity_id = case_history_id
-
-        if remark:
-            file_document.remark = remark
-
-        db.commit()
-        db.refresh(file_document)
-
-        # Create a traditional document record for backward compatibility
-        db_document = Document(
-            case_history_id=case_history_id,
-            file_name=file_document.file_name,
-            size=file_document.size,
-            link=file_document.link,
-            uploaded_by=CaseHistoryUploadedBy.DOCTOR if current_user.role == UserRole.DOCTOR else (
-                CaseHistoryUploadedBy.ADMIN if current_user.role == UserRole.ADMIN else CaseHistoryUploadedBy.PATIENT
-            ),
-            remark=file_document.remark
-        )
-
-    else:
-        # Workflow 1: Upload a new document directly
-        # Read file content
-        file_content = await file.read()
-        file_size = len(file_content)
-
-        # In a real application, you would upload this file to a storage service
-        # and get a link to the uploaded file. For this example, we'll create a dummy link.
-        file_link = f"https://example.com/files/{case_history_id}/{file.filename}"
-
-        # Create document
-        db_document = Document(
-            case_history_id=case_history_id,
-            file_name=file.filename,
-            size=file_size,
-            link=file_link,
-            uploaded_by=CaseHistoryUploadedBy.DOCTOR if current_user.role == UserRole.DOCTOR else (
-                CaseHistoryUploadedBy.ADMIN if current_user.role == UserRole.ADMIN else CaseHistoryUploadedBy.PATIENT
-            ),
-            remark=remark
-        )
-
-    db.add(db_document)
-    db.commit()
-    db.refresh(db_document)
-
-    # Update case history documents list
-    if case_history.documents:
-        case_history.documents.append(db_document.id)
-    else:
-        case_history.documents = [db_document.id]
-
-    db.commit()
-
-    # Construct response
-    return DocumentResponse(
-        id=db_document.id,
-        case_history_id=db_document.case_history_id,
-        file_name=db_document.file_name,
-        size=db_document.size,
-        link=db_document.link,
-        uploaded_by=db_document.uploaded_by,
-        remark=db_document.remark,
-        upload_timestamp=db_document.upload_timestamp,
-        created_at=db_document.created_at
-    )
 
 @router.post("/admin/create", response_model=PatientResponse)
 async def admin_create_patient(

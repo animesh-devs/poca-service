@@ -1429,7 +1429,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Blood Test Results\",\n  \"description\": \"Complete blood count and metabolic panel\",\n  \"report_type\": \"lab_test\"\n}"
+              "raw": "{\n  \"title\": \"Blood Test Results\",\n  \"description\": \"Complete blood count and metabolic panel\",\n  \"report_type\": \"lab_test\",\n  \"document_ids\": [\"{{documentId}}\"]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/patients/{{patientId}}/reports",
@@ -1484,110 +1484,8 @@
           },
           "response": []
         },
-        {
-          "name": "Upload Report Document",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "body": {
-              "mode": "formdata",
-              "formdata": [
-                {
-                  "key": "file",
-                  "type": "file",
-                  "src": "/path/to/your/file.pdf"
-                },
-                {
-                  "key": "remark",
-                  "value": "Lab results from City Hospital",
-                  "type": "text"
-                },
-                {
-                  "key": "document_id",
-                  "value": "{{documentId}}",
-                  "type": "text",
-                  "description": "Optional - ID of pre-uploaded document to link instead of uploading a new file"
-                }
-              ]
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/patients/{{patientId}}/reports/{{reportId}}/documents",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "patients",
-                "{{patientId}}",
-                "reports",
-                "{{reportId}}",
-                "documents"
-              ]
-            },
-            "description": "Upload a document for a patient's report. Now supports two workflows: 1) Upload a new document directly, or 2) Link an existing document by providing document_id."
-          },
-          "response": []
-        },
-        {
-          "name": "Upload Case History Document",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "body": {
-              "mode": "formdata",
-              "formdata": [
-                {
-                  "key": "file",
-                  "type": "file",
-                  "src": "/path/to/your/file.pdf"
-                },
-                {
-                  "key": "remark",
-                  "value": "Medical history document",
-                  "type": "text"
-                },
-                {
-                  "key": "case_history_id",
-                  "value": "{{caseHistoryId}}",
-                  "type": "text"
-                },
-                {
-                  "key": "document_id",
-                  "value": "{{documentId}}",
-                  "type": "text",
-                  "description": "Optional - ID of pre-uploaded document to link instead of uploading a new file"
-                }
-              ]
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/patients/{{patientId}}/case-history/documents",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "patients",
-                "{{patientId}}",
-                "case-history",
-                "documents"
-              ]
-            },
-            "description": "Upload a document for a patient's case history. Now supports two workflows: 1) Upload a new document directly, or 2) Link an existing document by providing document_id."
-          },
-          "response": []
-        },
+
+
         {
           "name": "Get Patient Documents",
           "request": {

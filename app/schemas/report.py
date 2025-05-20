@@ -19,7 +19,7 @@ class ReportDocumentResponse(ReportDocumentBase):
     report_id: str
     upload_timestamp: datetime
     created_at: datetime
-    
+
     model_config = {
         "from_attributes": True
     }
@@ -35,7 +35,7 @@ class PatientReportMappingResponse(PatientReportMappingBase):
     id: str
     created_at: datetime
     updated_at: Optional[datetime] = None
-    
+
     model_config = {
         "from_attributes": True
     }
@@ -47,6 +47,7 @@ class ReportBase(BaseModel):
 
 class ReportCreate(ReportBase):
     patient_id: str  # Used to create the mapping
+    document_ids: Optional[List[str]] = None  # List of pre-uploaded document IDs
 
 class ReportUpdate(BaseModel):
     title: Optional[str] = None
@@ -58,7 +59,7 @@ class ReportResponse(ReportBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     report_documents: Optional[List[ReportDocumentResponse]] = None
-    
+
     model_config = {
         "from_attributes": True
     }
@@ -68,7 +69,7 @@ class ReportListItem(BaseModel):
     title: str
     report_type: ReportType
     created_at: datetime
-    
+
     model_config = {
         "from_attributes": True
     }
