@@ -4,12 +4,18 @@ from datetime import datetime
 
 from app.models.user import UserRole
 
-class Token(BaseModel):
+class TokenData(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
     user_id: str
     role: UserRole
+
+class Token(BaseModel):
+    status_code: int = 200
+    status: bool = True
+    message: str = "successful"
+    data: TokenData
 
 class TokenPayload(BaseModel):
     sub: Optional[str] = None

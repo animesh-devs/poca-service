@@ -25,6 +25,8 @@ from app.api import (
 )
 from app.websockets import ai_assistant, chat
 from app.errors import http_exception_handler, validation_exception_handler
+from app.middleware.response import add_standard_response_middleware
+from app.utils.openapi import custom_openapi
 
 # Configure logging
 logging.basicConfig(
@@ -61,6 +63,12 @@ app.add_middleware(
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
+# Add standard response middleware
+add_standard_response_middleware(app)
+
+# Use custom OpenAPI schema
+app.openapi = lambda: custom_openapi(app)
+
 # Include routers
 app.include_router(auth.router, prefix=f"{settings.API_V1_PREFIX}/auth", tags=["Authentication"])
 app.include_router(users.router, prefix=f"{settings.API_V1_PREFIX}/users", tags=["Users"])
@@ -82,16 +90,26 @@ app.include_router(documents.router, prefix=f"{settings.API_V1_PREFIX}/documents
 def read_root():
     """Root endpoint with API information"""
     return {
-        "name": settings.PROJECT_NAME,
-        "description": "A comprehensive service for doctor-patient communication with AI assistance",
-        "version": "1.0.0",
-        "documentation": f"{settings.API_V1_PREFIX}/docs"
+        "status_code": status.HTTP_200_OK,
+        "status": True,
+        "message": "Welcome to POCA Service API",
+        "data": {
+            "name": settings.PROJECT_NAME,
+            "description": "A comprehensive service for doctor-patient communication with AI assistance",
+            "version": "1.0.0",
+            "documentation": f"{settings.API_V1_PREFIX}/docs"
+        }
     }
 
 @app.get("/health")
 def health_check():
     """Health check endpoint"""
-    return {"status": "healthy"}
+    return {
+        "status_code": status.HTTP_200_OK,
+        "status": True,
+        "message": "Service is healthy",
+        "data": {"status": "healthy"}
+    }
 
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

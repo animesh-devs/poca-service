@@ -148,12 +148,19 @@ async def admin_signup(
     )
     refresh_token = create_refresh_token(data={"sub": db_user.id})
 
-    return {
+    token_data = {
         "access_token": access_token,
         "refresh_token": refresh_token,
         "token_type": "bearer",
         "user_id": db_user.id,
         "role": db_user.role
+    }
+
+    return {
+        "status_code": status.HTTP_201_CREATED,
+        "status": True,
+        "message": "Admin account created successfully",
+        "data": token_data
     }
 
 @router.post("/doctor-signup", response_model=Token)
@@ -212,12 +219,19 @@ async def doctor_signup(
     )
     refresh_token = create_refresh_token(data={"sub": db_user.id})
 
-    return {
+    token_data = {
         "access_token": access_token,
         "refresh_token": refresh_token,
         "token_type": "bearer",
         "user_id": db_user.id,
         "role": db_user.role
+    }
+
+    return {
+        "status_code": status.HTTP_201_CREATED,
+        "status": True,
+        "message": "Doctor account created successfully",
+        "data": token_data
     }
 
 @router.post("/patient-signup", response_model=Token)
@@ -318,12 +332,19 @@ async def patient_signup(
     )
     refresh_token = create_refresh_token(data={"sub": db_user.id})
 
-    return {
+    token_data = {
         "access_token": access_token,
         "refresh_token": refresh_token,
         "token_type": "bearer",
         "user_id": db_user.id,
         "role": db_user.role
+    }
+
+    return {
+        "status_code": status.HTTP_201_CREATED,
+        "status": True,
+        "message": "Patient account created successfully",
+        "data": token_data
     }
 
 @router.post("/hospital-signup", response_model=Token)
@@ -392,12 +413,19 @@ async def hospital_signup(
         )
         refresh_token = create_refresh_token(data={"sub": db_user.id})
 
-        return {
+        token_data = {
             "access_token": access_token,
             "refresh_token": refresh_token,
             "token_type": "bearer",
             "user_id": db_user.id,
             "role": db_user.role
+        }
+
+        return {
+            "status_code": status.HTTP_201_CREATED,
+            "status": True,
+            "message": "Hospital account created successfully",
+            "data": token_data
         }
     except Exception as e:
         db.rollback()
@@ -517,12 +545,19 @@ async def login(
 
     logger.info(f"Successful login for user {email} (ID: {user.id}) from {client_ip}")
 
-    return {
+    token_data = {
         "access_token": access_token,
         "refresh_token": refresh_token,
         "token_type": "bearer",
         "user_id": user.id,
         "role": user.role
+    }
+
+    return {
+        "status_code": status.HTTP_200_OK,
+        "status": True,
+        "message": "Login successful",
+        "data": token_data
     }
 
 @router.post("/reset-password")
@@ -552,7 +587,12 @@ async def reset_password(
     current_user.hashed_password = hashed_password
     db.commit()
 
-    return {"message": "Password reset successfully"}
+    return {
+        "status_code": status.HTTP_200_OK,
+        "status": True,
+        "message": "Password reset successfully",
+        "data": None
+    }
 
 @router.post("/refresh", response_model=Token)
 async def refresh_token(
@@ -609,12 +649,19 @@ async def refresh_token(
             expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         )
 
-        return {
+        token_data = {
             "access_token": access_token,
             "refresh_token": refresh_data.refresh_token,
             "token_type": "bearer",
             "user_id": user.id,
             "role": user.role
+        }
+
+        return {
+            "status_code": status.HTTP_200_OK,
+            "status": True,
+            "message": "Token refreshed successfully",
+            "data": token_data
         }
     except JWTError as e:
         logging.error(f"JWT error during token refresh: {str(e)}")
