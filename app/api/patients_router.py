@@ -11,10 +11,12 @@ from app.schemas.patient import PatientUpdate, PatientResponse, PatientListRespo
 from app.schemas.hospital import HospitalListItem
 from app.dependencies import get_current_user
 from app.errors import ErrorCode, create_error_response
+from app.utils.decorators import standardize_response
 
 router = APIRouter()
 
 @router.get("", response_model=PatientListResponse)
+@standardize_response
 async def get_patients(
     skip: int = 0,
     limit: int = 100,
@@ -44,6 +46,7 @@ async def get_patients(
     }
 
 @router.get("/{patient_id}", response_model=PatientResponse)
+@standardize_response
 async def get_patient(
     patient_id: str,
     db: Session = Depends(get_db),
@@ -90,6 +93,7 @@ async def get_patient(
     return patient
 
 @router.put("/{patient_id}", response_model=PatientResponse)
+@standardize_response
 async def update_patient(
     patient_id: str,
     patient_data: PatientUpdate,
@@ -147,6 +151,7 @@ async def update_patient(
     return patient
 
 @router.get("/{patient_id}/doctors", response_model=List[dict])
+@standardize_response
 async def get_patient_doctors(
     patient_id: str,
     skip: int = 0,
@@ -241,6 +246,7 @@ async def get_patient_doctors(
     ]
 
 @router.get("/{patient_id}/hospitals", response_model=List[Dict])
+@standardize_response
 async def get_patient_hospitals(
     patient_id: str,
     skip: int = 0,
@@ -335,6 +341,7 @@ async def get_patient_hospitals(
     ]
 
 @router.get("/user/{user_id}", response_model=PatientListResponse)
+@standardize_response
 async def get_user_patients(
     user_id: str,
     skip: int = 0,

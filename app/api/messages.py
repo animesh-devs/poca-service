@@ -56,7 +56,7 @@ async def create_message(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=create_error_response(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        message="Not enough permissions",
+                        message="Invalid entity ID for this user",
                         error_code=ErrorCode.AUTH_004
                     )
                 )
@@ -93,15 +93,25 @@ async def create_message(
                     )
         elif current_user.role == UserRole.PATIENT:
             # Check if patient has access to this chat using user_entity_id
+            # For patients, we need to check if the user_entity_id is the patient_id in the chat
+            # This is because patients can have multiple patient profiles (1:n relationship)
             if user_entity_id != chat.patient_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=create_error_response(
+                # Check if the user has a relation to this patient
+                from app.models.mapping import UserPatientRelation
+                relation = db.query(UserPatientRelation).filter(
+                    UserPatientRelation.user_id == current_user.id,
+                    UserPatientRelation.patient_id == chat.patient_id
+                ).first()
+
+                if not relation:
+                    raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        message="Not enough permissions",
-                        error_code=ErrorCode.AUTH_004
+                        detail=create_error_response(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            message="Invalid entity ID for this user",
+                            error_code=ErrorCode.AUTH_004
+                        )
                     )
-                )
 
             # Verify sender ID matches the patient's entity ID
             if message_data.sender_id != user_entity_id and message_data.sender_id != current_user.id:
@@ -139,7 +149,7 @@ async def create_message(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=create_error_response(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    message="Not enough permissions",
+                    message="Invalid entity ID for this user",
                     error_code=ErrorCode.AUTH_004
                 )
             )
@@ -219,7 +229,7 @@ async def get_chat_messages(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=create_error_response(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        message="Not enough permissions",
+                        message="Invalid entity ID for this user",
                         error_code=ErrorCode.AUTH_004
                     )
                 )
@@ -227,15 +237,25 @@ async def get_chat_messages(
             # Messages should be accessible regardless of chat active status
         elif current_user.role == UserRole.PATIENT:
             # Check if patient has access to this chat using user_entity_id
+            # For patients, we need to check if the user_entity_id is the patient_id in the chat
+            # This is because patients can have multiple patient profiles (1:n relationship)
             if user_entity_id != chat.patient_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=create_error_response(
+                # Check if the user has a relation to this patient
+                from app.models.mapping import UserPatientRelation
+                relation = db.query(UserPatientRelation).filter(
+                    UserPatientRelation.user_id == current_user.id,
+                    UserPatientRelation.patient_id == chat.patient_id
+                ).first()
+
+                if not relation:
+                    raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        message="Not enough permissions",
-                        error_code=ErrorCode.AUTH_004
+                        detail=create_error_response(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            message="Invalid entity ID for this user",
+                            error_code=ErrorCode.AUTH_004
+                        )
                     )
-                )
 
             # Messages should be accessible regardless of chat active status
         else:
@@ -244,7 +264,7 @@ async def get_chat_messages(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=create_error_response(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    message="Not enough permissions",
+                    message="Invalid entity ID for this user",
                     error_code=ErrorCode.AUTH_004
                 )
             )
@@ -334,15 +354,25 @@ async def update_read_status(
                     )
             elif current_user.role == UserRole.PATIENT:
                 # Check if patient has access to this chat using user_entity_id
+                # For patients, we need to check if the user_entity_id is the patient_id in the chat
+                # This is because patients can have multiple patient profiles (1:n relationship)
                 if user_entity_id != chat.patient_id:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail=create_error_response(
+                    # Check if the user has a relation to this patient
+                    from app.models.mapping import UserPatientRelation
+                    relation = db.query(UserPatientRelation).filter(
+                        UserPatientRelation.user_id == current_user.id,
+                        UserPatientRelation.patient_id == chat.patient_id
+                    ).first()
+
+                    if not relation:
+                        raise HTTPException(
                             status_code=status.HTTP_403_FORBIDDEN,
-                            message=f"Not enough permissions for message {message.id}",
-                            error_code=ErrorCode.AUTH_004
+                            detail=create_error_response(
+                                status_code=status.HTTP_403_FORBIDDEN,
+                                message=f"Not enough permissions for message {message.id}",
+                                error_code=ErrorCode.AUTH_004
+                            )
                         )
-                    )
 
                 # Patients can only mark messages as read if they are the receiver
                 if message.receiver_id != user_entity_id and status_data.is_read:
@@ -456,15 +486,25 @@ async def create_message_with_attachment(
                     )
         elif is_patient:
             # Verify sender ID matches the patient's entity ID
+            # For patients, we need to check if the user_entity_id is the patient_id in the chat
+            # This is because patients can have multiple patient profiles (1:n relationship)
             if sender_id != chat.patient_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=create_error_response(
+                # Check if the user has a relation to this patient
+                from app.models.mapping import UserPatientRelation
+                relation = db.query(UserPatientRelation).filter(
+                    UserPatientRelation.user_id == current_user.id,
+                    UserPatientRelation.patient_id == chat.patient_id
+                ).first()
+
+                if not relation:
+                    raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        message="Sender ID does not match authenticated user",
-                        error_code=ErrorCode.BIZ_001
+                        detail=create_error_response(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            message="Sender ID does not match authenticated user",
+                            error_code=ErrorCode.BIZ_001
+                        )
                     )
-                )
 
             # Verify receiver ID matches the doctor's ID
             if receiver_id != chat.doctor_id:

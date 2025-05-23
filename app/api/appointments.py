@@ -16,10 +16,12 @@ from app.schemas.appointment import (
 )
 from app.dependencies import get_current_user, get_admin_user, get_doctor_user, get_patient_user, get_hospital_user
 from app.errors import ErrorCode, create_error_response
+from app.utils.decorators import standardize_response
 
 router = APIRouter()
 
 @router.post("", response_model=AppointmentResponse)
+@standardize_response
 async def create_appointment(
     appointment_data: AppointmentCreate,
     db: Session = Depends(get_db),
@@ -83,6 +85,7 @@ async def create_appointment(
     return db_appointment
 
 @router.get("", response_model=AppointmentListResponse)
+@standardize_response
 async def get_appointments(
     skip: int = 0,
     limit: int = 100,
@@ -101,6 +104,7 @@ async def get_appointments(
     }
 
 @router.get("/{appointment_id}", response_model=AppointmentResponse)
+@standardize_response
 async def get_appointment(
     appointment_id: str,
     db: Session = Depends(get_db),
@@ -206,6 +210,7 @@ async def get_appointment(
         )
 
 @router.put("/{appointment_id}", response_model=AppointmentResponse)
+@standardize_response
 async def update_appointment(
     appointment_id: str,
     appointment_data: AppointmentUpdate,
@@ -343,6 +348,7 @@ async def cancel_appointment(
     db.commit()
 
 @router.put("/{appointment_id}/cancel", response_model=AppointmentResponse)
+@standardize_response
 async def cancel_appointment_with_reason(
     appointment_id: str,
     cancellation_data: AppointmentCancellation,
@@ -458,6 +464,7 @@ async def cancel_appointment_with_reason(
         )
 
 @router.get("/doctor/{doctor_id}", response_model=AppointmentListResponse)
+@standardize_response
 async def get_doctor_appointments(
     doctor_id: str,
     skip: int = 0,
@@ -604,6 +611,7 @@ async def get_doctor_appointments(
         )
 
 @router.get("/patient/{patient_id}", response_model=AppointmentListResponse)
+@standardize_response
 async def get_patient_appointments(
     patient_id: str,
     skip: int = 0,

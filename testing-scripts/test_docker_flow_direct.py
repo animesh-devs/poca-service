@@ -81,10 +81,10 @@ def check_docker_running() -> bool:
             logging.info("Docker is running")
             return True
         else:
-            logging.error("Docker is not running")
+            logging.warning("Docker is not running - will run non-Docker tests only")
             return False
     except Exception as e:
-        logging.error(f"Error checking Docker: {str(e)}")
+        logging.warning(f"Error checking Docker: {str(e)} - will run non-Docker tests only")
         return False
 
 def check_docker_container_running() -> bool:
@@ -193,9 +193,19 @@ def get_auth_token(email: str, password: str) -> Optional[Dict[str, Any]]:
         )
 
         if response.status_code == 200:
-            token_data = response.json()
-            logging.info(f"Got authentication token for user ID: {token_data.get('user_id')}")
-            return token_data
+            response_json = response.json()
+
+            # Check if the response is in the standardized format
+            if "data" in response_json and all(key in response_json for key in ["status_code", "status", "message"]):
+                # Extract the token data from the data field
+                token_data = response_json["data"]
+                logging.info(f"Got authentication token for user ID: {token_data.get('user_id')} (standardized response)")
+                return token_data
+            else:
+                # Handle the old format (direct response)
+                token_data = response_json
+                logging.info(f"Got authentication token for user ID: {token_data.get('user_id')} (direct response)")
+                return token_data
         else:
             logging.error(f"Failed to get authentication token: {response.text}")
             return None
@@ -214,9 +224,19 @@ def refresh_token(refresh_token: str) -> Optional[Dict[str, Any]]:
         )
 
         if response.status_code == 200:
-            token_data = response.json()
-            logging.info(f"Refreshed authentication token for user ID: {token_data.get('user_id')}")
-            return token_data
+            response_json = response.json()
+
+            # Check if the response is in the standardized format
+            if "data" in response_json and all(key in response_json for key in ["status_code", "status", "message"]):
+                # Extract the token data from the data field
+                token_data = response_json["data"]
+                logging.info(f"Refreshed authentication token for user ID: {token_data.get('user_id')} (standardized response)")
+                return token_data
+            else:
+                # Handle the old format (direct response)
+                token_data = response_json
+                logging.info(f"Refreshed authentication token for user ID: {token_data.get('user_id')} (direct response)")
+                return token_data
         else:
             logging.error(f"Failed to refresh authentication token: {response.text}")
             return None
@@ -249,7 +269,18 @@ def create_hospital() -> Optional[Dict[str, Any]]:
         )
 
         if response.status_code in [200, 201]:
-            result = response.json()
+            response_json = response.json()
+
+            # Check if the response is in the standardized format
+            if "data" in response_json and all(key in response_json for key in ["status_code", "status", "message"]):
+                # Extract the result from the data field
+                result = response_json["data"]
+                logging.info(f"Hospital signup response is in standardized format")
+            else:
+                # Handle the old format (direct response)
+                result = response_json
+                logging.info(f"Hospital signup response is in direct format")
+
             hospital_data["id"] = result.get("user_id")
             hospital_data["user_id"] = result.get("user_id")
             logging.info(f"Created hospital: {TEST_HOSPITAL_NAME} with ID: {hospital_data['id']}")
@@ -288,7 +319,18 @@ def create_doctor() -> Optional[Dict[str, Any]]:
         )
 
         if response.status_code in [200, 201]:
-            result = response.json()
+            response_json = response.json()
+
+            # Check if the response is in the standardized format
+            if "data" in response_json and all(key in response_json for key in ["status_code", "status", "message"]):
+                # Extract the result from the data field
+                result = response_json["data"]
+                logging.info(f"Doctor signup response is in standardized format")
+            else:
+                # Handle the old format (direct response)
+                result = response_json
+                logging.info(f"Doctor signup response is in direct format")
+
             doctor_data["id"] = result.get("user_id")
             doctor_data["user_id"] = result.get("user_id")
             logging.info(f"Created doctor: {TEST_DOCTOR_NAME} with ID: {doctor_data['id']}")
@@ -333,7 +375,18 @@ def create_patient() -> Optional[Dict[str, Any]]:
         )
 
         if response.status_code in [200, 201]:
-            result = response.json()
+            response_json = response.json()
+
+            # Check if the response is in the standardized format
+            if "data" in response_json and all(key in response_json for key in ["status_code", "status", "message"]):
+                # Extract the result from the data field
+                result = response_json["data"]
+                logging.info(f"Patient signup response is in standardized format")
+            else:
+                # Handle the old format (direct response)
+                result = response_json
+                logging.info(f"Patient signup response is in direct format")
+
             patient_data["id"] = result.get("user_id")
             patient_data["user_id"] = result.get("user_id")
             logging.info(f"Created patient: {TEST_PATIENT_NAME} with ID: {patient_data['id']}")
@@ -429,6 +482,14 @@ def map_doctor_to_patient(admin_token: str, doctor_id: str, patient_id: str) -> 
         )
 
         if response.status_code in [200, 201]:
+            response_json = response.json()
+
+            # Check if the response is in the standardized format
+            if "data" in response_json and all(key in response_json for key in ["status_code", "status", "message"]):
+                logging.info(f"Mapping response is in standardized format")
+            else:
+                logging.info(f"Mapping response is in direct format")
+
             logging.info(f"Mapped doctor {doctor_id} to patient {patient_id}")
             return True
         else:
@@ -791,10 +852,16 @@ def create_chat(token: str, doctor_id: str, patient_id: str) -> Optional[Dict[st
             "is_active_for_patient": True
         }
 
+        # Add user-entity-id header for the patient
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "user-entity-id": patient_profile_id
+        }
+
         response = requests.post(
             CHATS_URL,
             json=chat_data,
-            headers={"Authorization": f"Bearer {token}"}
+            headers=headers
         )
 
         if response.status_code == 200:
@@ -808,14 +875,20 @@ def create_chat(token: str, doctor_id: str, patient_id: str) -> Optional[Dict[st
         logging.error(f"Error creating chat: {str(e)}")
         return None
 
-def get_all_chats(token: str) -> Optional[Dict[str, Any]]:
+def get_all_chats(token: str, entity_id: str = None) -> Optional[Dict[str, Any]]:
     """Get all chats for the current user"""
     logging.info("Getting all chats...")
 
     try:
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Add user-entity-id header if provided
+        if entity_id:
+            headers["user-entity-id"] = entity_id
+
         response = requests.get(
             CHATS_URL,
-            headers={"Authorization": f"Bearer {token}"}
+            headers=headers
         )
 
         if response.status_code == 200:
@@ -829,14 +902,20 @@ def get_all_chats(token: str) -> Optional[Dict[str, Any]]:
         logging.error(f"Error getting chats: {str(e)}")
         return None
 
-def get_chat_by_id(token: str, chat_id: str) -> Optional[Dict[str, Any]]:
+def get_chat_by_id(token: str, chat_id: str, entity_id: str = None) -> Optional[Dict[str, Any]]:
     """Get a chat by ID"""
     logging.info(f"Getting chat with ID: {chat_id}...")
 
     try:
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Add user-entity-id header if provided
+        if entity_id:
+            headers["user-entity-id"] = entity_id
+
         response = requests.get(
             f"{CHATS_URL}/{chat_id}",
-            headers={"Authorization": f"Bearer {token}"}
+            headers=headers
         )
 
         if response.status_code == 200:
@@ -863,29 +942,51 @@ def send_message(token: str, chat_id: str, sender_id: str = None, receiver_id: s
         }
 
         # Add sender_id and receiver_id if provided (optional in some implementations)
+        sender_profile_id = None
         if sender_id:
-            # Get profile IDs if needed
-            if "doctor" in sender_id:
-                sender_profile_id = get_doctor_profile_id(token, sender_id) or sender_id
-            elif "patient" in sender_id:
-                sender_profile_id = get_patient_profile_id(token, sender_id) or sender_id
-            else:
-                sender_profile_id = sender_id
+            # Get profile ID using the unified function
+            sender_profile_id = get_profile_id_for_user(token, sender_id)
+            if not sender_profile_id:
+                # Fall back to the old method if the unified function fails
+                if "doctor" in sender_id:
+                    sender_profile_id = get_doctor_profile_id(token, sender_id) or sender_id
+                elif "patient" in sender_id:
+                    sender_profile_id = get_patient_profile_id(token, sender_id) or sender_id
+                else:
+                    sender_profile_id = sender_id
             message_data["sender_id"] = sender_profile_id
+            logging.info(f"Using sender profile ID: {sender_profile_id}")
 
         if receiver_id:
-            if "doctor" in receiver_id:
-                receiver_profile_id = get_doctor_profile_id(token, receiver_id) or receiver_id
-            elif "patient" in receiver_id:
-                receiver_profile_id = get_patient_profile_id(token, receiver_id) or receiver_id
-            else:
-                receiver_profile_id = receiver_id
+            # Get profile ID using the unified function
+            receiver_profile_id = get_profile_id_for_user(token, receiver_id)
+            if not receiver_profile_id:
+                # Fall back to the old method if the unified function fails
+                if "doctor" in receiver_id:
+                    receiver_profile_id = get_doctor_profile_id(token, receiver_id) or receiver_id
+                elif "patient" in receiver_id:
+                    receiver_profile_id = get_patient_profile_id(token, receiver_id) or receiver_id
+                else:
+                    receiver_profile_id = receiver_id
             message_data["receiver_id"] = receiver_profile_id
+            logging.info(f"Using receiver profile ID: {receiver_profile_id}")
+
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Add user-entity-id header if sender_id is provided
+        if sender_id and sender_profile_id:
+            headers["user-entity-id"] = sender_profile_id
+            logging.info(f"Adding user-entity-id header: {sender_profile_id}")
+
+        # Add debug logging
+        logging.info(f"Sending request to: {MESSAGES_URL}")
+        logging.info(f"Request payload: {message_data}")
+        logging.info(f"Request headers: {headers}")
 
         response = requests.post(
             MESSAGES_URL,
             json=message_data,
-            headers={"Authorization": f"Bearer {token}"}
+            headers=headers
         )
 
         if response.status_code in [200, 201]:
@@ -897,20 +998,26 @@ def send_message(token: str, chat_id: str, sender_id: str = None, receiver_id: s
                 logging.warning("Message sending endpoint not found (404). This endpoint might not be implemented yet.")
                 return None
             else:
-                logging.error(f"Failed to send message: {response.text}")
+                logging.error(f"Failed to send message: {response.status_code} - {response.text}")
                 return None
     except Exception as e:
         logging.error(f"Error sending message: {str(e)}")
         return None
 
-def get_chat_messages(token: str, chat_id: str) -> Optional[Dict[str, Any]]:
+def get_chat_messages(token: str, chat_id: str, entity_id: str = None) -> Optional[Dict[str, Any]]:
     """Get all messages for a chat"""
     logging.info(f"Getting messages for chat {chat_id}...")
 
     try:
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Add user-entity-id header if provided
+        if entity_id:
+            headers["user-entity-id"] = entity_id
+
         response = requests.get(
             f"{MESSAGES_URL}/chat/{chat_id}",
-            headers={"Authorization": f"Bearer {token}"}
+            headers=headers
         )
 
         if response.status_code == 200:
@@ -924,7 +1031,7 @@ def get_chat_messages(token: str, chat_id: str) -> Optional[Dict[str, Any]]:
         logging.error(f"Error getting messages: {str(e)}")
         return None
 
-def update_message_read_status(token: str, message_ids: List[str], is_read: bool) -> bool:
+def update_message_read_status(token: str, message_ids: List[str], is_read: bool, entity_id: str = None) -> bool:
     """Update read status for messages"""
     logging.info(f"Updating read status for {len(message_ids)} messages...")
 
@@ -935,10 +1042,16 @@ def update_message_read_status(token: str, message_ids: List[str], is_read: bool
             "is_read": is_read
         }
 
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Add user-entity-id header if provided
+        if entity_id:
+            headers["user-entity-id"] = entity_id
+
         response = requests.put(
             f"{MESSAGES_URL}/read-status",
             json=data,
-            headers={"Authorization": f"Bearer {token}"}
+            headers=headers
         )
 
         if response.status_code == 200:
@@ -957,7 +1070,7 @@ def update_message_read_status(token: str, message_ids: List[str], is_read: bool
         logging.error(f"Error updating message read status: {str(e)}")
         return False
 
-def create_ai_session(token: str, chat_id: str) -> Optional[Dict[str, Any]]:
+def create_ai_session(token: str, chat_id: str, entity_id: str = None) -> Optional[Dict[str, Any]]:
     """Create a new AI session"""
     logging.info(f"Creating AI session for chat {chat_id}...")
 
@@ -966,10 +1079,16 @@ def create_ai_session(token: str, chat_id: str) -> Optional[Dict[str, Any]]:
             "chat_id": chat_id
         }
 
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Add user-entity-id header if provided
+        if entity_id:
+            headers["user-entity-id"] = entity_id
+
         response = requests.post(
             AI_SESSIONS_URL,
             json=session_data,
-            headers={"Authorization": f"Bearer {token}"}
+            headers=headers
         )
 
         if response.status_code in [200, 201]:
@@ -988,7 +1107,45 @@ def create_ai_session(token: str, chat_id: str) -> Optional[Dict[str, Any]]:
         logging.error(f"Error creating AI session: {str(e)}")
         return None
 
-def get_ai_session_messages(token: str, session_id: str) -> Optional[Dict[str, Any]]:
+def send_ai_message(token: str, session_id: str, message: str, entity_id: str = None) -> Optional[Dict[str, Any]]:
+    """Send a message to an AI session"""
+    logging.info(f"Sending message to AI session {session_id}...")
+
+    try:
+        message_data = {
+            "session_id": session_id,
+            "message": message
+        }
+
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Add user-entity-id header if provided
+        if entity_id:
+            headers["user-entity-id"] = entity_id
+
+        response = requests.post(
+            AI_MESSAGES_URL,
+            json=message_data,
+            headers=headers
+        )
+
+        if response.status_code in [200, 201]:
+            message = response.json()
+            logging.info(f"Sent AI message successfully")
+            return message
+        else:
+            # Handle 404 errors gracefully as the endpoint might not be implemented yet
+            if response.status_code == 404:
+                logging.warning("AI message sending endpoint not found (404). This endpoint might not be implemented yet.")
+                return None
+            else:
+                logging.error(f"Failed to send AI message: {response.text}")
+                return None
+    except Exception as e:
+        logging.error(f"Error sending AI message: {str(e)}")
+        return None
+
+def get_ai_session_messages(token: str, session_id: str, entity_id: str = None) -> Optional[Dict[str, Any]]:
     """Get all messages for an AI session"""
     logging.info(f"Getting messages for AI session {session_id}...")
 
@@ -999,9 +1156,15 @@ def get_ai_session_messages(token: str, session_id: str) -> Optional[Dict[str, A
         # Add debug logging
         logging.info(f"Sending request to: {url}")
 
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Add user-entity-id header if provided
+        if entity_id:
+            headers["user-entity-id"] = entity_id
+
         response = requests.get(
             url,
-            headers={"Authorization": f"Bearer {token}"}
+            headers=headers
         )
 
         if response.status_code == 200:
@@ -1070,6 +1233,44 @@ def get_patient_profile_id(token: str, patient_user_id: str) -> Optional[str]:
             return None
     except Exception as e:
         logging.error(f"Error getting patient profile ID: {str(e)}")
+        return None
+
+def get_profile_id_for_user(token: str, user_id: str) -> Optional[str]:
+    """Get profile ID for a user based on their role"""
+    logging.info(f"Getting profile ID for user ID: {user_id}...")
+
+    try:
+        # First, get the user to determine their role
+        user_response = requests.get(
+            f"{USERS_URL}/{user_id}",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+
+        if user_response.status_code == 200:
+            try:
+                user_data = user_response.json()
+
+                # Check if response is in standardized format
+                if "data" in user_data:
+                    user_data = user_data["data"]
+
+                # Extract role and profile_id
+                role = user_data.get("role")
+                profile_id = user_data.get("profile_id")
+
+                if profile_id:
+                    logging.info(f"Got profile ID: {profile_id} for user with role: {role}")
+                    return profile_id
+                else:
+                    logging.error(f"No profile_id found in user data: {user_data}")
+            except Exception as e:
+                logging.error(f"Error parsing user response: {str(e)}")
+        else:
+            logging.error(f"Failed to get user: {user_response.text}")
+
+        return None
+    except Exception as e:
+        logging.error(f"Error getting profile ID for user: {str(e)}")
         return None
 
 def get_hospital_profile_id(token: str, hospital_user_id: str) -> Optional[str]:
@@ -1153,25 +1354,34 @@ def main():
     print("This may take a few minutes...")
 
     # Check if Docker is running
-    if not check_docker_running():
-        logging.error("Docker is not running. Please start Docker and try again.")
-        return
+    docker_running = check_docker_running()
 
-    # Check if the Docker container is running
-    container_running = check_docker_container_running()
+    # Only try to start Docker container if Docker is running
+    if docker_running:
+        # Check if the Docker container is running
+        container_running = check_docker_container_running()
 
-    # If container is not running, try to start it
-    if not container_running:
-        logging.info("Attempting to start Docker container...")
-        if not start_docker_container():
-            logging.error("Failed to start Docker container. Please start it manually and try again.")
-            return
-        logging.info("Docker container started successfully")
+        # If container is not running, try to start it
+        if not container_running:
+            logging.info("Attempting to start Docker container...")
+            if not start_docker_container():
+                logging.error("Failed to start Docker container. Will run non-Docker tests only.")
+                # Continue with non-Docker tests
+            else:
+                logging.info("Docker container started successfully")
+    else:
+        logging.info("Skipping Docker container checks and continuing with non-Docker tests.")
 
     # Check if the server is up
-    if not check_server_health():
-        logging.error("Server is not running. Please start the server and try again.")
-        return
+    server_running = check_server_health()
+    if not server_running:
+        logging.warning("Server is not running. Starting server health check...")
+        # Try to check server health again after a short delay
+        time.sleep(5)
+        server_running = check_server_health()
+        if not server_running:
+            logging.error("Server is still not running. Please start the server manually.")
+            return
 
     # Test authentication flow
     auth_result, doctor_data, patient_data, hospital_data = test_authentication_flow()
@@ -1318,6 +1528,14 @@ def main():
     # Test Chats API (now implemented)
     logging.info("Testing Chats API...")
 
+    # Get profile IDs for doctor and patient
+    doctor_profile_id = get_doctor_profile_id(admin_token, doctor_id)
+    patient_profile_id = get_patient_profile_id(admin_token, patient_id)
+
+    if not doctor_profile_id or not patient_profile_id:
+        logging.error("Failed to get profile IDs. Skipping chat and message tests.")
+        return
+
     # Create chat - test with patient token (patient can create their own chat)
     chat_data = create_chat(patient_token, doctor_id, patient_id)
     if chat_data:
@@ -1330,77 +1548,87 @@ def main():
         if chat_data:
             chat_id = chat_data["id"]
             logging.info(f"Created chat with ID: {chat_id}")
-
-        # Get all chats
-        chats = get_all_chats(patient_token)
-        if chats is not None:
-            logging.info("Get all chats successful")
-
-        # Get chat by ID
-        chat = get_chat_by_id(patient_token, chat_id)
-        if chat is not None:
-            logging.info("Get chat by ID successful")
-
-        # Test Messages API (now implemented)
-        logging.info("Testing Messages API...")
-
-        # Send message from patient to doctor
-        patient_message = send_message(
-            patient_token,
-            chat_id,
-            patient_id,
-            doctor_id,
-            "Hello doctor, I'm not feeling well."
-        )
-        if patient_message:
-            logging.info("Send message from patient to doctor successful")
-
-            # Send message from doctor to patient
-            doctor_message = send_message(
-                doctor_token,
-                chat_id,
-                doctor_id,
-                patient_id,
-                "Hello, what symptoms are you experiencing?"
-            )
-            if doctor_message:
-                logging.info("Send message from doctor to patient successful")
-
-                # Get chat messages
-                messages = get_chat_messages(patient_token, chat_id)
-                if messages is not None:
-                    logging.info("Get chat messages successful")
-
-                    # Update message read status
-                    if isinstance(messages, dict) and "messages" in messages and len(messages["messages"]) > 0:
-                        message_ids = [msg["id"] for msg in messages["messages"]]
-                        if message_ids and update_message_read_status(patient_token, message_ids, True):
-                            logging.info("Update message read status successful")
-
-        # Test AI API (implemented)
-        logging.info("Testing AI API...")
-
-        # Create AI session
-        session_data = create_ai_session(patient_token, chat_id)
-        if session_data:
-            session_id = session_data["id"]
-            logging.info(f"Created AI session with ID: {session_id}")
-
-            # Send a message to AI
-            ai_message = send_ai_message(
-                patient_token,
-                session_id,
-                "I have a headache and fever. What could be wrong with me?"
-            )
-            if ai_message:
-                logging.info("Send message to AI successful")
-
-                # Get AI session messages
-                ai_messages = get_ai_session_messages(patient_token, session_id)
-                if ai_messages is not None:
-                    logging.info("Get AI session messages successful")
         else:
             logging.error("Failed to create chat. Skipping chat and message tests.")
+            return
+
+    # Get all chats with entity ID
+    chats = get_all_chats(patient_token, patient_profile_id)
+    if chats is not None:
+        logging.info("Get all chats successful")
+
+    # Get chat by ID with entity ID
+    # Get patient profile ID for user ID
+    patient_profile_id = get_profile_id_for_user(patient_token, patient_id)
+    if patient_profile_id:
+        logging.info(f"Using patient profile ID: {patient_profile_id} for user-entity-id header")
+        chat = get_chat_by_id(patient_token, chat_id, patient_profile_id)
+        if chat is not None:
+            logging.info("Get chat by ID successful")
+    else:
+        logging.warning("Failed to get patient profile ID for user-entity-id header")
+
+    # Test Messages API (now implemented)
+    logging.info("Testing Messages API...")
+
+    # Send message from patient to doctor with entity ID
+    patient_message = send_message(
+        patient_token,
+        chat_id,
+        patient_id,
+        doctor_id,
+        "Hello doctor, I'm not feeling well."
+    )
+    if patient_message:
+        logging.info("Send message from patient to doctor successful")
+
+        # Send message from doctor to patient
+        doctor_message = send_message(
+            doctor_token,
+            chat_id,
+            doctor_id,
+            patient_id,
+            "Hello, what symptoms are you experiencing?"
+        )
+        if doctor_message:
+            logging.info("Send message from doctor to patient successful")
+
+            # Get chat messages with entity ID
+            messages = get_chat_messages(patient_token, chat_id, patient_profile_id)
+            if messages is not None:
+                logging.info("Get chat messages successful")
+
+                # Update message read status with entity ID
+                if isinstance(messages, dict) and "messages" in messages and len(messages["messages"]) > 0:
+                    message_ids = [msg["id"] for msg in messages["messages"]]
+                    if message_ids and update_message_read_status(patient_token, message_ids, True, patient_profile_id):
+                        logging.info("Update message read status successful")
+
+    # Test AI API (implemented)
+    logging.info("Testing AI API...")
+
+    # Create AI session with entity ID
+    session_data = create_ai_session(patient_token, chat_id, patient_profile_id)
+    if session_data:
+        session_id = session_data["id"]
+        logging.info(f"Created AI session with ID: {session_id}")
+
+        # Send a message to AI with entity ID
+        ai_message = send_ai_message(
+            patient_token,
+            session_id,
+            "I have a headache and fever. What could be wrong with me?",
+            patient_profile_id
+        )
+        if ai_message:
+            logging.info("Send message to AI successful")
+
+            # Get AI session messages with entity ID
+            ai_messages = get_ai_session_messages(patient_token, session_id, patient_profile_id)
+            if ai_messages is not None:
+                logging.info("Get AI session messages successful")
+    else:
+        logging.error("Failed to create AI session. Skipping AI message tests.")
 
     print("Docker flow test completed successfully!")
 

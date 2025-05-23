@@ -138,7 +138,16 @@ def make_request(method: str, url: str, token: Optional[str] = None, data: Optio
         if response.status_code == expected_status:
             try:
                 if response.text:
-                    response_data = response.json()
+                    response_json = response.json()
+
+                    # Check if the response is in the standardized format
+                    if isinstance(response_json, dict) and all(key in response_json for key in ["status_code", "status", "message", "data"]):
+                        # Extract the actual data from the standardized response
+                        response_data = response_json.get("data", {})
+                        logger.debug(f"Received standardized response: {response_json['message']}")
+                    else:
+                        # If not in standardized format, use the response as is
+                        response_data = response_json
                 else:
                     response_data = {}
                 return response_data, True
@@ -147,6 +156,18 @@ def make_request(method: str, url: str, token: Optional[str] = None, data: Optio
                 return {}, False
         else:
             logger.error(f"Request failed: {url}, Status: {response.status_code}, Response: {response.text}")
+            try:
+                if response.text:
+                    response_json = response.json()
+                    # Check if error response is in standardized format
+                    if isinstance(response_json, dict) and all(key in response_json for key in ["status_code", "status", "message", "data"]):
+                        error_message = response_json.get("message", "Unknown error")
+                        error_data = response_json.get("data", {})
+                        logger.error(f"Error details: {error_message}, Data: {error_data}")
+                    else:
+                        logger.error(f"Non-standardized error response: {response_json}")
+            except:
+                pass
             return {}, False
     except Exception as e:
         logger.error(f"Request error: {url}, Error: {str(e)}")
@@ -163,7 +184,16 @@ def login(email: str, password: str) -> Optional[str]:
 
     if response.status_code == 200:
         logger.info(f"Login successful for {email}")
-        return response.json().get("access_token")
+        response_json = response.json()
+
+        # Check if the response is in the standardized format
+        if isinstance(response_json, dict) and all(key in response_json for key in ["status_code", "status", "message", "data"]):
+            # Extract the token from the data field
+            token_data = response_json.get("data", {})
+            return token_data.get("access_token")
+        else:
+            # If not in standardized format, use the response as is
+            return response_json.get("access_token")
     else:
         logger.error(f"Login failed for {email}: {response.text}")
         return None
@@ -518,7 +548,7 @@ def test_admin_mapping_management():
         return True
 
     if False:  # Skip mapping deletion test
-    
+
     response, success = make_request(
         "DELETE",
         f"{MAPPINGS_URL}/hospital-doctor/{hospital_profile_id}/{doctor_profile_id}",

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -25,6 +25,7 @@ from app.api import (
 )
 from app.websockets import ai_assistant, chat
 from app.errors import http_exception_handler, validation_exception_handler
+from app.utils.openapi import custom_openapi
 
 # Configure logging
 logging.basicConfig(
@@ -48,6 +49,10 @@ app = FastAPI(
     redoc_url=f"{settings.API_V1_PREFIX}/redoc",
 )
 
+# Note: We're using a decorator approach instead of middleware for standardizing responses
+# This is because middleware has issues with streaming responses
+# See app/utils/decorators.py for the implementation
+
 # Set up CORS
 app.add_middleware(
     CORSMiddleware,
@@ -60,6 +65,9 @@ app.add_middleware(
 # Add exception handlers
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
+
+# Use custom OpenAPI schema
+app.openapi = lambda: custom_openapi(app)
 
 # Include routers
 app.include_router(auth.router, prefix=f"{settings.API_V1_PREFIX}/auth", tags=["Authentication"])
@@ -82,16 +90,26 @@ app.include_router(documents.router, prefix=f"{settings.API_V1_PREFIX}/documents
 def read_root():
     """Root endpoint with API information"""
     return {
-        "name": settings.PROJECT_NAME,
-        "description": "A comprehensive service for doctor-patient communication with AI assistance",
-        "version": "1.0.0",
-        "documentation": f"{settings.API_V1_PREFIX}/docs"
+        "status_code": status.HTTP_200_OK,
+        "status": True,
+        "message": "Welcome to POCA Service API",
+        "data": {
+            "name": settings.PROJECT_NAME,
+            "description": "A comprehensive service for doctor-patient communication with AI assistance",
+            "version": "1.0.0",
+            "documentation": f"{settings.API_V1_PREFIX}/docs"
+        }
     }
 
 @app.get("/health")
 def health_check():
     """Health check endpoint"""
-    return {"status": "healthy"}
+    return {
+        "status_code": status.HTTP_200_OK,
+        "status": True,
+        "message": "Service is healthy",
+        "data": {"status": "healthy"}
+    }
 
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

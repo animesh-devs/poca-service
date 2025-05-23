@@ -509,6 +509,142 @@ async def delete_user_patient_relation(
             )
         )
 
+@router.post("/user/{user_id}/patients", response_model=UserPatientRelationResponse)
+async def create_user_patient_mapping(
+    user_id: str,
+    relation_data: UserPatientRelationCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> Any:
+    """
+    Create a relation between a user and a patient
+    """
+    try:
+        from app.models.user import UserRole
+        from app.models.mapping import RelationType
+
+        # Override the user_id in the relation data with the path parameter
+        relation_data.user_id = user_id
+
+        # Check if user exists
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="User not found",
+                    error_code=ErrorCode.RES_001
+                )
+            )
+
+        # Check if patient exists
+        patient = db.query(Patient).filter(Patient.id == relation_data.patient_id).first()
+
+        # If not found by ID, try to find by user_id
+        if not patient:
+            patient_user = db.query(User).filter(User.id == relation_data.patient_id, User.role == UserRole.PATIENT).first()
+            if patient_user and patient_user.profile_id:
+                patient = db.query(Patient).filter(Patient.id == patient_user.profile_id).first()
+
+        if not patient:
+            # If still not found, create a new patient if the relation is "self"
+            if relation_data.relation == RelationType.SELF and user.role == UserRole.PATIENT:
+                patient = Patient(
+                    name=user.name,
+                    user_id=user.id
+                )
+                db.add(patient)
+                db.commit()
+                db.refresh(patient)
+
+                # Update user's profile_id
+                user.profile_id = patient.id
+                db.commit()
+                db.refresh(user)
+
+                # Update relation_data.patient_id
+                relation_data.patient_id = patient.id
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=create_error_response(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        message="Patient not found",
+                        error_code=ErrorCode.RES_001
+                    )
+                )
+
+        # Check if relation already exists
+        existing_relation = db.query(UserPatientRelation).filter(
+            UserPatientRelation.user_id == relation_data.user_id,
+            UserPatientRelation.patient_id == relation_data.patient_id
+        ).first()
+
+        if existing_relation:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=create_error_response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message="Relation already exists",
+                    error_code=ErrorCode.RES_002
+                )
+            )
+
+        # Validate relation type based on user role
+        if relation_data.relation == RelationType.DOCTOR:
+            # For doctor relation, check if the user is a doctor
+            if user.role != UserRole.DOCTOR:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=create_error_response(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        message="Only users with doctor role can have doctor relation",
+                        error_code=ErrorCode.BIZ_001
+                    )
+                )
+
+            # Also create a doctor-patient mapping if it doesn't exist
+            doctor = db.query(Doctor).filter(Doctor.user_id == user.id).first()
+            if not doctor:
+                # Try to get doctor by profile_id
+                if user.profile_id:
+                    doctor = db.query(Doctor).filter(Doctor.id == user.profile_id).first()
+
+            if doctor:
+                # Check if mapping already exists
+                existing_mapping = db.query(DoctorPatientMapping).filter(
+                    DoctorPatientMapping.doctor_id == doctor.id,
+                    DoctorPatientMapping.patient_id == patient.id
+                ).first()
+
+                if not existing_mapping:
+                    # Create new mapping
+                    db_mapping = DoctorPatientMapping(
+                        doctor_id=doctor.id,
+                        patient_id=patient.id
+                    )
+                    db.add(db_mapping)
+
+        # Create new relation
+        db_relation = UserPatientRelation(**relation_data.model_dump())
+
+        db.add(db_relation)
+        db.commit()
+        db.refresh(db_relation)
+
+        return db_relation
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=create_error_response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred: {str(e)}",
+                error_code=ErrorCode.SRV_001
+            )
+        )
+
 @router.get("/user/{user_id}/patients", response_model=PatientListResponse)
 async def get_user_patients(
     user_id: str,

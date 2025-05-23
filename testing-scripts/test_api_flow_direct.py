@@ -7,6 +7,7 @@ It uses direct signup endpoints to create test data.
 """
 
 import sys
+import os
 import logging
 import requests
 import random
@@ -37,6 +38,7 @@ AI_MESSAGES_URL = f"{AI_URL}/messages"
 CHATS_URL = f"{BASE_URL}/api/v1/chats"
 MESSAGES_URL = f"{BASE_URL}/api/v1/messages"
 MAPPINGS_URL = f"{BASE_URL}/api/v1/mappings"
+DOCUMENTS_URL = f"{BASE_URL}/api/v1/documents"
 
 # Default admin credentials
 DEFAULT_ADMIN_EMAIL = "admin@example.com"
@@ -92,9 +94,19 @@ def get_auth_token(email: str, password: str) -> Optional[Dict[str, Any]]:
         )
 
         if response.status_code == 200:
-            token_data = response.json()
-            logging.info(f"Got authentication token for user ID: {token_data.get('user_id')}")
-            return token_data
+            response_json = response.json()
+
+            # Check if the response is in the standardized format
+            if "data" in response_json and all(key in response_json for key in ["status_code", "status", "message"]):
+                # Extract the token data from the data field
+                token_data = response_json["data"]
+                logging.info(f"Got authentication token for user ID: {token_data.get('user_id')} (standardized response)")
+                return token_data
+            else:
+                # Handle the old format (direct response)
+                token_data = response_json
+                logging.info(f"Got authentication token for user ID: {token_data.get('user_id')} (direct response)")
+                return token_data
         else:
             logging.error(f"Failed to get authentication token: {response.text}")
             return None
@@ -127,7 +139,18 @@ def create_hospital() -> Optional[Dict[str, Any]]:
         )
 
         if response.status_code in [200, 201]:
-            result = response.json()
+            response_json = response.json()
+
+            # Check if the response is in the standardized format
+            if "data" in response_json and all(key in response_json for key in ["status_code", "status", "message"]):
+                # Extract the result from the data field
+                result = response_json["data"]
+                logging.info(f"Hospital signup response is in standardized format")
+            else:
+                # Handle the old format (direct response)
+                result = response_json
+                logging.info(f"Hospital signup response is in direct format")
+
             hospital_data["id"] = result.get("user_id")  # Use user_id as the ID
             hospital_data["user_id"] = result.get("user_id")
             logging.info(f"Created hospital: {TEST_HOSPITAL_NAME} with ID: {hospital_data['id']}")
@@ -166,7 +189,18 @@ def create_doctor() -> Optional[Dict[str, Any]]:
         )
 
         if response.status_code in [200, 201]:
-            result = response.json()
+            response_json = response.json()
+
+            # Check if the response is in the standardized format
+            if "data" in response_json and all(key in response_json for key in ["status_code", "status", "message"]):
+                # Extract the result from the data field
+                result = response_json["data"]
+                logging.info(f"Doctor signup response is in standardized format")
+            else:
+                # Handle the old format (direct response)
+                result = response_json
+                logging.info(f"Doctor signup response is in direct format")
+
             doctor_data["id"] = result.get("user_id")  # Use user_id as the ID
             doctor_data["user_id"] = result.get("user_id")
             logging.info(f"Created doctor: {TEST_DOCTOR_NAME} with ID: {doctor_data['id']}")
@@ -211,7 +245,18 @@ def create_patient() -> Optional[Dict[str, Any]]:
         )
 
         if response.status_code in [200, 201]:
-            result = response.json()
+            response_json = response.json()
+
+            # Check if the response is in the standardized format
+            if "data" in response_json and all(key in response_json for key in ["status_code", "status", "message"]):
+                # Extract the result from the data field
+                result = response_json["data"]
+                logging.info(f"Patient signup response is in standardized format")
+            else:
+                # Handle the old format (direct response)
+                result = response_json
+                logging.info(f"Patient signup response is in direct format")
+
             patient_data["id"] = result.get("user_id")  # Use user_id as the ID
             patient_data["user_id"] = result.get("user_id")
             logging.info(f"Created patient: {TEST_PATIENT_NAME} with ID: {patient_data['id']}")
@@ -238,7 +283,18 @@ def get_doctor_profile_id(token: str, doctor_user_id: str) -> Optional[str]:
         )
 
         if response.status_code == 200:
-            user = response.json()
+            response_json = response.json()
+
+            # Check if the response is in the standardized format
+            if "data" in response_json and all(key in response_json for key in ["status_code", "status", "message"]):
+                # Extract the user data from the data field
+                user = response_json["data"]
+                logging.info(f"User response is in standardized format")
+            else:
+                # Handle the old format (direct response)
+                user = response_json
+                logging.info(f"User response is in direct format")
+
             profile_id = user.get("profile_id")
             if profile_id:
                 logging.info(f"Got doctor profile ID: {profile_id}")
@@ -264,7 +320,18 @@ def get_patient_profile_id(token: str, patient_user_id: str) -> Optional[str]:
         )
 
         if response.status_code == 200:
-            user = response.json()
+            response_json = response.json()
+
+            # Check if the response is in the standardized format
+            if "data" in response_json and all(key in response_json for key in ["status_code", "status", "message"]):
+                # Extract the user data from the data field
+                user = response_json["data"]
+                logging.info(f"User response is in standardized format")
+            else:
+                # Handle the old format (direct response)
+                user = response_json
+                logging.info(f"User response is in direct format")
+
             profile_id = user.get("profile_id")
             if profile_id:
                 logging.info(f"Got patient profile ID: {profile_id}")
@@ -279,6 +346,44 @@ def get_patient_profile_id(token: str, patient_user_id: str) -> Optional[str]:
         logging.error(f"Error getting patient profile ID: {str(e)}")
         return None
 
+def get_profile_id_for_user(token: str, user_id: str) -> Optional[str]:
+    """Get profile ID for a user based on their role"""
+    logging.info(f"Getting profile ID for user ID: {user_id}...")
+
+    try:
+        # First, get the user to determine their role
+        user_response = requests.get(
+            f"{USERS_URL}/{user_id}",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+
+        if user_response.status_code == 200:
+            try:
+                user_data = user_response.json()
+
+                # Check if response is in standardized format
+                if "data" in user_data:
+                    user_data = user_data["data"]
+
+                # Extract role and profile_id
+                role = user_data.get("role")
+                profile_id = user_data.get("profile_id")
+
+                if profile_id:
+                    logging.info(f"Got profile ID: {profile_id} for user with role: {role}")
+                    return profile_id
+                else:
+                    logging.error(f"No profile_id found in user data: {user_data}")
+            except Exception as e:
+                logging.error(f"Error parsing user response: {str(e)}")
+        else:
+            logging.error(f"Failed to get user: {user_response.text}")
+
+        return None
+    except Exception as e:
+        logging.error(f"Error getting profile ID for user: {str(e)}")
+        return None
+
 def get_hospital_profile_id(token: str, hospital_user_id: str) -> Optional[str]:
     """Get hospital profile ID from user ID"""
     logging.info(f"Getting hospital profile ID for user ID: {hospital_user_id}...")
@@ -290,7 +395,18 @@ def get_hospital_profile_id(token: str, hospital_user_id: str) -> Optional[str]:
         )
 
         if response.status_code == 200:
-            user = response.json()
+            response_json = response.json()
+
+            # Check if the response is in the standardized format
+            if "data" in response_json and all(key in response_json for key in ["status_code", "status", "message"]):
+                # Extract the user data from the data field
+                user = response_json["data"]
+                logging.info(f"User response is in standardized format")
+            else:
+                # Handle the old format (direct response)
+                user = response_json
+                logging.info(f"User response is in direct format")
+
             profile_id = user.get("profile_id")
             if profile_id:
                 logging.info(f"Got hospital profile ID: {profile_id}")
@@ -335,7 +451,18 @@ def map_doctor_to_patient(token: str, doctor_id: str, patient_id: str) -> Option
         )
 
         if response.status_code in [200, 201]:
-            mapping = response.json()
+            response_json = response.json()
+
+            # Check if the response is in the standardized format
+            if "data" in response_json and all(key in response_json for key in ["status_code", "status", "message"]):
+                # Extract the mapping data from the data field
+                mapping = response_json["data"]
+                logging.info(f"Mapping response is in standardized format")
+            else:
+                # Handle the old format (direct response)
+                mapping = response_json
+                logging.info(f"Mapping response is in direct format")
+
             logging.info(f"Mapped doctor {doctor_profile_id} to patient {patient_profile_id}")
             return mapping
         elif response.status_code == 403:
@@ -454,7 +581,18 @@ def create_chat(token: str, doctor_id: str, patient_id: str) -> Optional[Dict[st
                     )
 
         if response.status_code in [200, 201]:
-            chat = response.json()
+            response_json = response.json()
+
+            # Check if the response is in the standardized format
+            if "data" in response_json and all(key in response_json for key in ["status_code", "status", "message"]):
+                # Extract the chat data from the data field
+                chat = response_json["data"]
+                logging.info(f"Chat response is in standardized format")
+            else:
+                # Handle the old format (direct response)
+                chat = response_json
+                logging.info(f"Chat response is in direct format")
+
             logging.info(f"Created chat with ID: {chat.get('id')}")
             return chat
         else:
@@ -489,33 +627,66 @@ def send_message(token: str, chat_id: str, sender_id: str = None, receiver_id: s
         }
 
         # Add sender_id and receiver_id if provided (optional in some implementations)
+        sender_profile_id = None
         if sender_id:
-            # Get profile IDs if needed
-            if "doctor" in sender_id:
-                sender_profile_id = get_doctor_profile_id(token, sender_id) or sender_id
-            elif "patient" in sender_id:
-                sender_profile_id = get_patient_profile_id(token, sender_id) or sender_id
-            else:
-                sender_profile_id = sender_id
+            # Get profile ID using the unified function
+            sender_profile_id = get_profile_id_for_user(token, sender_id)
+            if not sender_profile_id:
+                # Fall back to the old method if the unified function fails
+                if "doctor" in sender_id:
+                    sender_profile_id = get_doctor_profile_id(token, sender_id) or sender_id
+                elif "patient" in sender_id:
+                    sender_profile_id = get_patient_profile_id(token, sender_id) or sender_id
+                else:
+                    sender_profile_id = sender_id
             message_data["sender_id"] = sender_profile_id
+            logging.info(f"Using sender profile ID: {sender_profile_id}")
 
         if receiver_id:
-            if "doctor" in receiver_id:
-                receiver_profile_id = get_doctor_profile_id(token, receiver_id) or receiver_id
-            elif "patient" in receiver_id:
-                receiver_profile_id = get_patient_profile_id(token, receiver_id) or receiver_id
-            else:
-                receiver_profile_id = receiver_id
+            # Get profile ID using the unified function
+            receiver_profile_id = get_profile_id_for_user(token, receiver_id)
+            if not receiver_profile_id:
+                # Fall back to the old method if the unified function fails
+                if "doctor" in receiver_id:
+                    receiver_profile_id = get_doctor_profile_id(token, receiver_id) or receiver_id
+                elif "patient" in receiver_id:
+                    receiver_profile_id = get_patient_profile_id(token, receiver_id) or receiver_id
+                else:
+                    receiver_profile_id = receiver_id
             message_data["receiver_id"] = receiver_profile_id
+            logging.info(f"Using receiver profile ID: {receiver_profile_id}")
+
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Add user-entity-id header if sender_id is provided
+        if sender_id and sender_profile_id:
+            headers["user-entity-id"] = sender_profile_id
+            logging.info(f"Adding user-entity-id header: {sender_profile_id}")
+
+        # Add debug logging
+        logging.info(f"Sending request to: {MESSAGES_URL}")
+        logging.info(f"Request payload: {message_data}")
+        logging.info(f"Request headers: {headers}")
 
         response = requests.post(
             MESSAGES_URL,
             json=message_data,
-            headers={"Authorization": f"Bearer {token}"}
+            headers=headers
         )
 
         if response.status_code in [200, 201]:
-            message = response.json()
+            response_json = response.json()
+
+            # Check if the response is in the standardized format
+            if "data" in response_json and all(key in response_json for key in ["status_code", "status", "message"]):
+                # Extract the message data from the data field
+                message = response_json["data"]
+                logging.info(f"Message response is in standardized format")
+            else:
+                # Handle the old format (direct response)
+                message = response_json
+                logging.info(f"Message response is in direct format")
+
             logging.info(f"Sent message with ID: {message.get('id')}")
             return message
         else:
@@ -534,14 +705,41 @@ def create_ai_session(token: str, chat_id: str) -> Optional[Dict[str, Any]]:
             "chat_id": chat_id
         }
 
+        # Add debug logging
+        logging.info(f"Sending request to: {AI_SESSIONS_URL}")
+        logging.info(f"Using token: {token[:10]}... (truncated)")
+        logging.info(f"Request payload: {session_data}")
+
+        # Add user-entity-id header if available
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+
+        # Try to get the entity ID for the current user
+        entity_id = get_profile_id_for_user(token, chat_id)
+        if entity_id:
+            headers["user-entity-id"] = entity_id
+            logging.info(f"Added user-entity-id header: {entity_id}")
+
         response = requests.post(
             AI_SESSIONS_URL,
             json=session_data,
-            headers={"Authorization": f"Bearer {token}"}
+            headers=headers
         )
 
         if response.status_code in [200, 201]:
-            session = response.json()
+            response_json = response.json()
+
+            # Check if the response is in the standardized format
+            if "data" in response_json and all(key in response_json for key in ["status_code", "status", "message"]):
+                # Extract the session data from the data field
+                session = response_json["data"]
+                logging.info(f"AI session response is in standardized format")
+            else:
+                # Handle the old format (direct response)
+                session = response_json
+                logging.info(f"AI session response is in direct format")
+
             logging.info(f"Created AI session with ID: {session.get('id')}")
             return session
         else:
@@ -550,7 +748,7 @@ def create_ai_session(token: str, chat_id: str) -> Optional[Dict[str, Any]]:
                 logging.warning("AI session creation endpoint not found (404). This endpoint might not be implemented yet.")
                 return None
             else:
-                logging.error(f"Failed to create AI session: {response.text}")
+                logging.error(f"Failed to create AI session: {response.status_code} - {response.text}")
                 return None
     except Exception as e:
         logging.error(f"Error creating AI session: {str(e)}")
@@ -572,11 +770,22 @@ def send_ai_message(token: str, session_id: str, content: str) -> Optional[Dict[
         logging.info(f"Sending request to: {url}")
         logging.info(f"Request payload: {message_data}")
 
+        # Add user-entity-id header if available
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+
+        # Try to get the entity ID for the current user
+        entity_id = get_profile_id_for_user(token, session_id)
+        if entity_id:
+            headers["user-entity-id"] = entity_id
+            logging.info(f"Added user-entity-id header: {entity_id}")
+
         # First try the standard endpoint
         response = requests.post(
             url,
             json=message_data,
-            headers={"Authorization": f"Bearer {token}"}
+            headers=headers
         )
 
         # If that fails with a 405 Method Not Allowed error, try with a different HTTP method
@@ -585,7 +794,7 @@ def send_ai_message(token: str, session_id: str, content: str) -> Optional[Dict[
             response = requests.put(
                 url,
                 json=message_data,
-                headers={"Authorization": f"Bearer {token}"}
+                headers=headers
             )
 
             # If that also fails, try with the session-specific endpoint
@@ -597,7 +806,7 @@ def send_ai_message(token: str, session_id: str, content: str) -> Optional[Dict[
                 response = requests.post(
                     session_url,
                     json={"message": content},  # Simplified payload for session-specific endpoint
-                    headers={"Authorization": f"Bearer {token}"}
+                    headers=headers
                 )
 
                 # If that also fails, try with a different payload format
@@ -614,11 +823,22 @@ def send_ai_message(token: str, session_id: str, content: str) -> Optional[Dict[
                     response = requests.post(
                         url,
                         json=alt_data,
-                        headers={"Authorization": f"Bearer {token}"}
+                        headers=headers
                     )
 
         if response.status_code in [200, 201]:
-            response_data = response.json()
+            response_json = response.json()
+
+            # Check if the response is in the standardized format
+            if "data" in response_json and all(key in response_json for key in ["status_code", "status", "message"]):
+                # Extract the message data from the data field
+                response_data = response_json["data"]
+                logging.info(f"AI message response is in standardized format")
+            else:
+                # Handle the old format (direct response)
+                response_data = response_json
+                logging.info(f"AI message response is in direct format")
+
             logging.info(f"Got AI response: {response_data.get('response', '')[:50]}...")
             return response_data
         else:
@@ -653,9 +873,19 @@ def refresh_token(refresh_token: str) -> Optional[Dict[str, Any]]:
         )
 
         if response.status_code == 200:
-            token_data = response.json()
-            logging.info(f"Refreshed authentication token for user ID: {token_data.get('user_id')}")
-            return token_data
+            response_json = response.json()
+
+            # Check if the response is in the standardized format
+            if "data" in response_json and all(key in response_json for key in ["status_code", "status", "message"]):
+                # Extract the token data from the data field
+                token_data = response_json["data"]
+                logging.info(f"Refreshed authentication token for user ID: {token_data.get('user_id')} (standardized response)")
+                return token_data
+            else:
+                # Handle the old format (direct response)
+                token_data = response_json
+                logging.info(f"Refreshed authentication token for user ID: {token_data.get('user_id')} (direct response)")
+                return token_data
         else:
             logging.error(f"Failed to refresh authentication token: {response.text}")
             return None
@@ -1161,10 +1391,21 @@ def get_patient_case_history(token: str, patient_id: str, create_if_not_exists: 
         logging.info(f"Sending request to: {url}")
         logging.info(f"Using token: {token[:10]}... (truncated)")
 
+        # Add user-entity-id header if available
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+
+        # Try to get the entity ID for the current user
+        entity_id = get_profile_id_for_user(token, patient_id)
+        if entity_id:
+            headers["user-entity-id"] = entity_id
+            logging.info(f"Added user-entity-id header: {entity_id}")
+
         # First try the case-history endpoint
         response = requests.get(
             url,
-            headers={"Authorization": f"Bearer {token}"}
+            headers=headers
         )
 
         # If that fails, try the medical-history endpoint
@@ -1173,7 +1414,7 @@ def get_patient_case_history(token: str, patient_id: str, create_if_not_exists: 
             logging.info(f"Case history endpoint not found, trying: {url}")
             response = requests.get(
                 url,
-                headers={"Authorization": f"Bearer {token}"}
+                headers=headers
             )
 
             # If that also fails, try the health-records endpoint
@@ -1182,11 +1423,22 @@ def get_patient_case_history(token: str, patient_id: str, create_if_not_exists: 
                 logging.info(f"Medical history endpoint not found, trying: {url}")
                 response = requests.get(
                     url,
-                    headers={"Authorization": f"Bearer {token}"}
+                    headers=headers
                 )
 
         if response.status_code == 200:
-            case_history = response.json()
+            response_json = response.json()
+
+            # Check if the response is in the standardized format
+            if "data" in response_json and all(key in response_json for key in ["status_code", "status", "message"]):
+                # Extract the case history data from the data field
+                case_history = response_json["data"]
+                logging.info(f"Case history response is in standardized format")
+            else:
+                # Handle the old format (direct response)
+                case_history = response_json
+                logging.info(f"Case history response is in direct format")
+
             logging.info(f"Got case history for patient: {patient_id}")
             return case_history
         elif response.status_code == 403:
@@ -1198,6 +1450,79 @@ def get_patient_case_history(token: str, patient_id: str, create_if_not_exists: 
             return None
     except Exception as e:
         logging.error(f"Error getting patient case history: {str(e)}")
+        return None
+
+def upload_document(token: str, file_path: str, document_type: str = "OTHER", remark: str = None, entity_id: str = None) -> Optional[Dict[str, Any]]:
+    """
+    Upload a document that can later be associated with a case history, report, or other entity.
+
+    Args:
+        token: Authentication token
+        file_path: Path to the file to upload (for testing, we'll use a dummy file)
+        document_type: Type of document (CASE_HISTORY, REPORT, OTHER)
+        remark: Optional remark about the document
+        entity_id: Optional ID of the entity to associate with
+
+    Returns:
+        Document data if successful, None otherwise
+    """
+    logging.info(f"Uploading document: {file_path}...")
+
+    try:
+        # For testing purposes, we'll create a dummy file if the path doesn't exist
+        if not os.path.exists(file_path):
+            logging.info(f"File {file_path} doesn't exist, creating a dummy file for testing")
+            with open(file_path, 'w') as f:
+                f.write("This is a dummy file for testing document uploads")
+
+        # Prepare form data
+        files = {'file': open(file_path, 'rb')}
+        data = {}
+
+        if document_type:
+            data['document_type'] = document_type
+        if remark:
+            data['remark'] = remark
+        if entity_id:
+            data['entity_id'] = entity_id
+
+        # Add debug logging
+        logging.info(f"Sending request to: {DOCUMENTS_URL}/upload")
+        logging.info(f"Using token: {token[:10]}... (truncated)")
+        logging.info(f"Request data: {data}")
+
+        # Add user-entity-id header if available
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+
+        response = requests.post(
+            f"{DOCUMENTS_URL}/upload",
+            files=files,
+            data=data,
+            headers=headers
+        )
+
+        if response.status_code in [200, 201]:
+            response_json = response.json()
+
+            # Check if the response is in the standardized format
+            if "data" in response_json and all(key in response_json for key in ["status_code", "status", "message"]):
+                # Extract the document data from the data field
+                document = response_json["data"]
+                logging.info(f"Document upload response is in standardized format")
+            else:
+                # Handle the old format (direct response)
+                document = response_json
+                logging.info(f"Document upload response is in direct format")
+
+            logging.info(f"Uploaded document with ID: {document.get('id')}")
+            return document
+        else:
+            logging.error(f"Failed to upload document: {response.status_code} - {response.text}")
+            return None
+    except Exception as e:
+        logging.error(f"Error uploading document: {str(e)}")
         return None
 
 def create_patient_case_history(token: str, patient_id: str, summary: str, documents: List[str]) -> Optional[Dict[str, Any]]:
@@ -1224,11 +1549,22 @@ def create_patient_case_history(token: str, patient_id: str, summary: str, docum
         logging.info(f"Using token: {token[:10]}... (truncated)")
         logging.info(f"Request payload: {case_history_data}")
 
+        # Add user-entity-id header if available
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+
+        # Try to get the entity ID for the current user
+        entity_id = get_profile_id_for_user(token, patient_id)
+        if entity_id:
+            headers["user-entity-id"] = entity_id
+            logging.info(f"Added user-entity-id header: {entity_id}")
+
         # Use the provided token (should be doctor or admin token for best results)
         response = requests.post(
             url,
             json=case_history_data,
-            headers={"Authorization": f"Bearer {token}"}
+            headers=headers
         )
 
         # If that fails, try alternative endpoints
@@ -1240,7 +1576,7 @@ def create_patient_case_history(token: str, patient_id: str, summary: str, docum
             response = requests.post(
                 url,
                 json=case_history_data,
-                headers={"Authorization": f"Bearer {token}"}
+                headers=headers
             )
 
             # If that also fails, try health-records endpoint
@@ -1251,7 +1587,7 @@ def create_patient_case_history(token: str, patient_id: str, summary: str, docum
                 response = requests.post(
                     url,
                     json=case_history_data,
-                    headers={"Authorization": f"Bearer {token}"}
+                    headers=headers
                 )
 
                 # If that also fails, try medical-history endpoint
@@ -1262,11 +1598,22 @@ def create_patient_case_history(token: str, patient_id: str, summary: str, docum
                     response = requests.post(
                         url,
                         json=case_history_data,
-                        headers={"Authorization": f"Bearer {token}"}
+                        headers=headers
                     )
 
         if response.status_code in [200, 201]:
-            case_history = response.json()
+            response_json = response.json()
+
+            # Check if the response is in the standardized format
+            if "data" in response_json and all(key in response_json for key in ["status_code", "status", "message"]):
+                # Extract the case history data from the data field
+                case_history = response_json["data"]
+                logging.info(f"Case history response is in standardized format")
+            else:
+                # Handle the old format (direct response)
+                case_history = response_json
+                logging.info(f"Case history response is in direct format")
+
             logging.info(f"Created case history for patient: {patient_id}")
             return case_history
         elif response.status_code == 403:
@@ -1819,25 +2166,32 @@ def create_user_patient_mapping(token: str, user_id: str, patient_id: str, relat
         # Use the mapped relation if available, otherwise use the original
         safe_relation = relation_mapping.get(relation, relation)
 
-        # Try different relation formats
-        # First try with standard format and safe relation
+        # First try the user/{user_id}/patients endpoint (correct endpoint)
         mapping_data = {
-            "user_id": user_id,
             "patient_id": patient_profile_id,
             "relation": safe_relation
         }
 
         # Add debug logging
-        logging.info(f"Sending request to: {MAPPINGS_URL}/user-patient")
+        url = f"{MAPPINGS_URL}/user/{user_id}/patients"
+        logging.info(f"Sending request to: {url}")
         logging.info(f"Request payload: {mapping_data}")
 
-        # Use the provided token - we'll handle permission issues by using safe relations
-        auth_header = {"Authorization": f"Bearer {token}"}
+        # Add user-entity-id header if available
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+
+        # Try to get the entity ID for the current user
+        entity_id = get_profile_id_for_user(token, user_id)
+        if entity_id:
+            headers["user-entity-id"] = entity_id
+            logging.info(f"Added user-entity-id header: {entity_id}")
 
         response = requests.post(
-            f"{MAPPINGS_URL}/user-patient",
+            url,
             json=mapping_data,
-            headers=auth_header
+            headers=headers
         )
 
         # If that fails with a validation error, try with relationship_type
@@ -1852,7 +2206,7 @@ def create_user_patient_mapping(token: str, user_id: str, patient_id: str, relat
             response = requests.post(
                 f"{MAPPINGS_URL}/user-patient",
                 json=mapping_data,
-                headers=auth_header
+                headers=headers
             )
 
             # If that also fails, try with a different endpoint format
@@ -1871,7 +2225,7 @@ def create_user_patient_mapping(token: str, user_id: str, patient_id: str, relat
                 response = requests.post(
                     alt_url,
                     json=alt_data,
-                    headers=auth_header
+                    headers=headers
                 )
 
         if response.status_code in [200, 201]:

@@ -182,6 +182,21 @@ The service supports both OpenAI GPT-4 and Google Gemini models for AI assistanc
 
 The API documentation is available at `/api/v1/docs` when the service is running. It provides detailed information about all endpoints, request/response schemas, and authentication requirements.
 
+### API Response Format
+
+All API responses follow a standardized format:
+
+```json
+{
+  "status_code": 200,
+  "status": true,
+  "message": "successful",
+  "data": { ... }
+}
+```
+
+For more details on the API response format, see the [API Response Format](docs/api_response_format.md) documentation.
+
 ### Key API Endpoints
 
 #### Authentication

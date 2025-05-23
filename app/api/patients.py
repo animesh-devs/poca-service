@@ -13,22 +13,27 @@ from app.models.document import FileDocument, DocumentType
 from app.schemas.patient import PatientResponse, AdminPatientCreate
 from app.schemas.case_history import CaseHistoryCreate, CaseHistoryUpdate, CaseHistoryResponse, DocumentResponse
 from app.schemas.report import ReportCreate, ReportUpdate, ReportResponse, ReportListResponse, ReportDocumentResponse
-from app.dependencies import get_current_user, get_admin_user
+from app.dependencies import get_current_user, get_admin_user, get_user_entity_id
 from app.api.auth import get_password_hash
 from app.errors import ErrorCode, create_error_response
 
 router = APIRouter()
+
+
 
 @router.get("/{patient_id}/case-history", response_model=CaseHistoryResponse)
 async def get_case_history(
     patient_id: str,
     create_if_not_exists: bool = False,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ) -> Any:
     """
-    Get case history for a patient.
-    If create_if_not_exists is True and the patient doesn't have a case history, a new empty one will be created.
+    Get the most recent case history for a patient
+
+    This endpoint uses the user_entity_id header to determine which entity (doctor, patient)
+    the user is operating as. This simplifies permission checks.
     """
     try:
         # Check if patient exists
@@ -65,95 +70,87 @@ async def get_case_history(
                     )
                 )
 
-        # Check if current user is authorized to view this patient's case history
+        # Check if user is authorized to view this patient's case history
+        is_admin = current_user.role == UserRole.ADMIN
+        is_doctor = current_user.role == UserRole.DOCTOR
+
+        # For patients, we need to check if the user_entity_id is the patient_id
+        # or if the user has a relation to this patient (1:n relationship)
+        is_patient_owner = False
         if current_user.role == UserRole.PATIENT:
-            # First try to get patient by profile_id (preferred way)
-            if current_user.profile_id:
-                current_patient = db.query(Patient).filter(Patient.id == current_user.profile_id).first()
+            if user_entity_id == patient_id:
+                is_patient_owner = True
             else:
-                # Try to find patient by user_id
-                current_patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+                # Check if the user has a relation to this patient
+                from app.models.mapping import UserPatientRelation
+                relation = db.query(UserPatientRelation).filter(
+                    UserPatientRelation.user_id == current_user.id,
+                    UserPatientRelation.patient_id == patient_id
+                ).first()
+                is_patient_owner = relation is not None
 
-                # If not found, try to find by direct ID match
-                if not current_patient:
-                    current_patient = db.query(Patient).filter(Patient.id == current_user.id).first()
-
-            if not current_patient or current_patient.id != patient_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=create_error_response(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        message="Not authorized to view this patient's case history",
-                        error_code=ErrorCode.AUTH_004
-                    )
-                )
-        elif current_user.role == UserRole.DOCTOR:
-            # Check if doctor has access to this patient
-            doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
-
-            # If not found, try to get doctor by profile_id
-            if not doctor and current_user.profile_id:
-                doctor = db.query(Doctor).filter(Doctor.id == current_user.profile_id).first()
-
+        # For doctors, check if they are treating this patient
+        doctor_treating_patient = False
+        if is_doctor:
+            # Check if there's a doctor-patient mapping
+            doctor = db.query(Doctor).filter(Doctor.id == user_entity_id).first()
             if doctor:
-                # Check if doctor is associated with this patient
-                doctor_patient = db.query(DoctorPatientMapping).filter(
+                mapping = db.query(DoctorPatientMapping).filter(
                     DoctorPatientMapping.doctor_id == doctor.id,
                     DoctorPatientMapping.patient_id == patient_id
                 ).first()
+                doctor_treating_patient = mapping is not None
 
-                if not doctor_patient:
-                    # Doctor is not associated with this patient
-                    pass  # We'll allow it for now, but could restrict in the future
+        if not (is_admin or is_patient_owner or doctor_treating_patient):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=create_error_response(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    message="Invalid entity ID for this user",
+                    error_code=ErrorCode.AUTH_004
+                )
+            )
 
         # Get the most recent case history
         case_history = db.query(CaseHistory).filter(
             CaseHistory.patient_id == patient_id
         ).order_by(CaseHistory.created_at.desc()).first()
 
-        # If no case history exists and create_if_not_exists is True, create a new one
+        # If no case history exists and create_if_not_exists is True, create one
         if not case_history and create_if_not_exists:
-            if current_user.role not in [UserRole.DOCTOR, UserRole.ADMIN]:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=create_error_response(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        message="Only doctors or admins can create case histories",
-                        error_code=ErrorCode.AUTH_004
-                    )
-                )
-
-            # Create a new empty case history
+            # Create a new case history
             case_history = CaseHistory(
                 patient_id=patient_id,
-                summary="",
+                summary="Patient case history",
                 documents=[]  # Empty document IDs array
             )
 
             db.add(case_history)
+            db.flush()  # Flush to get the ID
+
+            # Create a document
+            document = Document(
+                case_history_id=case_history.id,
+                file_name="patient_record.pdf",
+                size=1024,
+                link="https://example.com/documents/patient_record.pdf",
+                uploaded_by=UploadedBy.DOCTOR if is_doctor else (UploadedBy.ADMIN if is_admin else UploadedBy.PATIENT),
+                remark="Patient record"
+            )
+
+            db.add(document)
             db.commit()
             db.refresh(case_history)
+            db.refresh(document)
         elif not case_history:
-            # Run the migration to add dummy case history data
-            from app.db.migrations.add_dummy_case_history_data import run_migration
-            run_migration()
-
-            # Try to get the case history again
-            case_history = db.query(CaseHistory).filter(
-                CaseHistory.patient_id == patient_id
-            ).order_by(CaseHistory.created_at.desc()).first()
-
-            if not case_history:
-                # Create a new empty case history
-                case_history = CaseHistory(
-                    patient_id=patient_id,
-                    summary="Patient case history",
-                    documents=[]  # Empty document IDs array
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=create_error_response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="Case history not found for this patient",
+                    error_code=ErrorCode.RES_001
                 )
-
-                db.add(case_history)
-                db.commit()
-                db.refresh(case_history)
+            )
 
         # Get documents for this case history
         documents = db.query(Document).filter(
@@ -165,7 +162,7 @@ async def get_case_history(
             id=case_history.id,
             patient_id=case_history.patient_id,
             summary=case_history.summary,
-            documents=case_history.documents if case_history.documents else [],  # JSON array of document IDs
+            documents=case_history.documents,
             created_at=case_history.created_at,
             updated_at=case_history.updated_at,
             document_files=[DocumentResponse.model_validate(doc) for doc in documents]
@@ -186,7 +183,8 @@ async def create_case_history(
     patient_id: str,
     case_history_data: CaseHistoryCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ) -> Any:
     """
     Create a new case history for a patient
@@ -194,14 +192,40 @@ async def create_case_history(
     # Check if user is admin, doctor, or the patient themselves
     is_admin = current_user.role == UserRole.ADMIN
     is_doctor = current_user.role == UserRole.DOCTOR
-    is_patient_owner = current_user.role == UserRole.PATIENT and current_user.profile_id == patient_id
 
-    if not (is_admin or is_doctor or is_patient_owner):
+    # For patients, we need to check if the user_entity_id is the patient_id
+    # or if the user has a relation to this patient (1:n relationship)
+    is_patient_owner = False
+    if current_user.role == UserRole.PATIENT:
+        if user_entity_id == patient_id:
+            is_patient_owner = True
+        else:
+            # Check if the user has a relation to this patient
+            from app.models.mapping import UserPatientRelation
+            relation = db.query(UserPatientRelation).filter(
+                UserPatientRelation.user_id == current_user.id,
+                UserPatientRelation.patient_id == patient_id
+            ).first()
+            is_patient_owner = relation is not None
+
+    # For doctors, check if they are treating this patient
+    doctor_treating_patient = False
+    if is_doctor:
+        # Check if there's a doctor-patient mapping
+        doctor = db.query(Doctor).filter(Doctor.id == user_entity_id).first()
+        if doctor:
+            mapping = db.query(DoctorPatientMapping).filter(
+                DoctorPatientMapping.doctor_id == doctor.id,
+                DoctorPatientMapping.patient_id == patient_id
+            ).first()
+            doctor_treating_patient = mapping is not None
+
+    if not (is_admin or doctor_treating_patient or is_patient_owner):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=create_error_response(
                 status_code=status.HTTP_403_FORBIDDEN,
-                message="Not enough permissions",
+                message="Invalid entity ID for this user",
                 error_code=ErrorCode.AUTH_004
             )
         )
@@ -282,7 +306,8 @@ async def update_case_history(
     patient_id: str,
     case_history_data: CaseHistoryUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ) -> Any:
     """
     Update a case history for a patient
@@ -290,14 +315,40 @@ async def update_case_history(
     # Check if user is admin, doctor, or the patient themselves
     is_admin = current_user.role == UserRole.ADMIN
     is_doctor = current_user.role == UserRole.DOCTOR
-    is_patient_owner = current_user.role == UserRole.PATIENT and current_user.profile_id == patient_id
 
-    if not (is_admin or is_doctor or is_patient_owner):
+    # For patients, we need to check if the user_entity_id is the patient_id
+    # or if the user has a relation to this patient (1:n relationship)
+    is_patient_owner = False
+    if current_user.role == UserRole.PATIENT:
+        if user_entity_id == patient_id:
+            is_patient_owner = True
+        else:
+            # Check if the user has a relation to this patient
+            from app.models.mapping import UserPatientRelation
+            relation = db.query(UserPatientRelation).filter(
+                UserPatientRelation.user_id == current_user.id,
+                UserPatientRelation.patient_id == patient_id
+            ).first()
+            is_patient_owner = relation is not None
+
+    # For doctors, check if they are treating this patient
+    doctor_treating_patient = False
+    if is_doctor:
+        # Check if there's a doctor-patient mapping
+        doctor = db.query(Doctor).filter(Doctor.id == user_entity_id).first()
+        if doctor:
+            mapping = db.query(DoctorPatientMapping).filter(
+                DoctorPatientMapping.doctor_id == doctor.id,
+                DoctorPatientMapping.patient_id == patient_id
+            ).first()
+            doctor_treating_patient = mapping is not None
+
+    if not (is_admin or doctor_treating_patient or is_patient_owner):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=create_error_response(
                 status_code=status.HTTP_403_FORBIDDEN,
-                message="Not enough permissions",
+                message="Invalid entity ID for this user",
                 error_code=ErrorCode.AUTH_004
             )
         )
@@ -358,7 +409,8 @@ async def update_case_history(
 async def get_patient_documents(
     patient_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ) -> Any:
     """
     Get all documents for a patient across all case histories
@@ -399,27 +451,45 @@ async def get_patient_documents(
                 )
 
         # Check if current user is authorized to view this patient's documents
+        is_admin = current_user.role == UserRole.ADMIN
+        is_doctor = current_user.role == UserRole.DOCTOR
+
+        # For patients, we need to check if the user_entity_id is the patient_id
+        # or if the user has a relation to this patient (1:n relationship)
+        is_patient_owner = False
         if current_user.role == UserRole.PATIENT:
-            # First try to get patient by profile_id (preferred way)
-            if current_user.profile_id:
-                current_patient = db.query(Patient).filter(Patient.id == current_user.profile_id).first()
+            if user_entity_id == patient_id:
+                is_patient_owner = True
             else:
-                # Try to find patient by user_id
-                current_patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+                # Check if the user has a relation to this patient
+                from app.models.mapping import UserPatientRelation
+                relation = db.query(UserPatientRelation).filter(
+                    UserPatientRelation.user_id == current_user.id,
+                    UserPatientRelation.patient_id == patient_id
+                ).first()
+                is_patient_owner = relation is not None
 
-                # If not found, try to find by direct ID match
-                if not current_patient:
-                    current_patient = db.query(Patient).filter(Patient.id == current_user.id).first()
+        # For doctors, check if they are treating this patient
+        doctor_treating_patient = False
+        if is_doctor:
+            # Check if there's a doctor-patient mapping
+            doctor = db.query(Doctor).filter(Doctor.id == user_entity_id).first()
+            if doctor:
+                mapping = db.query(DoctorPatientMapping).filter(
+                    DoctorPatientMapping.doctor_id == doctor.id,
+                    DoctorPatientMapping.patient_id == patient_id
+                ).first()
+                doctor_treating_patient = mapping is not None
 
-            if not current_patient or current_patient.id != patient_id:
-                raise HTTPException(
+        if not (is_admin or doctor_treating_patient or is_patient_owner):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=create_error_response(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=create_error_response(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        message="Not authorized to view this patient's documents",
-                        error_code=ErrorCode.AUTH_004
-                    )
+                    message="Not authorized to view this patient's documents",
+                    error_code=ErrorCode.AUTH_004
                 )
+            )
 
         # Get all case histories for this patient
         case_histories = db.query(CaseHistory).filter(
@@ -491,7 +561,8 @@ async def get_patient_documents(
 async def get_patient_reports(
     patient_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ) -> Any:
     """
     Get all reports for a patient

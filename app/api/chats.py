@@ -21,7 +21,8 @@ router = APIRouter()
 async def create_chat(
     chat_data: ChatCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ) -> Any:
     """
     Create a new chat between a doctor and a patient
@@ -29,29 +30,34 @@ async def create_chat(
     # Check if user is admin, the doctor, or the patient in the chat
     is_admin = current_user.role == UserRole.ADMIN
 
-    # For doctor, check if the doctor_id matches either the user's ID or profile_id
+    # For doctor, check if the doctor_id matches the user_entity_id
     is_doctor_in_chat = False
     if current_user.role == UserRole.DOCTOR:
-        # Check if doctor_id is the user's profile_id
-        if current_user.profile_id == chat_data.doctor_id:
+        if user_entity_id == chat_data.doctor_id:
             is_doctor_in_chat = True
-        # Check if doctor_id is the user's ID and get the doctor profile
+        # If doctor_id is the user's ID, update it to use the entity_id
         elif current_user.id == chat_data.doctor_id:
             is_doctor_in_chat = True
-            # Update chat_data.doctor_id to use the profile_id
-            chat_data.doctor_id = current_user.profile_id
+            chat_data.doctor_id = user_entity_id
 
-    # For patient, check if the patient_id matches either the user's ID or profile_id
+    # For patient, check if the patient_id matches the user_entity_id
+    # or if the user has a relation to this patient (1:n relationship)
     is_patient_in_chat = False
     if current_user.role == UserRole.PATIENT:
-        # Check if patient_id is the user's profile_id
-        if current_user.profile_id == chat_data.patient_id:
+        if user_entity_id == chat_data.patient_id:
             is_patient_in_chat = True
-        # Check if patient_id is the user's ID and get the patient profile
+        # If patient_id is the user's ID, update it to use the entity_id
         elif current_user.id == chat_data.patient_id:
             is_patient_in_chat = True
-            # Update chat_data.patient_id to use the profile_id
-            chat_data.patient_id = current_user.profile_id
+            chat_data.patient_id = user_entity_id
+        else:
+            # Check if the user has a relation to this patient
+            from app.models.mapping import UserPatientRelation
+            relation = db.query(UserPatientRelation).filter(
+                UserPatientRelation.user_id == current_user.id,
+                UserPatientRelation.patient_id == chat_data.patient_id
+            ).first()
+            is_patient_in_chat = relation is not None
 
     if not (is_admin or is_doctor_in_chat or is_patient_in_chat):
         raise HTTPException(
@@ -116,7 +122,8 @@ async def get_chats(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ) -> Any:
     """
     Get all chats for the current user
@@ -128,67 +135,40 @@ async def get_chats(
         total = db.query(Chat).count()
     elif current_user.role == UserRole.DOCTOR:
         # Doctors can see all their chats
-        if current_user.profile_id:
-            # Use profile_id directly if available
-            doctor_id = current_user.profile_id
-            chats = db.query(Chat).filter(
-                Chat.doctor_id == doctor_id
-            ).offset(skip).limit(limit).all()
-            total = db.query(Chat).filter(
-                Chat.doctor_id == doctor_id
-            ).count()
-        else:
-            # Try to find doctor profile
-            doctor = db.query(Doctor).filter(Doctor.id == current_user.id).first()
-            if not doctor:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=create_error_response(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        message="Doctor profile not found",
-                        error_code=ErrorCode.RES_001
-                    )
-                )
-            chats = db.query(Chat).filter(
-                Chat.doctor_id == doctor.id
-            ).offset(skip).limit(limit).all()
-            total = db.query(Chat).filter(
-                Chat.doctor_id == doctor.id
-            ).count()
+        # Use user_entity_id directly
+        doctor_id = user_entity_id
+        chats = db.query(Chat).filter(
+            Chat.doctor_id == doctor_id
+        ).offset(skip).limit(limit).all()
+        total = db.query(Chat).filter(
+            Chat.doctor_id == doctor_id
+        ).count()
     elif current_user.role == UserRole.PATIENT:
         # Patients can see all their chats
-        if current_user.profile_id:
-            # Use profile_id directly if available
-            patient_id = current_user.profile_id
-            chats = db.query(Chat).filter(
-                Chat.patient_id == patient_id
-            ).offset(skip).limit(limit).all()
-            total = db.query(Chat).filter(
-                Chat.patient_id == patient_id
-            ).count()
-        else:
-            # Try to find patient profile by user_id
-            patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+        # Use user_entity_id directly
+        patient_id = user_entity_id
 
-            # If not found, try to find by direct ID match
-            if not patient:
-                patient = db.query(Patient).filter(Patient.id == current_user.id).first()
+        # For patients, we need to check if there are any chats with this patient_id
+        # or if the user has relations to other patients (1:n relationship)
+        from app.models.mapping import UserPatientRelation
+        relations = db.query(UserPatientRelation).filter(
+            UserPatientRelation.user_id == current_user.id
+        ).all()
 
-            if not patient:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=create_error_response(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        message="Patient profile not found",
-                        error_code=ErrorCode.RES_001
-                    )
-                )
-            chats = db.query(Chat).filter(
-                Chat.patient_id == patient.id
-            ).offset(skip).limit(limit).all()
-            total = db.query(Chat).filter(
-                Chat.patient_id == patient.id
-            ).count()
+        # Get all patient IDs this user has access to
+        patient_ids = [patient_id]  # Start with the user_entity_id
+        for relation in relations:
+            if relation.patient_id not in patient_ids:
+                patient_ids.append(relation.patient_id)
+
+        # Get chats for all these patient IDs
+        chats = db.query(Chat).filter(
+            Chat.patient_id.in_(patient_ids)
+        ).offset(skip).limit(limit).all()
+
+        total = db.query(Chat).filter(
+            Chat.patient_id.in_(patient_ids)
+        ).count()
     else:
         # Hospitals and other roles don't have chats
         chats = []
@@ -231,7 +211,7 @@ async def get_chat(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=create_error_response(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    message="Not enough permissions",
+                    message="Invalid entity ID for this user",
                     error_code=ErrorCode.AUTH_004
                 )
             )
@@ -240,15 +220,25 @@ async def get_chat(
         return chat
     elif current_user.role == UserRole.PATIENT:
         # Check if patient has access to this chat using user_entity_id
+        # For patients, we need to check if the user_entity_id is the patient_id in the chat
+        # This is because patients can have multiple patient profiles (1:n relationship)
         if user_entity_id != chat.patient_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=create_error_response(
+            # Check if the user has a relation to this patient
+            from app.models.mapping import UserPatientRelation
+            relation = db.query(UserPatientRelation).filter(
+                UserPatientRelation.user_id == current_user.id,
+                UserPatientRelation.patient_id == chat.patient_id
+            ).first()
+
+            if not relation:
+                raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    message="Not enough permissions",
-                    error_code=ErrorCode.AUTH_004
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="Invalid entity ID for this user",
+                        error_code=ErrorCode.AUTH_004
+                    )
                 )
-            )
 
         # Chats should be accessible to patients regardless of active status
         return chat
@@ -362,15 +352,25 @@ async def deactivate_chat_for_patient(
             pass
         elif current_user.role == UserRole.PATIENT:
             # Check if patient has access to this chat using user_entity_id
+            # For patients, we need to check if the user_entity_id is the patient_id in the chat
+            # This is because patients can have multiple patient profiles (1:n relationship)
             if user_entity_id != chat.patient_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=create_error_response(
+                # Check if the user has a relation to this patient
+                from app.models.mapping import UserPatientRelation
+                relation = db.query(UserPatientRelation).filter(
+                    UserPatientRelation.user_id == current_user.id,
+                    UserPatientRelation.patient_id == chat.patient_id
+                ).first()
+
+                if not relation:
+                    raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        message="Not enough permissions",
-                        error_code=ErrorCode.AUTH_004
+                        detail=create_error_response(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            message="Not enough permissions",
+                            error_code=ErrorCode.AUTH_004
+                        )
                     )
-                )
         else:
             # Other roles can't deactivate chats for patients
             raise HTTPException(
@@ -498,15 +498,25 @@ async def activate_chat_for_patient(
             pass
         elif current_user.role == UserRole.PATIENT:
             # Check if patient has access to this chat using user_entity_id
+            # For patients, we need to check if the user_entity_id is the patient_id in the chat
+            # This is because patients can have multiple patient profiles (1:n relationship)
             if user_entity_id != chat.patient_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=create_error_response(
+                # Check if the user has a relation to this patient
+                from app.models.mapping import UserPatientRelation
+                relation = db.query(UserPatientRelation).filter(
+                    UserPatientRelation.user_id == current_user.id,
+                    UserPatientRelation.patient_id == chat.patient_id
+                ).first()
+
+                if not relation:
+                    raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        message="Not enough permissions",
-                        error_code=ErrorCode.AUTH_004
+                        detail=create_error_response(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            message="Not enough permissions",
+                            error_code=ErrorCode.AUTH_004
+                        )
                     )
-                )
         else:
             # Other roles can't activate chats for patients
             raise HTTPException(

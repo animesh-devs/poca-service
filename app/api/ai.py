@@ -15,10 +15,12 @@ from app.schemas.ai import (
 from app.dependencies import get_current_user, get_user_entity_id
 from app.services.ai import get_ai_service
 from app.errors import ErrorCode, create_error_response
+from app.utils.decorators import standardize_response
 
 router = APIRouter()
 
 @router.post("/sessions", response_model=AISessionResponse)
+@standardize_response
 async def create_ai_session(
     session_data: AISessionCreate,
     db: Session = Depends(get_db),
@@ -69,28 +71,38 @@ async def create_ai_session(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=create_error_response(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        message="You don't have access to this chat",
+                        message="Invalid entity ID for this user",
                         error_code=ErrorCode.AUTH_004
                     )
                 )
         # Patient users should have their entity_id match the chat's patient_id
+        # For patients, we need to check if the user_entity_id is the patient_id in the chat
+        # This is because patients can have multiple patient profiles (1:n relationship)
         elif current_user.role == UserRole.PATIENT:
             if user_entity_id != chat.patient_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=create_error_response(
+                # Check if the user has a relation to this patient
+                from app.models.mapping import UserPatientRelation
+                relation = db.query(UserPatientRelation).filter(
+                    UserPatientRelation.user_id == current_user.id,
+                    UserPatientRelation.patient_id == chat.patient_id
+                ).first()
+
+                if not relation:
+                    raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        message="You don't have access to this chat",
-                        error_code=ErrorCode.AUTH_004
+                        detail=create_error_response(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            message="Invalid entity ID for this user",
+                            error_code=ErrorCode.AUTH_004
+                        )
                     )
-                )
         # Hospital users don't have access to chats directly
         else:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=create_error_response(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    message="You don't have access to this chat",
+                    message="Invalid entity ID for this user",
                     error_code=ErrorCode.AUTH_004
                 )
             )
@@ -118,6 +130,7 @@ async def create_ai_session(
         )
 
 @router.post("/messages", response_model=AIMessageResponse)
+@standardize_response
 async def create_ai_message(
     message_data: AIMessageCreate,
     db: Session = Depends(get_db),
@@ -180,28 +193,38 @@ async def create_ai_message(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=create_error_response(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        message="You don't have access to this chat",
+                        message="Invalid entity ID for this user",
                         error_code=ErrorCode.AUTH_004
                     )
                 )
         # Patient users should have their entity_id match the chat's patient_id
+        # For patients, we need to check if the user_entity_id is the patient_id in the chat
+        # This is because patients can have multiple patient profiles (1:n relationship)
         elif current_user.role == UserRole.PATIENT:
             if user_entity_id != chat.patient_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=create_error_response(
+                # Check if the user has a relation to this patient
+                from app.models.mapping import UserPatientRelation
+                relation = db.query(UserPatientRelation).filter(
+                    UserPatientRelation.user_id == current_user.id,
+                    UserPatientRelation.patient_id == chat.patient_id
+                ).first()
+
+                if not relation:
+                    raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        message="You don't have access to this chat",
-                        error_code=ErrorCode.AUTH_004
+                        detail=create_error_response(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            message="Invalid entity ID for this user",
+                            error_code=ErrorCode.AUTH_004
+                        )
                     )
-                )
         # Hospital users don't have access to chats directly
         else:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=create_error_response(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    message="You don't have access to this chat",
+                    message="Invalid entity ID for this user",
                     error_code=ErrorCode.AUTH_004
                 )
             )
@@ -261,6 +284,7 @@ async def create_ai_message(
         )
 
 @router.get("/sessions/{session_id}/messages", response_model=AIMessageListResponse)
+@standardize_response
 async def get_ai_messages(
     session_id: str,
     skip: int = 0,
@@ -325,28 +349,38 @@ async def get_ai_messages(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=create_error_response(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        message="You don't have access to this chat",
+                        message="Invalid entity ID for this user",
                         error_code=ErrorCode.AUTH_004
                     )
                 )
         # Patient users should have their entity_id match the chat's patient_id
+        # For patients, we need to check if the user_entity_id is the patient_id in the chat
+        # This is because patients can have multiple patient profiles (1:n relationship)
         elif current_user.role == UserRole.PATIENT:
             if user_entity_id != chat.patient_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=create_error_response(
+                # Check if the user has a relation to this patient
+                from app.models.mapping import UserPatientRelation
+                relation = db.query(UserPatientRelation).filter(
+                    UserPatientRelation.user_id == current_user.id,
+                    UserPatientRelation.patient_id == chat.patient_id
+                ).first()
+
+                if not relation:
+                    raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        message="You don't have access to this chat",
-                        error_code=ErrorCode.AUTH_004
+                        detail=create_error_response(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            message="Invalid entity ID for this user",
+                            error_code=ErrorCode.AUTH_004
+                        )
                     )
-                )
         # Hospital users don't have access to chats directly
         else:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=create_error_response(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    message="You don't have access to this chat",
+                    message="Invalid entity ID for this user",
                     error_code=ErrorCode.AUTH_004
                 )
             )
@@ -372,6 +406,7 @@ async def get_ai_messages(
         )
 
 @router.get("/sessions/{session_id}", response_model=AISessionResponse)
+@standardize_response
 async def get_ai_session(
     session_id: str,
     db: Session = Depends(get_db),
@@ -434,28 +469,38 @@ async def get_ai_session(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=create_error_response(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        message="You don't have access to this chat",
+                        message="Invalid entity ID for this user",
                         error_code=ErrorCode.AUTH_004
                     )
                 )
         # Patient users should have their entity_id match the chat's patient_id
+        # For patients, we need to check if the user_entity_id is the patient_id in the chat
+        # This is because patients can have multiple patient profiles (1:n relationship)
         elif current_user.role == UserRole.PATIENT:
             if user_entity_id != chat.patient_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=create_error_response(
+                # Check if the user has a relation to this patient
+                from app.models.mapping import UserPatientRelation
+                relation = db.query(UserPatientRelation).filter(
+                    UserPatientRelation.user_id == current_user.id,
+                    UserPatientRelation.patient_id == chat.patient_id
+                ).first()
+
+                if not relation:
+                    raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        message="You don't have access to this chat",
-                        error_code=ErrorCode.AUTH_004
+                        detail=create_error_response(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            message="Invalid entity ID for this user",
+                            error_code=ErrorCode.AUTH_004
+                        )
                     )
-                )
         # Hospital users don't have access to chats directly
         else:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=create_error_response(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    message="You don't have access to this chat",
+                    message="Invalid entity ID for this user",
                     error_code=ErrorCode.AUTH_004
                 )
             )
@@ -474,6 +519,7 @@ async def get_ai_session(
         )
 
 @router.put("/sessions/{session_id}/end", response_model=AISessionResponse)
+@standardize_response
 async def end_ai_session(
     session_id: str,
     db: Session = Depends(get_db),
@@ -541,16 +587,26 @@ async def end_ai_session(
                     )
                 )
         # Patient users should have their entity_id match the chat's patient_id
+        # For patients, we need to check if the user_entity_id is the patient_id in the chat
+        # This is because patients can have multiple patient profiles (1:n relationship)
         elif current_user.role == UserRole.PATIENT:
             if user_entity_id != chat.patient_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=create_error_response(
+                # Check if the user has a relation to this patient
+                from app.models.mapping import UserPatientRelation
+                relation = db.query(UserPatientRelation).filter(
+                    UserPatientRelation.user_id == current_user.id,
+                    UserPatientRelation.patient_id == chat.patient_id
+                ).first()
+
+                if not relation:
+                    raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        message="You don't have access to this chat",
-                        error_code=ErrorCode.AUTH_004
+                        detail=create_error_response(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            message="You don't have access to this chat",
+                            error_code=ErrorCode.AUTH_004
+                        )
                     )
-                )
         # Hospital users don't have access to chats directly
         else:
             raise HTTPException(
@@ -648,16 +704,26 @@ async def update_ai_summary(
                     )
                 )
         # Patient users should have their entity_id match the chat's patient_id
+        # For patients, we need to check if the user_entity_id is the patient_id in the chat
+        # This is because patients can have multiple patient profiles (1:n relationship)
         elif current_user.role == UserRole.PATIENT:
             if user_entity_id != chat.patient_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=create_error_response(
+                # Check if the user has a relation to this patient
+                from app.models.mapping import UserPatientRelation
+                relation = db.query(UserPatientRelation).filter(
+                    UserPatientRelation.user_id == current_user.id,
+                    UserPatientRelation.patient_id == chat.patient_id
+                ).first()
+
+                if not relation:
+                    raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        message="You don't have access to this chat",
-                        error_code=ErrorCode.AUTH_004
+                        detail=create_error_response(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            message="You don't have access to this chat",
+                            error_code=ErrorCode.AUTH_004
+                        )
                     )
-                )
         # Hospital users don't have access to chats directly
         else:
             raise HTTPException(

@@ -38,7 +38,6 @@ def create_error_response(
 ) -> Dict[str, Any]:
     """Create a standardized error response"""
     return {
-        "status_code": status_code,
         "message": message,
         "error_code": error_code,
         "details": details or {}
@@ -46,24 +45,42 @@ def create_error_response(
 
 async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
     """Handle HTTP exceptions"""
+    # Check if the detail is already a dict with our error format
+    if isinstance(exc.detail, dict) and "message" in exc.detail and "error_code" in exc.detail:
+        # Already in our format, use it directly
+        error_data = {
+            "error_code": exc.detail["error_code"],
+            "details": exc.detail.get("details", {})
+        }
+    else:
+        # Create a new error response
+        error_data = {
+            "error_code": getattr(exc, "error_code", ErrorCode.SRV_001),
+            "details": getattr(exc, "details", {})
+        }
+
+    # Return the standardized response
     return JSONResponse(
         status_code=exc.status_code,
-        content=create_error_response(
-            status_code=exc.status_code,
-            message=str(exc.detail),
-            error_code=getattr(exc, "error_code", ErrorCode.SRV_001),
-            details=getattr(exc, "details", {})
-        )
+        content={
+            "status_code": exc.status_code,
+            "status": False,
+            "message": str(exc.detail) if not isinstance(exc.detail, dict) else exc.detail.get("message", "An error occurred"),
+            "data": error_data
+        }
     )
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     """Handle validation exceptions"""
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content=create_error_response(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            message="Validation error",
-            error_code=ErrorCode.VAL_001,
-            details={"errors": exc.errors()}
-        )
+        content={
+            "status_code": status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "status": False,
+            "message": "Validation error",
+            "data": {
+                "error_code": ErrorCode.VAL_001,
+                "details": {"errors": exc.errors()}
+            }
+        }
     )

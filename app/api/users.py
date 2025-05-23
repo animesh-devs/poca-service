@@ -1,16 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import Any, List
+from typing import Any
 
 from app.db.database import get_db
 from app.models.user import User
 from app.schemas.user import UserUpdate, UserResponse, UserListResponse, UserListItem
 from app.dependencies import get_current_user, get_admin_user
 from app.errors import ErrorCode, create_error_response
+from app.utils.decorators import standardize_response
 
 router = APIRouter()
 
 @router.get("/me", response_model=UserResponse)
+@standardize_response
 async def get_current_user_profile(
     current_user: User = Depends(get_current_user)
 ) -> Any:
@@ -21,6 +23,7 @@ async def get_current_user_profile(
     return current_user
 
 @router.put("/me", response_model=UserResponse)
+@standardize_response
 async def update_current_user_profile(
     user_data: UserUpdate,
     db: Session = Depends(get_db),
@@ -39,11 +42,12 @@ async def update_current_user_profile(
     return current_user
 
 @router.get("", response_model=UserListResponse)
+@standardize_response
 async def get_users(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_admin_user)
+    _: User = Depends(get_admin_user)  # Admin check, but we don't use the user
 ) -> Any:
     """
     Get all users (admin only)
@@ -57,6 +61,7 @@ async def get_users(
     }
 
 @router.get("/{user_id}", response_model=UserResponse)
+@standardize_response
 async def get_user(
     user_id: str,
     db: Session = Depends(get_db),
@@ -71,7 +76,7 @@ async def get_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=create_error_response(
                 status_code=status.HTTP_403_FORBIDDEN,
-                message="Not enough permissions",
+                message="Invalid entity ID for this user",
                 error_code=ErrorCode.AUTH_004
             )
         )
@@ -90,6 +95,7 @@ async def get_user(
     return user
 
 @router.put("/{user_id}", response_model=UserResponse)
+@standardize_response
 async def update_user(
     user_id: str,
     user_data: UserUpdate,
@@ -105,7 +111,7 @@ async def update_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=create_error_response(
                 status_code=status.HTTP_403_FORBIDDEN,
-                message="Not enough permissions",
+                message="Invalid entity ID for this user",
                 error_code=ErrorCode.AUTH_004
             )
         )

@@ -2,6 +2,29 @@
 
 This document provides a comprehensive guide for testing the POCA service, including information about the test scripts, test data, and how to run the tests.
 
+## API Response Format
+
+All API responses follow a standardized format:
+
+```json
+{
+  "status_code": int,
+  "status": bool,
+  "message": string,
+  "data": any
+}
+```
+
+The test scripts are designed to handle both the standardized response format and the direct response format for backward compatibility. This allows for a smooth transition as more endpoints are processed by the middleware.
+
+The standardized response format is implemented through middleware that wraps the API responses. The middleware handles:
+
+1. Setting the appropriate status code
+2. Adding the status, status_code, and message fields
+3. Wrapping the original response in the data field
+
+For more details on the standardized response format, see [API Response Format](docs/api_response_format.md).
+
 ## Test Scripts
 
 The following test scripts are available in the `testing-scripts` directory:
