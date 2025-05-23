@@ -4,8 +4,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response, JSONResponse
 import json
+import logging
 
 from app.utils.response import create_response
+
+logger = logging.getLogger(__name__)
 
 class StandardResponseMiddleware(BaseHTTPMiddleware):
     """
@@ -24,6 +27,10 @@ class StandardResponseMiddleware(BaseHTTPMiddleware):
         # Process the request and get the response
         response = await call_next(request)
 
+        # Skip non-API routes
+        if not request.url.path.startswith("/api") and not request.url.path == "/" and not request.url.path == "/health":
+            return response
+
         # Only process JSON responses
         if not isinstance(response, JSONResponse):
             return response
@@ -31,26 +38,71 @@ class StandardResponseMiddleware(BaseHTTPMiddleware):
         # Check if the response is already in the standard format
         try:
             content = json.loads(response.body.decode())
+
+            # If it's already in the standard format, return it as is
             if isinstance(content, dict) and all(key in content for key in ["status_code", "status", "message", "data"]):
-                # Response is already in the standard format
                 return response
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            # Not a valid JSON response or not decodable
+
+            # For 204 No Content responses, create an empty success response
+            if response.status_code == 204:
+                wrapped_content = create_response(
+                    data=None,
+                    message="Operation completed successfully",
+                    status_code=200,  # Change to 200 since we're adding content
+                    success=True
+                )
+                return JSONResponse(
+                    content=wrapped_content,
+                    status_code=200,  # Use 200 instead of 204 since we have content now
+                    headers=dict(response.headers),
+                    media_type=response.media_type
+                )
+
+            # For error responses, format them properly
+            if response.status_code >= 400:
+                # If it's an error response with our error format
+                if isinstance(content, dict) and "error_code" in content:
+                    error_data = {
+                        "error_code": content.get("error_code"),
+                        "details": content.get("details", {})
+                    }
+                    wrapped_content = {
+                        "status_code": response.status_code,
+                        "status": False,
+                        "message": content.get("message", "An error occurred"),
+                        "data": error_data
+                    }
+                else:
+                    # Generic error response
+                    wrapped_content = {
+                        "status_code": response.status_code,
+                        "status": False,
+                        "message": "An error occurred",
+                        "data": {
+                            "error_code": "SRV_001",
+                            "details": content
+                        }
+                    }
+            else:
+                # For success responses, wrap the content
+                wrapped_content = create_response(
+                    data=content,
+                    status_code=response.status_code,
+                    success=True,
+                    message="Operation completed successfully"
+                )
+
+            # Create a new response with the wrapped content
+            return JSONResponse(
+                content=wrapped_content,
+                status_code=response.status_code if response.status_code != 204 else 200,
+                headers=dict(response.headers),
+                media_type=response.media_type
+            )
+        except Exception as e:
+            logger.error(f"Error in StandardResponseMiddleware: {str(e)}")
+            # If there's an error processing the response, return it as is
             return response
-
-        # Wrap the response in the standard format
-        wrapped_content = create_response(
-            data=content,
-            status_code=response.status_code
-        )
-
-        # Create a new response with the wrapped content
-        return JSONResponse(
-            content=wrapped_content,
-            status_code=response.status_code,
-            headers=dict(response.headers),
-            media_type=response.media_type
-        )
 
 def add_standard_response_middleware(app: FastAPI) -> None:
     """
