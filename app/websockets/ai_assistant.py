@@ -107,12 +107,10 @@ async def websocket_ai_endpoint(
                 has_access = True
                 logger.info(f"Doctor {user_entity_id} accessing AI session {session_id}")
         elif current_user.role == UserRole.PATIENT:
-            # Check if the patient is part of this chat
+            # For patients, check if the user has a relation to the patient in this chat (1:n relationship)
+            # The user_entity_id should be the patient_id they want to access
             if user_entity_id and user_entity_id == chat.patient_id:
-                has_access = True
-                logger.info(f"Patient {user_entity_id} accessing AI session {session_id}")
-            else:
-                # Check if the user has a relation with the patient in this chat
+                # Verify that this user actually has a relation to this patient
                 from app.models.mapping import UserPatientRelation
                 relation = db.query(UserPatientRelation).filter(
                     UserPatientRelation.user_id == current_user.id,
@@ -121,7 +119,9 @@ async def websocket_ai_endpoint(
 
                 if relation:
                     has_access = True
-                    logger.info(f"User {current_user.id} with relation to patient {chat.patient_id} accessing AI session {session_id}")
+                    logger.info(f"User {current_user.id} with relation '{relation.relation}' to patient {chat.patient_id} accessing AI session {session_id}")
+                else:
+                    logger.warning(f"User {current_user.id} has no relation to patient {chat.patient_id} for AI session {session_id}")
 
         if not has_access:
             logger.warning(f"User {current_user.id} (role: {current_user.role}, entity_id: {user_entity_id}) denied access to AI session {session_id}")
