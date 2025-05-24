@@ -473,14 +473,14 @@ async def get_patient_documents(
         is_admin = current_user.role == UserRole.ADMIN
         is_doctor = current_user.role == UserRole.DOCTOR
 
-        # For patients, we need to check if the user_entity_id is the patient_id
-        # or if the user has a relation to this patient (1:n relationship)
+        # For patients, check if the user has a relation to this patient (1:n relationship)
+        # The user_entity_id should be the patient_id they want to access
         is_patient_owner = False
         if current_user.role == UserRole.PATIENT:
+            # Check if the user has a relation to this patient
+            # The user_entity_id should match the patient_id they're trying to access
             if user_entity_id == patient_id:
-                is_patient_owner = True
-            else:
-                # Check if the user has a relation to this patient
+                # Verify that this user actually has a relation to this patient
                 from app.models.mapping import UserPatientRelation
                 relation = db.query(UserPatientRelation).filter(
                     UserPatientRelation.user_id == current_user.id,
@@ -628,27 +628,44 @@ async def get_patient_reports(
                 )
 
         # Check if current user is authorized to view this patient's reports
+        is_admin = current_user.role == UserRole.ADMIN
+        is_doctor = current_user.role == UserRole.DOCTOR
+
+        # For patients, check if the user has a relation to this patient (1:n relationship)
+        # The user_entity_id should be the patient_id they want to access
+        is_patient_owner = False
         if current_user.role == UserRole.PATIENT:
-            # First try to get patient by profile_id (preferred way)
-            if current_user.profile_id:
-                current_patient = db.query(Patient).filter(Patient.id == current_user.profile_id).first()
-            else:
-                # Try to find patient by user_id
-                current_patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+            # Check if the user has a relation to this patient
+            # The user_entity_id should match the patient_id they're trying to access
+            if user_entity_id == patient_id:
+                # Verify that this user actually has a relation to this patient
+                relation = db.query(UserPatientRelation).filter(
+                    UserPatientRelation.user_id == current_user.id,
+                    UserPatientRelation.patient_id == patient_id
+                ).first()
+                is_patient_owner = relation is not None
 
-                # If not found, try to find by direct ID match
-                if not current_patient:
-                    current_patient = db.query(Patient).filter(Patient.id == current_user.id).first()
+        # For doctors, check if they are treating this patient
+        doctor_treating_patient = False
+        if is_doctor:
+            # Check if there's a doctor-patient mapping
+            doctor = db.query(Doctor).filter(Doctor.id == user_entity_id).first()
+            if doctor:
+                mapping = db.query(DoctorPatientMapping).filter(
+                    DoctorPatientMapping.doctor_id == doctor.id,
+                    DoctorPatientMapping.patient_id == patient_id
+                ).first()
+                doctor_treating_patient = mapping is not None
 
-            if not current_patient or current_patient.id != patient_id:
-                raise HTTPException(
+        if not (is_admin or doctor_treating_patient or is_patient_owner):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=create_error_response(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=create_error_response(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        message="Not authorized to view this patient's reports",
-                        error_code=ErrorCode.AUTH_004
-                    )
+                    message="Not authorized to view this patient's reports",
+                    error_code=ErrorCode.AUTH_004
                 )
+            )
 
         # Get all report mappings for this patient
         report_mappings = db.query(PatientReportMapping).filter(
@@ -738,7 +755,8 @@ async def get_patient_report(
     patient_id: str,
     report_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ) -> Any:
     """
     Get a specific report for a patient
@@ -756,7 +774,36 @@ async def get_patient_report(
         )
 
     # Check if current user is authorized to view this patient's reports
-    if current_user.role == "patient" and current_user.profile_id != patient_id:
+    is_admin = current_user.role == UserRole.ADMIN
+    is_doctor = current_user.role == UserRole.DOCTOR
+
+    # For patients, check if the user has a relation to this patient (1:n relationship)
+    # The user_entity_id should be the patient_id they want to access
+    is_patient_owner = False
+    if current_user.role == UserRole.PATIENT:
+        # Check if the user has a relation to this patient
+        # The user_entity_id should match the patient_id they're trying to access
+        if user_entity_id == patient_id:
+            # Verify that this user actually has a relation to this patient
+            relation = db.query(UserPatientRelation).filter(
+                UserPatientRelation.user_id == current_user.id,
+                UserPatientRelation.patient_id == patient_id
+            ).first()
+            is_patient_owner = relation is not None
+
+    # For doctors, check if they are treating this patient
+    doctor_treating_patient = False
+    if is_doctor:
+        # Check if there's a doctor-patient mapping
+        doctor = db.query(Doctor).filter(Doctor.id == user_entity_id).first()
+        if doctor:
+            mapping = db.query(DoctorPatientMapping).filter(
+                DoctorPatientMapping.doctor_id == doctor.id,
+                DoctorPatientMapping.patient_id == patient_id
+            ).first()
+            doctor_treating_patient = mapping is not None
+
+    if not (is_admin or doctor_treating_patient or is_patient_owner):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=create_error_response(
@@ -815,7 +862,8 @@ async def create_patient_report(
     patient_id: str,
     report_data: ReportCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ) -> Any:
     """
     Create a new report for a patient
@@ -823,7 +871,20 @@ async def create_patient_report(
     # Check if user is admin, doctor, or the patient themselves
     is_admin = current_user.role == UserRole.ADMIN
     is_doctor = current_user.role == UserRole.DOCTOR
-    is_patient_owner = current_user.role == UserRole.PATIENT and current_user.profile_id == patient_id
+
+    # For patients, check if the user has a relation to this patient (1:n relationship)
+    # The user_entity_id should be the patient_id they want to access
+    is_patient_owner = False
+    if current_user.role == UserRole.PATIENT:
+        # Check if the user has a relation to this patient
+        # The user_entity_id should match the patient_id they're trying to access
+        if user_entity_id == patient_id:
+            # Verify that this user actually has a relation to this patient
+            relation = db.query(UserPatientRelation).filter(
+                UserPatientRelation.user_id == current_user.id,
+                UserPatientRelation.patient_id == patient_id
+            ).first()
+            is_patient_owner = relation is not None
 
     if not (is_admin or is_doctor or is_patient_owner):
         raise HTTPException(
@@ -921,7 +982,8 @@ async def update_patient_report(
     report_id: str,
     report_data: ReportUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ) -> Any:
     """
     Update a report for a patient
@@ -929,7 +991,20 @@ async def update_patient_report(
     # Check if user is admin, doctor, or the patient themselves
     is_admin = current_user.role == UserRole.ADMIN
     is_doctor = current_user.role == UserRole.DOCTOR
-    is_patient_owner = current_user.role == UserRole.PATIENT and current_user.profile_id == patient_id
+
+    # For patients, check if the user has a relation to this patient (1:n relationship)
+    # The user_entity_id should be the patient_id they want to access
+    is_patient_owner = False
+    if current_user.role == UserRole.PATIENT:
+        # Check if the user has a relation to this patient
+        # The user_entity_id should match the patient_id they're trying to access
+        if user_entity_id == patient_id:
+            # Verify that this user actually has a relation to this patient
+            relation = db.query(UserPatientRelation).filter(
+                UserPatientRelation.user_id == current_user.id,
+                UserPatientRelation.patient_id == patient_id
+            ).first()
+            is_patient_owner = relation is not None
 
     if not (is_admin or is_doctor or is_patient_owner):
         raise HTTPException(
