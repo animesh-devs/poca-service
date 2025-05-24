@@ -80,12 +80,19 @@ async def signup(
     )
     refresh_token = create_refresh_token(data={"sub": db_user.id})
 
-    return {
+    token_data = {
         "access_token": access_token,
         "refresh_token": refresh_token,
         "token_type": "bearer",
         "user_id": db_user.id,
         "role": db_user.role
+    }
+
+    return {
+        "status_code": status.HTTP_201_CREATED,
+        "status": True,
+        "message": "User account created successfully",
+        "data": token_data
     }
 
 @router.post("/admin-signup", response_model=Token)

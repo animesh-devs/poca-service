@@ -15,6 +15,7 @@ from app.schemas.chat import (
 from app.dependencies import get_current_user, get_admin_user, get_doctor_user, get_patient_user, get_user_entity_id
 from app.errors import ErrorCode, create_error_response
 from app.utils.document_utils import enhance_message_file_details
+from app.utils.decorators import standardize_response
 
 router = APIRouter()
 
@@ -118,7 +119,8 @@ async def create_chat(
 
     return db_chat
 
-@router.get("", response_model=ChatListResponse)
+@router.get("")
+@standardize_response
 async def get_chats(
     skip: int = 0,
     limit: int = 100,
@@ -177,7 +179,8 @@ async def get_chats(
 
     return {"chats": chats, "total": total}
 
-@router.get("/{chat_id}", response_model=ChatResponse)
+@router.get("/{chat_id}")
+@standardize_response
 async def get_chat(
     chat_id: str,
     db: Session = Depends(get_db),
@@ -569,7 +572,8 @@ async def delete_chat(
     db.delete(chat)
     db.commit()
 
-@router.get("/patient/{patient_id}", response_model=ChatListResponse)
+@router.get("/patient/{patient_id}")
+@standardize_response
 async def get_patient_chats(
     patient_id: str,
     skip: int = 0,
@@ -675,7 +679,8 @@ async def get_patient_chats(
             )
         )
 
-@router.get("/doctor/{doctor_id}", response_model=ChatListResponse)
+@router.get("/doctor/{doctor_id}")
+@standardize_response
 async def get_doctor_chats(
     doctor_id: str,
     skip: int = 0,
@@ -781,7 +786,8 @@ async def get_doctor_chats(
             )
         )
 
-@router.get("/{chat_id}/messages", response_model=MessageListResponse)
+@router.get("/{chat_id}/messages")
+@standardize_response
 async def get_chat_messages(
     chat_id: str,
     skip: int = 0,

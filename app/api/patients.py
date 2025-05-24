@@ -14,6 +14,7 @@ from app.schemas.patient import PatientResponse, AdminPatientCreate
 from app.schemas.case_history import CaseHistoryCreate, CaseHistoryUpdate, CaseHistoryResponse, DocumentResponse
 from app.schemas.report import ReportCreate, ReportUpdate, ReportResponse, ReportListResponse, ReportDocumentResponse
 from app.utils.document_utils import enhance_case_history_documents, enhance_report_documents
+from app.utils.decorators import standardize_response
 from app.dependencies import get_current_user, get_admin_user, get_user_entity_id
 from app.api.auth import get_password_hash
 from app.errors import ErrorCode, create_error_response
@@ -422,7 +423,8 @@ async def update_case_history(
         document_files=[DocumentResponse(**doc) for doc in enhanced_documents]
     )
 
-@router.get("/{patient_id}/documents", response_model=List[DocumentResponse])
+@router.get("/{patient_id}/documents")
+@standardize_response
 async def get_patient_documents(
     patient_id: str,
     db: Session = Depends(get_db),
@@ -562,7 +564,13 @@ async def get_patient_documents(
             ).all()
             all_documents.extend(documents)
 
-        return [DocumentResponse.model_validate(doc) for doc in all_documents]
+        # Enhance documents with download links
+        enhanced_documents = enhance_case_history_documents(all_documents)
+
+        return {
+            "documents": [DocumentResponse(**doc) for doc in enhanced_documents],
+            "total": len(enhanced_documents)
+        }
     except Exception as e:
         db.rollback()
         raise HTTPException(

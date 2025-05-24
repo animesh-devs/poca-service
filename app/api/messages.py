@@ -16,6 +16,7 @@ from app.schemas.chat import (
 )
 from app.dependencies import get_current_user, get_user_entity_id
 from app.errors import ErrorCode, create_error_response
+from app.utils.decorators import standardize_response
 
 router = APIRouter()
 
@@ -193,7 +194,8 @@ async def create_message(
             )
         )
 
-@router.get("/chat/{chat_id}", response_model=MessageListResponse)
+@router.get("/chat/{chat_id}")
+@standardize_response
 async def get_chat_messages(
     chat_id: str,
     skip: int = 0,
@@ -304,7 +306,8 @@ async def get_chat_messages(
             )
         )
 
-@router.put("/read-status", status_code=status.HTTP_200_OK)
+@router.put("/read-status")
+@standardize_response
 async def update_read_status(
     status_data: ReadStatusUpdate,
     db: Session = Depends(get_db),
