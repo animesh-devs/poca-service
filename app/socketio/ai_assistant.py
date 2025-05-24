@@ -7,7 +7,7 @@ from app.models.chat import Chat
 from app.models.user import UserRole
 from app.services.ai import get_ai_service
 from app.socketio.connection_manager import socketio_manager
-from app.socketio.auth import authenticate_socketio_user
+
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -18,27 +18,38 @@ def create_ai_assistant_handlers(sio: socketio.AsyncServer):
     @sio.event
     async def connect(sid, environ, auth):
         """Handle Socket.IO connection for AI assistant"""
+        logger.info(f"Socket.IO connection attempt from {sid}")
+        logger.info(f"Auth data: {auth}")
+        logger.info(f"Query string: {environ.get('QUERY_STRING', '')}")
         try:
             # Get database session
             db_gen = get_db()
             db = next(db_gen)
 
             try:
-                # Authenticate user
-                if not auth or not isinstance(auth, dict):
-                    logger.warning(f"Socket.IO AI connection {sid} rejected: Invalid auth data")
+                # Extract from query parameters (same as WebSocket)
+                query_string = environ.get('QUERY_STRING', '')
+                from urllib.parse import parse_qs
+                query_params = parse_qs(query_string)
+
+                token = query_params.get('token', [None])[0]
+                session_id = query_params.get('session_id', [None])[0]
+                user_entity_id = query_params.get('user_entity_id', [None])[0]
+
+                if not token:
+                    logger.warning(f"Socket.IO AI connection {sid} rejected: No token provided")
                     await sio.disconnect(sid)
                     return False
 
-                user = await authenticate_socketio_user(auth, db)
+                # Use the same authentication as WebSocket
+                from app.dependencies import get_current_user_ws
+                user = await get_current_user_ws(token, db)
                 if not user:
                     logger.warning(f"Socket.IO AI connection {sid} rejected: Authentication failed")
                     await sio.disconnect(sid)
                     return False
 
-                # Extract session_id and user_entity_id from auth
-                session_id = auth.get('session_id')
-                user_entity_id = auth.get('user_entity_id')
+                # session_id and user_entity_id already extracted from query params above
 
                 if not session_id:
                     logger.warning(f"Socket.IO AI connection {sid} rejected: Missing session_id")
