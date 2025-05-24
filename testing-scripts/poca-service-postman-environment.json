@@ -162,6 +162,13 @@
       "type": "default",
       "enabled": true,
       "description": "Temporary download URL for browser downloads"
+    },
+    {
+      "key": "userEntityId",
+      "value": "admin",
+      "type": "default",
+      "enabled": true,
+      "description": "User entity ID for API requests (admin, doctor ID, patient ID, or hospital ID)"
     }
   ],
   "_postman_variable_scope": "environment"
