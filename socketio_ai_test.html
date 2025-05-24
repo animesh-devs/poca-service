@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socket.IO AI Assistant Test</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.error {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .messages {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background-color: #f8f9fa;
+            margin: 10px 0;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .message.sent {
+            background-color: #007bff;
+            color: white;
+            text-align: right;
+        }
+        .message.received {
+            background-color: #e9ecef;
+            color: #333;
+        }
+        .message.system {
+            background-color: #fff3cd;
+            color: #856404;
+            font-style: italic;
+        }
+        .message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .timestamp {
+            font-size: 0.8em;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Socket.IO AI Assistant Test Client</h1>
+        
+        <div class="form-group">
+            <label for="serverUrl">Server URL:</label>
+            <input type="text" id="serverUrl" value="http://localhost:8000" placeholder="http://localhost:8000">
+        </div>
+        
+        <div class="form-group">
+            <label for="sessionId">AI Session ID:</label>
+            <input type="text" id="sessionId" placeholder="Enter AI Session ID">
+        </div>
+        
+        <div class="form-group">
+            <label for="token">Authentication Token:</label>
+            <input type="text" id="token" placeholder="Enter JWT token">
+        </div>
+        
+        <div class="form-group">
+            <label for="entityId">User Entity ID (optional):</label>
+            <input type="text" id="entityId" placeholder="Enter user entity ID">
+        </div>
+        
+        <div class="form-group">
+            <button id="connectBtn">Connect</button>
+            <button id="disconnectBtn" disabled>Disconnect</button>
+        </div>
+        
+        <div id="status" class="status disconnected">Disconnected</div>
+        
+        <div class="messages" id="messages"></div>
+        
+        <div class="form-group">
+            <textarea id="messageInput" placeholder="Type your message here..." rows="3"></textarea>
+            <button id="sendBtn" disabled>Send Message</button>
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        let isConnected = false;
+        
+        const serverUrlInput = document.getElementById('serverUrl');
+        const sessionIdInput = document.getElementById('sessionId');
+        const tokenInput = document.getElementById('token');
+        const entityIdInput = document.getElementById('entityId');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const statusDiv = document.getElementById('status');
+        const messagesDiv = document.getElementById('messages');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        
+        function addMessage(content, type = 'received', data = null) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            let messageContent = '';
+            
+            if (type === 'sent') {
+                messageContent = `<strong>You:</strong> ${content}`;
+            } else if (type === 'system') {
+                messageContent = `<strong>System:</strong> ${content}`;
+            } else if (type === 'error') {
+                messageContent = `<strong>Error:</strong> ${content}`;
+            } else {
+                if (data && data.type === 'ai_response') {
+                    const response = data.content;
+                    messageContent = `<strong>AI Assistant:</strong> ${response.message}`;
+                    if (response.isSummary) {
+                        messageContent += ' <em>(Summary)</em>';
+                    }
+                } else {
+                    messageContent = `<strong>AI:</strong> ${content}`;
+                }
+            }
+            
+            messageDiv.innerHTML = `
+                ${messageContent}
+                <div class="timestamp">${timestamp}</div>
+            `;
+            
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        function updateStatus(status, type) {
+            statusDiv.textContent = status;
+            statusDiv.className = `status ${type}`;
+        }
+        
+        function updateButtons() {
+            connectBtn.disabled = isConnected;
+            disconnectBtn.disabled = !isConnected;
+            sendBtn.disabled = !isConnected;
+        }
+        
+        // Connect to Socket.IO
+        connectBtn.addEventListener('click', function() {
+            const serverUrl = serverUrlInput.value;
+            const sessionId = sessionIdInput.value;
+            const token = tokenInput.value;
+            const entityId = entityIdInput.value;
+            
+            if (!sessionId) {
+                addMessage('Please enter an AI Session ID', 'error');
+                return;
+            }
+            
+            if (!token) {
+                addMessage('Please enter an authentication token', 'error');
+                return;
+            }
+            
+            // Prepare authentication data
+            const authData = {
+                token: token,
+                session_id: sessionId
+            };
+            
+            if (entityId) {
+                authData.user_entity_id = entityId;
+            }
+            
+            addMessage(`Connecting to ${serverUrl}...`, 'system');
+            
+            // Create Socket.IO connection
+            socket = io(serverUrl, {
+                auth: authData,
+                transports: ['websocket', 'polling']
+            });
+            
+            socket.on('connect', function() {
+                isConnected = true;
+                updateStatus('Connected', 'connected');
+                updateButtons();
+                addMessage('Connected to Socket.IO AI Assistant', 'system');
+            });
+            
+            socket.on('disconnect', function() {
+                isConnected = false;
+                updateStatus('Disconnected', 'disconnected');
+                updateButtons();
+                addMessage('Disconnected from Socket.IO AI Assistant', 'system');
+            });
+            
+            socket.on('connect_error', function(error) {
+                isConnected = false;
+                updateStatus('Connection Error', 'error');
+                updateButtons();
+                addMessage(`Connection error: ${error.message}`, 'error');
+            });
+            
+            socket.on('ai_message', function(data) {
+                console.log('Received AI message:', data);
+                addMessage('', 'received', data);
+            });
+        });
+        
+        // Disconnect from Socket.IO
+        disconnectBtn.addEventListener('click', function() {
+            if (socket) {
+                socket.disconnect();
+            }
+        });
+        
+        // Send message
+        sendBtn.addEventListener('click', function() {
+            const message = messageInput.value.trim();
+            if (message && socket && isConnected) {
+                addMessage(message, 'sent');
+                socket.emit('ai_message', { message: message });
+                messageInput.value = '';
+            }
+        });
+        
+        // Send message on Enter key
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendBtn.click();
+            }
+        });
+        
+        // Initialize
+        updateButtons();
+    </script>
+</body>
+</html>

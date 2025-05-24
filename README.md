@@ -20,7 +20,7 @@ A comprehensive backend service for doctor-patient communication with AI assista
 - **ORM**: SQLAlchemy
 - **Data Validation**: Pydantic
 - **Authentication**: JWT-based
-- **Real-time Communication**: WebSockets
+- **Real-time Communication**: WebSockets and Socket.IO
 - **Database**: SQLite (development), PostgreSQL (production)
 - **AI Integration**: OpenAI GPT-4 and Google Gemini
 
@@ -303,6 +303,7 @@ For more details on the API response format, see the [API Response Format](docs/
 - `PUT /api/v1/ai/sessions/{session_id}/end` - End an AI session
 - `POST /api/v1/ai/suggested-response` - Generate a suggested response for a doctor based on a patient summary
 - `WebSocket /api/v1/ai-assistant/ws/{aiSessionId}?token={authToken}` - Real-time AI assistant communication
+- `Socket.IO /socket.io/` - Real-time AI assistant communication via Socket.IO
 
 ## 📝 License
 

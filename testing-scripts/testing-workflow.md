@@ -190,7 +190,11 @@ curl -X POST "http://localhost:8000/api/v1/ai-assistant/sessions/SESSION_ID/mess
   }'
 ```
 
-## WebSocket Testing
+## Real-time Communication Testing
+
+The POCA service supports both WebSocket and Socket.IO for real-time communication. Both implementations provide identical functionality for AI assistant interactions.
+
+### WebSocket Testing
 
 For WebSocket testing, you can use tools like [websocat](https://github.com/vi/websocat), browser-based WebSocket clients, or the Postman WebSocket client.
 
@@ -214,6 +218,62 @@ websocat "wss://localhost:8000/api/v1/ai-assistant/ws/SESSION_ID?token=YOUR_ACCE
 ```
 
 > **Note**: If you're testing locally with a self-signed certificate, you may need to use the `--insecure` flag with websocat or equivalent options in other tools.
+
+### Socket.IO Testing
+
+For Socket.IO testing, you can use the provided test clients:
+
+#### HTML Test Client
+Open `socketio_ai_test.html` in your browser:
+
+1. Enter server URL (default: http://localhost:8000)
+2. Enter AI Session ID
+3. Enter JWT authentication token
+4. Optionally enter user entity ID
+5. Click "Connect" to establish Socket.IO connection
+6. Send messages and receive AI responses in real-time
+
+#### Python Test Client
+Use the command-line Socket.IO test client:
+
+```bash
+# Interactive mode
+python test_socketio_ai.py --token YOUR_JWT_TOKEN --session-id SESSION_ID
+
+# Single message mode
+python test_socketio_ai.py --token YOUR_JWT_TOKEN --session-id SESSION_ID --message "Hello AI"
+
+# With user entity ID
+python test_socketio_ai.py --token YOUR_JWT_TOKEN --session-id SESSION_ID --user-entity-id ENTITY_ID
+```
+
+#### Integration Test
+Run the Socket.IO integration test to verify the implementation:
+
+```bash
+python test_socketio_integration.py
+```
+
+This test verifies:
+- Socket.IO server integration with FastAPI
+- Authentication rejection without valid tokens
+- Connection handling and error responses
+- Availability of test data for authenticated testing
+
+### Socket.IO vs WebSocket Comparison
+
+| Feature | WebSocket | Socket.IO |
+|---------|-----------|-----------|
+| **Protocol** | Native WebSocket | Socket.IO (WebSocket + fallbacks) |
+| **Browser Support** | Modern browsers only | All browsers (with fallbacks) |
+| **Reconnection** | Manual implementation | Automatic reconnection |
+| **Message Format** | JSON strings | Native JavaScript objects |
+| **Namespaces** | Not supported | Supported |
+| **Rooms** | Manual implementation | Built-in room support |
+| **Authentication** | Query parameters | Auth object |
+| **Endpoint** | `/api/v1/ai-assistant/ws/{session_id}` | `/socket.io/` |
+
+Both implementations provide identical business logic and AI assistant functionality.
 
 ## Automated Test Scripts
 

@@ -102,14 +102,21 @@ async def websocket_ai_endpoint(
             has_access = True
             logger.info(f"Admin user {current_user.id} accessing AI session {session_id}")
         elif current_user.role == UserRole.DOCTOR:
-            # Check if the doctor is part of this chat
-            if user_entity_id and user_entity_id == chat.doctor_id:
+            # For doctors: user_entity_id should be doctor_id (same as user.profile_id)
+            # Check if this doctor is part of the chat
+            if user_entity_id == chat.doctor_id:
                 has_access = True
                 logger.info(f"Doctor {user_entity_id} accessing AI session {session_id}")
+            elif not user_entity_id and current_user.profile_id == chat.doctor_id:
+                # Fallback: check profile_id if user_entity_id not provided
+                has_access = True
+                logger.info(f"Doctor {current_user.profile_id} accessing AI session {session_id} (using profile_id)")
+            else:
+                logger.warning(f"Doctor {current_user.id} (entity_id: {user_entity_id}, profile_id: {current_user.profile_id}) denied access to AI session {session_id} - not assigned to chat {chat.id}")
         elif current_user.role == UserRole.PATIENT:
-            # For patients, check if the user has a relation to the patient in this chat (1:n relationship)
-            # The user_entity_id should be the patient_id they want to access
-            if user_entity_id and user_entity_id == chat.patient_id:
+            # For patients: user_entity_id should be patient_id (from user-patient-relation mapping)
+            # Check if this patient is part of the chat
+            if user_entity_id == chat.patient_id:
                 # Verify that this user actually has a relation to this patient
                 from app.models.mapping import UserPatientRelation
                 relation = db.query(UserPatientRelation).filter(
@@ -119,9 +126,46 @@ async def websocket_ai_endpoint(
 
                 if relation:
                     has_access = True
-                    logger.info(f"User {current_user.id} with relation '{relation.relation}' to patient {chat.patient_id} accessing AI session {session_id}")
+                    logger.info(f"Patient user {current_user.id} with relation '{relation.relation}' accessing AI session {session_id} for patient {chat.patient_id}")
                 else:
-                    logger.warning(f"User {current_user.id} has no relation to patient {chat.patient_id} for AI session {session_id}")
+                    logger.warning(f"Patient user {current_user.id} has no relation to patient {chat.patient_id} for AI session {session_id}")
+            else:
+                # If user_entity_id doesn't match, check if user has any relation to this chat's patient
+                from app.models.mapping import UserPatientRelation
+                relation = db.query(UserPatientRelation).filter(
+                    UserPatientRelation.user_id == current_user.id,
+                    UserPatientRelation.patient_id == chat.patient_id
+                ).first()
+
+                if relation:
+                    has_access = True
+                    logger.info(f"Patient user {current_user.id} with relation '{relation.relation}' accessing AI session {session_id} for patient {chat.patient_id} (auto-resolved)")
+                else:
+                    logger.warning(f"Patient user {current_user.id} has no relation to patient {chat.patient_id} for AI session {session_id}")
+        elif current_user.role == UserRole.HOSPITAL:
+            # For hospitals: user_entity_id should be hospital_id (same as user.profile_id)
+            # Hospitals can access sessions if they have relationships with the doctor or patient
+            if user_entity_id and user_entity_id == current_user.profile_id:
+                # Check if hospital has relationship with the doctor or patient in this chat
+                from app.models.mapping import HospitalDoctorMapping, HospitalPatientMapping
+
+                doctor_relation = db.query(HospitalDoctorMapping).filter(
+                    HospitalDoctorMapping.hospital_id == user_entity_id,
+                    HospitalDoctorMapping.doctor_id == chat.doctor_id
+                ).first()
+
+                patient_relation = db.query(HospitalPatientMapping).filter(
+                    HospitalPatientMapping.hospital_id == user_entity_id,
+                    HospitalPatientMapping.patient_id == chat.patient_id
+                ).first()
+
+                if doctor_relation or patient_relation:
+                    has_access = True
+                    logger.info(f"Hospital {user_entity_id} accessing AI session {session_id} (has relationship with chat participants)")
+                else:
+                    logger.warning(f"Hospital {user_entity_id} has no relationship with chat participants for AI session {session_id}")
+            else:
+                logger.warning(f"Hospital user {current_user.id} invalid entity_id {user_entity_id} for AI session {session_id}")
 
         if not has_access:
             logger.warning(f"User {current_user.id} (role: {current_user.role}, entity_id: {user_entity_id}) denied access to AI session {session_id}")
