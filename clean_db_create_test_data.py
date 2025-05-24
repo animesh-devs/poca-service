@@ -5,10 +5,24 @@ import uuid
 from datetime import datetime, timedelta
 import random
 import logging
+import warnings
 
-# Configure logging
+# Suppress bcrypt warnings before any other imports
+warnings.filterwarnings("ignore", message=".*error reading bcrypt version.*")
+warnings.filterwarnings("ignore", message=".*trapped.*error reading bcrypt version.*")
+
+# Configure logging with a filter to suppress bcrypt warnings
+class BcryptWarningFilter(logging.Filter):
+    def filter(self, record):
+        return not ("error reading bcrypt version" in record.getMessage() or
+                   "trapped" in record.getMessage())
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Apply the filter to suppress bcrypt warnings
+logging.getLogger('passlib.handlers.bcrypt').addFilter(BcryptWarningFilter())
+logging.getLogger().addFilter(BcryptWarningFilter())
 
 # Add the parent directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))

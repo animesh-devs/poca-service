@@ -1,13 +1,12 @@
-from typing import TypeVar, Generic, Optional, Any, Dict
+from typing import TypeVar, Generic, Optional
 from pydantic import BaseModel, Field
-from pydantic.generics import GenericModel
 
 T = TypeVar('T')
 
-class StandardResponse(GenericModel, Generic[T]):
+class StandardResponse(BaseModel, Generic[T]):
     """
     Standard API response format for all endpoints.
-    
+
     Attributes:
         status_code: HTTP status code
         status: Boolean indicating success or failure
