@@ -377,7 +377,7 @@ def create_test_data():
                         chat_id=chat_id,
                         sender_id=patient_id,
                         receiver_id=doctor.id,
-                        message=f"Hi Dr. {doctor_last_name}, I've been having some symptoms I'd like to discuss.",
+                        message=f"Hi Dr. {last_names[doctor_idx]}, I've been having some symptoms I'd like to discuss.",
                         message_type=MessageType.TEXT,
                         is_read=False
                     )
@@ -418,7 +418,7 @@ def create_test_data():
                             id=ai_summary_id,
                             session_id=ai_session_id,
                             message="Can you provide a summary of my condition?",
-                            response=f"Based on our conversation, {patient_first_name} has been experiencing symptoms that may indicate a minor condition. Recommend further evaluation by Dr. {doctor_last_name}.",
+                            response=f"Based on our conversation, {patient_first_name} has been experiencing symptoms that may indicate a minor condition. Recommend further evaluation by Dr. {last_names[doctor_idx]}.",
                             is_summary=True
                         )
                         db.add(ai_summary)
@@ -436,7 +436,7 @@ def create_test_data():
                             "id": ai_summary_id,
                             "session_id": ai_session_id,
                             "message": "Can you provide a summary of my condition?",
-                            "response": f"Based on our conversation, {patient_first_name} has been experiencing symptoms that may indicate a minor condition. Recommend further evaluation by Dr. {doctor_last_name}.",
+                            "response": f"Based on our conversation, {patient_first_name} has been experiencing symptoms that may indicate a minor condition. Recommend further evaluation by Dr. {last_names[doctor_idx]}.",
                             "is_summary": True
                         })
 

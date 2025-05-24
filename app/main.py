@@ -25,10 +25,6 @@ from app.api import (
 )
 from app.websockets import ai_assistant, chat
 from app.errors import http_exception_handler, validation_exception_handler
-<<<<<<< HEAD
-=======
-from app.middleware.response import add_standard_response_middleware
->>>>>>> 84e6feb9065367e96c9b9083f6e18e474d598f39
 from app.utils.openapi import custom_openapi
 
 # Configure logging
@@ -70,12 +66,6 @@ app.add_middleware(
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
-<<<<<<< HEAD
-=======
-# Add standard response middleware
-add_standard_response_middleware(app)
-
->>>>>>> 84e6feb9065367e96c9b9083f6e18e474d598f39
 # Use custom OpenAPI schema
 app.openapi = lambda: custom_openapi(app)
 
