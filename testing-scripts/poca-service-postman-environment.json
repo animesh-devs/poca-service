@@ -141,6 +141,27 @@
       "type": "default",
       "enabled": true,
       "description": "Receiver ID for messaging"
+    },
+    {
+      "key": "documentId",
+      "value": "",
+      "type": "default",
+      "enabled": true,
+      "description": "Document ID for testing"
+    },
+    {
+      "key": "downloadToken",
+      "value": "",
+      "type": "secret",
+      "enabled": true,
+      "description": "Temporary download token for browser downloads"
+    },
+    {
+      "key": "downloadUrl",
+      "value": "",
+      "type": "default",
+      "enabled": true,
+      "description": "Temporary download URL for browser downloads"
     }
   ],
   "_postman_variable_scope": "environment"

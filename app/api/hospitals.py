@@ -13,6 +13,7 @@ from app.schemas.doctor import DoctorListResponse, DoctorListItem
 from app.schemas.patient import PatientListResponse, PatientListItem
 from app.dependencies import get_current_user, get_admin_user, get_hospital_user
 from app.errors import ErrorCode, create_error_response
+from app.utils.decorators import standardize_response
 
 router = APIRouter()
 
@@ -72,7 +73,8 @@ async def create_hospital(
             )
         )
 
-@router.get("", response_model=HospitalListResponse)
+@router.get("")
+@standardize_response
 async def get_hospitals(
     skip: int = 0,
     limit: int = 100,

@@ -9,10 +9,12 @@ from app.models.mapping import HospitalDoctorMapping, DoctorPatientMapping
 from app.schemas.doctor import DoctorUpdate, DoctorResponse, DoctorListResponse, DoctorListItem
 from app.dependencies import get_current_user, get_admin_user, get_doctor_user
 from app.errors import ErrorCode, create_error_response
+from app.utils.decorators import standardize_response
 
 router = APIRouter()
 
-@router.get("", response_model=DoctorListResponse)
+@router.get("")
+@standardize_response
 async def get_doctors(
     skip: int = 0,
     limit: int = 100,
@@ -24,7 +26,7 @@ async def get_doctors(
     """
     doctors = db.query(Doctor).offset(skip).limit(limit).all()
     total = db.query(Doctor).count()
-    
+
     return {
         "doctors": [DoctorListItem.model_validate(doctor) for doctor in doctors],
         "total": total
@@ -49,7 +51,7 @@ async def get_doctor(
                 error_code=ErrorCode.RES_001
             )
         )
-    
+
     return doctor
 
 @router.put("/{doctor_id}", response_model=DoctorResponse)
@@ -65,7 +67,7 @@ async def update_doctor(
     # Check if the current user is an admin or the doctor being updated
     is_admin = current_user.role == "admin"
     is_doctor_owner = current_user.role == "doctor" and current_user.profile_id == doctor_id
-    
+
     if not (is_admin or is_doctor_owner):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -75,7 +77,7 @@ async def update_doctor(
                 error_code=ErrorCode.AUTH_004
             )
         )
-    
+
     doctor = db.query(Doctor).filter(Doctor.id == doctor_id).first()
     if not doctor:
         raise HTTPException(
@@ -86,14 +88,14 @@ async def update_doctor(
                 error_code=ErrorCode.RES_001
             )
         )
-    
+
     # Update doctor fields
     for field, value in doctor_data.model_dump(exclude_unset=True).items():
         setattr(doctor, field, value)
-    
+
     db.commit()
     db.refresh(doctor)
-    
+
     return doctor
 
 @router.get("/{doctor_id}/patients", response_model=List[dict])
@@ -118,11 +120,11 @@ async def get_doctor_patients(
                 error_code=ErrorCode.RES_001
             )
         )
-    
+
     # Check if the current user is an admin or the doctor
     is_admin = current_user.role == "admin"
     is_doctor_owner = current_user.role == "doctor" and current_user.profile_id == doctor_id
-    
+
     if not (is_admin or is_doctor_owner):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -132,21 +134,21 @@ async def get_doctor_patients(
                 error_code=ErrorCode.AUTH_004
             )
         )
-    
+
     # Get all patients mapped to this doctor
     from app.models.patient import Patient
-    
+
     # Query for doctor-patient mappings
     mappings = db.query(DoctorPatientMapping).filter(
         DoctorPatientMapping.doctor_id == doctor_id
     ).offset(skip).limit(limit).all()
-    
+
     # Get patient IDs from mappings
     patient_ids = [mapping.patient_id for mapping in mappings]
-    
+
     # Query for patients
     patients = db.query(Patient).filter(Patient.id.in_(patient_ids)).all()
-    
+
     # Return patient data
     return [
         {
@@ -181,21 +183,21 @@ async def get_doctor_hospitals(
                 error_code=ErrorCode.RES_001
             )
         )
-    
+
     # Get all hospitals mapped to this doctor
     from app.models.hospital import Hospital
-    
+
     # Query for hospital-doctor mappings
     mappings = db.query(HospitalDoctorMapping).filter(
         HospitalDoctorMapping.doctor_id == doctor_id
     ).offset(skip).limit(limit).all()
-    
+
     # Get hospital IDs from mappings
     hospital_ids = [mapping.hospital_id for mapping in mappings]
-    
+
     # Query for hospitals
     hospitals = db.query(Hospital).filter(Hospital.id.in_(hospital_ids)).all()
-    
+
     # Return hospital data
     return [
         {

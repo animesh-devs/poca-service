@@ -59,7 +59,74 @@ All API responses in the POCA Service follow a standardized format:
 }
 ```
 
-### Example 3: Empty Response (204 No Content)
+### Example 3: Document Upload Response
+
+```json
+{
+  "status_code": 200,
+  "status": true,
+  "message": "Request successful",
+  "data": {
+    "id": "f27ea191-7277-4453-8cf3-2d43172c4ae0",
+    "file_name": "test_document.pdf",
+    "size": 1024,
+    "link": "http://localhost:8000/api/v1/documents/f27ea191-7277-4453-8cf3-2d43172c4ae0/download",
+    "document_type": "other",
+    "uploaded_by": "72530021-8af3-43cc-bc26-38255c6ed17d",
+    "uploaded_by_role": "admin",
+    "remark": "Test document",
+    "entity_id": null,
+    "upload_timestamp": "2023-05-01T12:00:00Z",
+    "created_at": "2023-05-01T12:00:00Z",
+    "download_link": "http://localhost:8000/api/v1/documents/f27ea191-7277-4453-8cf3-2d43172c4ae0/download"
+  }
+}
+```
+
+### Example 4: Patient Documents List Response
+
+```json
+{
+  "status_code": 200,
+  "status": true,
+  "message": "Request successful",
+  "data": {
+    "documents": [
+      {
+        "id": "3df79e11-eb4d-482c-bd17-ea415a3fb3a7",
+        "file_name": "blood_test_results.pdf",
+        "size": 1024,
+        "link": "http://localhost:8000/api/v1/documents/3df79e11-eb4d-482c-bd17-ea415a3fb3a7/download",
+        "uploaded_by": "doctor",
+        "remark": "Regular blood test results",
+        "case_history_id": "b673ecfa-b26b-4c99-92b2-59a5404483fe",
+        "upload_timestamp": "2023-05-01T12:00:00Z",
+        "created_at": "2023-05-01T12:00:00Z",
+        "download_link": "http://localhost:8000/api/v1/documents/3df79e11-eb4d-482c-bd17-ea415a3fb3a7/download"
+      }
+    ],
+    "total": 1
+  }
+}
+```
+
+### Example 5: Download Token Creation Response
+
+```json
+{
+  "status_code": 200,
+  "status": true,
+  "message": "Request successful",
+  "data": {
+    "download_token": "b2QWPcshLbb6l3lhvQ9Yfd0mJ8bFYUUAVuXi3xix890",
+    "download_url": "http://localhost:8000/api/v1/documents/download-with-token?token=b2QWPcshLbb6l3lhvQ9Yfd0mJ8bFYUUAVuXi3xix890",
+    "expires_at": "2023-05-01T13:00:00Z",
+    "expires_in_seconds": 3600
+  }
+}
+```
+
+### Example 6: Empty Response (204 No Content)
 
 ```json
 {
@@ -136,9 +203,9 @@ async function fetchData(url) {
         'Authorization': `Bearer ${token}`
       }
     });
-    
+
     const result = await response.json();
-    
+
     if (result.status) {
       // Success case
       return result.data;
@@ -154,3 +221,82 @@ async function fetchData(url) {
   }
 }
 ```
+
+### Document Download Implementation
+
+For downloading documents, use the `download_link` field from API responses:
+
+```javascript
+async function downloadDocument(downloadLink, filename, token) {
+  try {
+    const response = await fetch(downloadLink, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (response.ok) {
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } else {
+      throw new Error(`Download failed: ${response.status}`);
+    }
+  } catch (error) {
+    console.error('Download error:', error);
+    throw error;
+  }
+}
+
+// Usage example
+async function getPatientDocumentsAndDownload(patientId, token) {
+  const result = await fetchData(`/api/v1/patients/${patientId}/documents`);
+
+  for (const doc of result.documents) {
+    await downloadDocument(doc.download_link, doc.file_name, token);
+  }
+}
+```
+
+### Browser-Compatible Downloads
+
+For browser downloads without authentication headers, create temporary download tokens:
+
+```javascript
+async function createDownloadToken(documentId, token) {
+  const response = await fetch(`/api/v1/documents/${documentId}/download-token`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
+
+  const result = await response.json();
+
+  if (result.status) {
+    return result.data.download_url; // Can be used directly in browser
+  } else {
+    throw new Error(result.message);
+  }
+}
+
+// Usage: Create clickable download link
+async function createDownloadLink(documentId, filename, token) {
+  const downloadUrl = await createDownloadToken(documentId, token);
+
+  const link = document.createElement('a');
+  link.href = downloadUrl;
+  link.download = filename;
+  link.textContent = `Download ${filename}`;
+
+  return link; // Can be added to DOM
+}
+```
+
+> **Note**: For detailed document download examples and troubleshooting, see the [Document Download Guide](../DOCUMENT_DOWNLOAD_GUIDE.md).

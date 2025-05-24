@@ -284,6 +284,17 @@ For more details on the API response format, see the [API Response Format](docs/
 - `PUT /api/v1/suggestions/{suggestion_id}` - Update suggestion
 - `DELETE /api/v1/suggestions/{suggestion_id}` - Delete suggestion
 
+#### Documents
+- `POST /api/v1/documents/upload` - Upload a document
+- `GET /api/v1/documents/{document_id}` - Get document metadata
+- `GET /api/v1/documents/{document_id}/download` - Download a document (requires authentication)
+- `POST /api/v1/documents/{document_id}/download-token` - Create temporary download token for browser downloads
+- `GET /api/v1/documents/download-with-token?token={temp_token}` - Download using temporary token (no auth required)
+- `PUT /api/v1/documents/{document_id}/link` - Link document to an entity (case history, report, etc.)
+- `GET /api/v1/documents/storage/stats` - Get storage statistics (admin only)
+
+> **Document Download**: All document APIs include `download_link` fields. For browser downloads, use the download token endpoint to generate temporary URLs that don't require authentication headers. See [Document Download Guide](DOCUMENT_DOWNLOAD_GUIDE.md) for detailed examples.
+
 #### AI Assistant
 - `POST /api/v1/ai/sessions` - Create a new AI session
 - `GET /api/v1/ai/sessions/{session_id}` - Get an AI session

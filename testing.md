@@ -236,6 +236,81 @@ curl -X POST "http://localhost:8000/api/v1/ai/messages" \
   }'
 ```
 
+### Document Management
+
+#### Upload Document
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/documents/upload" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -F "file=@/path/to/your/document.pdf" \
+  -F "document_type=other" \
+  -F "remark=Test document"
+```
+
+#### Get Document Metadata
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/documents/DOCUMENT_ID" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+#### Download Document (Authenticated)
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/documents/DOCUMENT_ID/download" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -o "downloaded_document.pdf"
+```
+
+#### Create Download Token for Browser Downloads
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/documents/DOCUMENT_ID/download-token" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+#### Download with Token (Browser Compatible)
+
+```bash
+# Use the download_url from the token response
+curl -X GET "http://localhost:8000/api/v1/documents/download-with-token?token=TEMP_TOKEN" \
+  -o "downloaded_document.pdf"
+```
+
+#### Get Patient Documents
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/patients/PATIENT_ID/documents" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+#### Link Document to Entity
+
+```bash
+curl -X PUT "http://localhost:8000/api/v1/documents/DOCUMENT_ID/link" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -F "entity_id=CASE_HISTORY_ID" \
+  -F "document_type=case_history"
+```
+
+### Document Download Testing
+
+For comprehensive document download testing, use the provided test scripts:
+
+```bash
+# Test standardized response format for all APIs
+python3 test_standardized_responses.py
+
+# Test document upload and download functionality
+python3 working_download_example.py
+
+# Test browser-compatible downloads (requires manual interaction)
+python3 test_browser_download.py
+```
+
+See [Document Download Guide](DOCUMENT_DOWNLOAD_GUIDE.md) for detailed examples and troubleshooting.
+
 ## Troubleshooting
 
 If you encounter any issues while running the tests, try the following:

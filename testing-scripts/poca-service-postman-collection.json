@@ -3301,9 +3301,166 @@
             "description": "Link a document to an entity (case history, report, etc.)"
           },
           "response": []
+        },
+        {
+          "name": "Download Document",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/documents/{{documentId}}/download",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "documents",
+                "{{documentId}}",
+                "download"
+              ]
+            },
+            "description": "Download a document by ID (requires authentication). This endpoint returns the actual file content."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Download Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Check if the response is valid JSON",
+                  "try {",
+                  "    var jsonData = pm.response.json();",
+                  "    console.log('Response data:', jsonData);",
+                  "    ",
+                  "    // Check if the response is in the new standardized format",
+                  "    if (jsonData.data) {",
+                  "        // New format with data field",
+                  "        console.log('Response is in the new standardized format');",
+                  "        var tokenData = jsonData.data;",
+                  "        ",
+                  "        // Set environment variables if the response contains the expected fields",
+                  "        if (tokenData.download_token) {",
+                  "            pm.environment.set(\"downloadToken\", tokenData.download_token);",
+                  "            console.log('Set downloadToken:', tokenData.download_token);",
+                  "        }",
+                  "        ",
+                  "        if (tokenData.download_url) {",
+                  "            pm.environment.set(\"downloadUrl\", tokenData.download_url);",
+                  "            console.log('Set downloadUrl:', tokenData.download_url);",
+                  "        }",
+                  "    } else {",
+                  "        // Old format (direct response)",
+                  "        console.log('Response is in the old format');",
+                  "        ",
+                  "        if (jsonData.download_token) {",
+                  "            pm.environment.set(\"downloadToken\", jsonData.download_token);",
+                  "            console.log('Set downloadToken:', jsonData.download_token);",
+                  "        }",
+                  "        ",
+                  "        if (jsonData.download_url) {",
+                  "            pm.environment.set(\"downloadUrl\", jsonData.download_url);",
+                  "            console.log('Set downloadUrl:', jsonData.download_url);",
+                  "        }",
+                  "    }",
+                  "} catch (e) {",
+                  "    console.error('Error parsing response as JSON:', e.message);",
+                  "    console.log('Response body:', pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/documents/{{documentId}}/download-token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "documents",
+                "{{documentId}}",
+                "download-token"
+              ]
+            },
+            "description": "Create a temporary download token for browser downloads. This allows downloading documents without authentication headers."
+          },
+          "response": []
+        },
+        {
+          "name": "Download with Token (Browser Compatible)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/documents/download-with-token?token={{downloadToken}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "documents",
+                "download-with-token"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "{{downloadToken}}",
+                  "description": "Temporary download token"
+                }
+              ]
+            },
+            "description": "Download a document using a temporary token (no authentication required). This endpoint is browser-compatible and can be used directly in links."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Storage Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/documents/storage/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "documents",
+                "storage",
+                "stats"
+              ]
+            },
+            "description": "Get storage statistics (admin only)"
+          },
+          "response": []
         }
       ],
-      "description": "Document management endpoints"
+      "description": "Document management endpoints including upload, download, and browser-compatible downloads"
     },
     {
       "name": "Suggestions",
