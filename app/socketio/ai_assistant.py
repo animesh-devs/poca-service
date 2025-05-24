@@ -21,6 +21,7 @@ def create_ai_assistant_handlers(sio: socketio.AsyncServer):
         logger.info(f"Socket.IO connection attempt from {sid}")
         logger.info(f"Auth data: {auth}")
         logger.info(f"Query string: {environ.get('QUERY_STRING', '')}")
+        logger.info(f"Headers: {environ.get('HTTP_AUTHORIZATION', 'No auth header')}")
         try:
             # Get database session
             db_gen = get_db()
