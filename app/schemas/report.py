@@ -19,6 +19,7 @@ class ReportDocumentResponse(ReportDocumentBase):
     report_id: str
     upload_timestamp: datetime
     created_at: datetime
+    download_link: Optional[str] = None  # Dynamically generated download link
 
     model_config = {
         "from_attributes": True

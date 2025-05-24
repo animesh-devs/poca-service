@@ -14,6 +14,7 @@ from app.schemas.chat import (
 )
 from app.dependencies import get_current_user, get_admin_user, get_doctor_user, get_patient_user, get_user_entity_id
 from app.errors import ErrorCode, create_error_response
+from app.utils.document_utils import enhance_message_file_details
 
 router = APIRouter()
 
@@ -853,7 +854,23 @@ async def get_chat_messages(
         messages = db.query(Message).filter(Message.chat_id == chat_id).order_by(Message.timestamp.desc()).offset(skip).limit(limit).all()
         total = db.query(Message).filter(Message.chat_id == chat_id).count()
 
-        return {"messages": messages, "total": total}
+        # Enhance file_details in messages with download links
+        enhanced_messages = []
+        for message in messages:
+            message_dict = {
+                "id": message.id,
+                "chat_id": message.chat_id,
+                "sender_id": message.sender_id,
+                "receiver_id": message.receiver_id,
+                "message": message.message,
+                "message_type": message.message_type,
+                "file_details": enhance_message_file_details(message.file_details),
+                "timestamp": message.timestamp,
+                "is_read": message.is_read
+            }
+            enhanced_messages.append(message_dict)
+
+        return {"messages": enhanced_messages, "total": total}
     except Exception as e:
         db.rollback()
         raise HTTPException(

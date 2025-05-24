@@ -7,6 +7,9 @@ from app.db.database import get_db
 from app.models.user import User, UserRole
 from app.models.chat import Chat, Message, MessageType
 from app.models.document import FileDocument, DocumentType, UploadedBy
+from app.services.document_storage import document_storage
+from app.config import settings
+from app.utils.document_utils import enhance_message_file_details
 from app.schemas.chat import (
     MessageCreate, MessageResponse, MessageListResponse,
     ReadStatusUpdate
@@ -273,7 +276,23 @@ async def get_chat_messages(
         messages = db.query(Message).filter(Message.chat_id == chat_id).order_by(Message.timestamp.desc()).offset(skip).limit(limit).all()
         total = db.query(Message).filter(Message.chat_id == chat_id).count()
 
-        return {"messages": messages, "total": total}
+        # Enhance file_details in messages with download links
+        enhanced_messages = []
+        for message in messages:
+            message_dict = {
+                "id": message.id,
+                "chat_id": message.chat_id,
+                "sender_id": message.sender_id,
+                "receiver_id": message.receiver_id,
+                "message": message.message,
+                "message_type": message.message_type,
+                "file_details": enhance_message_file_details(message.file_details),
+                "timestamp": message.timestamp,
+                "is_read": message.is_read
+            }
+            enhanced_messages.append(message_dict)
+
+        return {"messages": enhanced_messages, "total": total}
     except Exception as e:
         db.rollback()
         raise HTTPException(
@@ -550,13 +569,19 @@ async def create_message_with_attachment(
             )
 
         if file:
-            # Upload a new file
+            # Upload a new file to in-memory storage
             file_content = await file.read()
             file_size = len(file_content)
 
-            # In a real application, you would upload this file to a storage service
-            # and get a link to the uploaded file. For this example, we'll create a dummy link.
-            file_link = f"https://example.com/files/{uuid4()}/{file.filename}"
+            # Store document in memory storage
+            storage_id = document_storage.store_document(
+                file_content=file_content,
+                filename=file.filename,
+                content_type=file.content_type
+            )
+
+            # Create downloadable link using the public base URL
+            download_link = f"{settings.PUBLIC_BASE_URL}{settings.API_V1_PREFIX}/documents/{storage_id}/download"
 
             # Determine uploaded_by_role based on current user's role
             if current_user.role == UserRole.DOCTOR:
@@ -574,9 +599,10 @@ async def create_message_with_attachment(
                 doc_type = DocumentType.OTHER
 
             db_document = FileDocument(
+                id=storage_id,  # Use the storage ID as the document ID
                 file_name=file.filename,
                 size=file_size,
-                link=file_link,
+                link=download_link,
                 document_type=doc_type,
                 uploaded_by=current_user.id,
                 uploaded_by_role=uploaded_by_role,
@@ -596,6 +622,9 @@ async def create_message_with_attachment(
                 "uploaded_by": db_document.uploaded_by,
                 "upload_timestamp": db_document.upload_timestamp.isoformat()
             }
+
+            # Enhance file details with download link
+            file_details = enhance_message_file_details(file_details)
 
         elif document_id:
             # Use an existing document
@@ -619,6 +648,9 @@ async def create_message_with_attachment(
                 "uploaded_by": db_document.uploaded_by,
                 "upload_timestamp": db_document.upload_timestamp.isoformat()
             }
+
+            # Enhance file details with download link
+            file_details = enhance_message_file_details(file_details)
 
         # Create new message
         db_message = Message(

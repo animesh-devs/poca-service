@@ -13,9 +13,11 @@ from app.models.document import FileDocument, DocumentType
 from app.schemas.patient import PatientResponse, AdminPatientCreate
 from app.schemas.case_history import CaseHistoryCreate, CaseHistoryUpdate, CaseHistoryResponse, DocumentResponse
 from app.schemas.report import ReportCreate, ReportUpdate, ReportResponse, ReportListResponse, ReportDocumentResponse
+from app.utils.document_utils import enhance_case_history_documents, enhance_report_documents
 from app.dependencies import get_current_user, get_admin_user, get_user_entity_id
 from app.api.auth import get_password_hash
 from app.errors import ErrorCode, create_error_response
+import logging
 
 router = APIRouter()
 
@@ -157,6 +159,9 @@ async def get_case_history(
             Document.case_history_id == case_history.id
         ).all()
 
+        # Enhance documents with download links
+        enhanced_documents = enhance_case_history_documents(documents)
+
         # Construct response
         return CaseHistoryResponse(
             id=case_history.id,
@@ -165,7 +170,7 @@ async def get_case_history(
             documents=case_history.documents,
             created_at=case_history.created_at,
             updated_at=case_history.updated_at,
-            document_files=[DocumentResponse.model_validate(doc) for doc in documents]
+            document_files=[DocumentResponse(**doc) for doc in enhanced_documents]
         )
     except Exception as e:
         db.rollback()
@@ -189,9 +194,15 @@ async def create_case_history(
     """
     Create a new case history for a patient
     """
+
+    logger = logging.getLogger(__name__)
+
     # Check if user is admin, doctor, or the patient themselves
     is_admin = current_user.role == UserRole.ADMIN
     is_doctor = current_user.role == UserRole.DOCTOR
+
+    logger.info(f"user_entity_id: {user_entity_id}, patient_id: {patient_id}, role: {current_user.role}")
+
 
     # For patients, we need to check if the user_entity_id is the patient_id
     # or if the user has a relation to this patient (1:n relationship)
@@ -290,6 +301,9 @@ async def create_case_history(
         Document.case_history_id == db_case_history.id
     ).all()
 
+    # Enhance documents with download links
+    enhanced_documents = enhance_case_history_documents(all_documents)
+
     # Construct response
     return CaseHistoryResponse(
         id=db_case_history.id,
@@ -298,7 +312,7 @@ async def create_case_history(
         documents=db_case_history.documents,
         created_at=db_case_history.created_at,
         updated_at=db_case_history.updated_at,
-        document_files=[DocumentResponse.model_validate(doc) for doc in all_documents]
+        document_files=[DocumentResponse(**doc) for doc in enhanced_documents]
     )
 
 @router.put("/{patient_id}/case-history", response_model=CaseHistoryResponse)
@@ -394,6 +408,9 @@ async def update_case_history(
         Document.case_history_id == case_history.id
     ).all()
 
+    # Enhance documents with download links
+    enhanced_documents = enhance_case_history_documents(documents)
+
     # Construct response
     return CaseHistoryResponse(
         id=case_history.id,
@@ -402,7 +419,7 @@ async def update_case_history(
         documents=case_history.documents,
         created_at=case_history.created_at,
         updated_at=case_history.updated_at,
-        document_files=[DocumentResponse.model_validate(doc) for doc in documents]
+        document_files=[DocumentResponse(**doc) for doc in enhanced_documents]
     )
 
 @router.get("/{patient_id}/documents", response_model=List[DocumentResponse])
@@ -876,6 +893,9 @@ async def create_patient_report(
         ReportDocument.report_id == db_report.id
     ).all()
 
+    # Enhance report documents with download links
+    enhanced_report_documents = enhance_report_documents(all_report_documents)
+
     # Construct response
     return ReportResponse(
         id=db_report.id,
@@ -884,7 +904,7 @@ async def create_patient_report(
         report_type=db_report.report_type,
         created_at=db_report.created_at,
         updated_at=db_report.updated_at,
-        report_documents=[ReportDocumentResponse.model_validate(doc) for doc in all_report_documents]
+        report_documents=[ReportDocumentResponse(**doc) for doc in enhanced_report_documents]
     )
 
 @router.put("/{patient_id}/reports/{report_id}", response_model=ReportResponse)

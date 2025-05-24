@@ -28,6 +28,7 @@ class Settings:
         # Application Settings
         self.PROJECT_NAME = os.getenv("PROJECT_NAME", "POCA Service")
         self.API_V1_PREFIX = os.getenv("API_V1_PREFIX", "/api/v1")
+        self.PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000")
 
         # Parse ALLOWED_ORIGINS from environment or use default
         allowed_origins_env = os.getenv("ALLOWED_ORIGINS")
