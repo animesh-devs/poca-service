@@ -21,9 +21,11 @@ from app.api import (
     messages,
     appointments,
     suggestions,
-    documents
+    documents,
+    socketio_rest
 )
 from app.websockets import ai_assistant, chat
+
 from app.errors import http_exception_handler, validation_exception_handler
 from app.utils.openapi import custom_openapi
 
@@ -65,7 +67,6 @@ app.add_middleware(
 # Add exception handlers
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
-
 # Use custom OpenAPI schema
 app.openapi = lambda: custom_openapi(app)
 
@@ -85,6 +86,9 @@ app.include_router(messages.router, prefix=f"{settings.API_V1_PREFIX}/messages",
 app.include_router(appointments.router, prefix=f"{settings.API_V1_PREFIX}/appointments", tags=["Appointments"])
 app.include_router(suggestions.router, prefix=f"{settings.API_V1_PREFIX}/suggestions", tags=["Suggestions"])
 app.include_router(documents.router, prefix=f"{settings.API_V1_PREFIX}/documents", tags=["Documents"])
+app.include_router(socketio_rest.router)
+
+# Note: Socket.IO HTTP polling removed - using Socket.IO REST API instead
 
 @app.get("/")
 def read_root():
@@ -110,6 +114,9 @@ def health_check():
         "message": "Service is healthy",
         "data": {"status": "healthy"}
     }
+
+# Export the FastAPI app (Socket.IO ASGI wrapper removed)
+# app = app  # No change needed - using FastAPI app directly
 
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

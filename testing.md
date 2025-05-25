@@ -213,6 +213,56 @@ ws://localhost:8000/api/v1/chats/ws/CHAT_ID?token=YOUR_ACCESS_TOKEN
 }
 ```
 
+### Socket.IO REST API
+
+The service provides a Socket.IO-like REST API for HTTP polling compatibility:
+
+#### Initialize Session
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/socketio/init" \
+  -H "Accept: application/json"
+```
+
+#### Connect/Authenticate
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/socketio/connect/SESSION_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token": "YOUR_ACCESS_TOKEN",
+    "session_id": "AI_SESSION_ID",
+    "user_entity_id": "USER_ENTITY_ID"
+  }'
+```
+
+#### Send AI Message
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/socketio/ai_message/SESSION_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "I have been experiencing headaches",
+    "token": "YOUR_ACCESS_TOKEN",
+    "session_id": "AI_SESSION_ID",
+    "user_entity_id": "USER_ENTITY_ID"
+  }'
+```
+
+#### Poll for Responses
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/socketio/poll/SESSION_ID" \
+  -H "Accept: application/json"
+```
+
+#### Disconnect Session
+
+```bash
+curl -X DELETE "http://localhost:8000/api/v1/socketio/disconnect/SESSION_ID" \
+  -H "Accept: application/json"
+```
+
 ### Create AI Session
 
 ```bash

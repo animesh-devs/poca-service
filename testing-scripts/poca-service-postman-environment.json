@@ -169,6 +169,13 @@
       "type": "default",
       "enabled": true,
       "description": "User entity ID for API requests (admin, doctor ID, patient ID, or hospital ID)"
+    },
+    {
+      "key": "socketTransportId",
+      "value": "",
+      "type": "default",
+      "enabled": true,
+      "description": "Socket.IO transport session ID (temporary for HTTP polling)"
     }
   ],
   "_postman_variable_scope": "environment"

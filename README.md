@@ -303,7 +303,7 @@ For more details on the API response format, see the [API Response Format](docs/
 - `PUT /api/v1/ai/sessions/{session_id}/end` - End an AI session
 - `POST /api/v1/ai/suggested-response` - Generate a suggested response for a doctor based on a patient summary
 - `WebSocket /api/v1/ai-assistant/ws/{aiSessionId}?token={authToken}` - Real-time AI assistant communication
-- `Socket.IO /socket.io/` - Real-time AI assistant communication via Socket.IO
+- `Socket.IO /realtime/` - Real-time communication via Socket.IO (custom path)
 
 ## 📝 License
 

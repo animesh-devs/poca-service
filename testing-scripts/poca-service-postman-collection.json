@@ -4002,6 +4002,178 @@
         }
       ],
       "description": "AI assistant endpoints for communication with the AI"
+    },
+
+    {
+      "name": "Socket.IO REST API",
+      "item": [
+        {
+          "name": "1. Initialize Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Extract session ID from response",
+                  "try {",
+                  "    var jsonData = pm.response.json();",
+                  "    console.log('Session Response:', jsonData);",
+                  "    ",
+                  "    if (jsonData.sid) {",
+                  "        pm.environment.set('socketRestSessionId', jsonData.sid);",
+                  "        console.log('Socket REST Session ID set:', jsonData.sid);",
+                  "    } else {",
+                  "        console.error('No sid found in response');",
+                  "    }",
+                  "} catch (e) {",
+                  "    console.error('Error parsing response:', e);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/socketio/init",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "socketio",
+                "init"
+              ]
+            },
+            "description": "Initialize a Socket.IO-like REST session"
+          },
+          "response": []
+        },
+        {
+          "name": "2. Connect/Authenticate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{authToken}}\",\n  \"session_id\": \"{{aiSessionId}}\",\n  \"user_entity_id\": \"{{userEntityId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/socketio/connect/{{socketRestSessionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "socketio",
+                "connect",
+                "{{socketRestSessionId}}"
+              ]
+            },
+            "description": "Authenticate the Socket.IO REST session"
+          },
+          "response": []
+        },
+        {
+          "name": "3. Send AI Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"I have been experiencing headaches. What could be causing this?\",\n  \"token\": \"{{authToken}}\",\n  \"session_id\": \"{{aiSessionId}}\",\n  \"user_entity_id\": \"{{userEntityId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/socketio/ai_message/{{socketRestSessionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "socketio",
+                "ai_message",
+                "{{socketRestSessionId}}"
+              ]
+            },
+            "description": "Send a message to the AI assistant"
+          },
+          "response": []
+        },
+        {
+          "name": "4. Poll for Responses",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/socketio/poll/{{socketRestSessionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "socketio",
+                "poll",
+                "{{socketRestSessionId}}"
+              ]
+            },
+            "description": "Poll for AI responses and other events"
+          },
+          "response": []
+        },
+        {
+          "name": "5. Disconnect Session",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/socketio/disconnect/{{socketRestSessionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "socketio",
+                "disconnect",
+                "{{socketRestSessionId}}"
+              ]
+            },
+            "description": "Disconnect and cleanup the session"
+          },
+          "response": []
+        }
+      ],
+      "description": "Socket.IO-like REST API that works reliably with HTTP requests for AI assistant communication"
     }
   ],
   "variable": [
