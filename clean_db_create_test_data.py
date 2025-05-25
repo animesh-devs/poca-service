@@ -59,11 +59,10 @@ credentials = {
 
 def clean_db():
     """Drop all tables and recreate them"""
-    logger.info("Dropping all tables...")
+    logger.info("Initializing database...")
     Base.metadata.drop_all(bind=engine)
-    logger.info("Creating all tables...")
     Base.metadata.create_all(bind=engine)
-    logger.info("Database cleaned and tables recreated.")
+    logger.info("Database initialized successfully.")
 
 def create_test_data():
     """Create test data with 2 hospitals, 4 users, 2-3 patients per user, and 4-5 doctors"""
@@ -466,7 +465,7 @@ def create_test_data():
 
         # Commit all changes
         db.commit()
-        logger.info("Test data created successfully!")
+        logger.info("Test data created successfully.")
         return True
     except Exception as e:
         db.rollback()
@@ -477,45 +476,21 @@ def create_test_data():
 
 def print_credentials():
     """Print all credentials in a readable format"""
-    print("\n=== TEST DATA CREDENTIALS ===\n")
+    print("\n=== TEST DATA SUMMARY ===")
 
-    print("ADMIN:")
-    for admin in credentials["admin"]:
-        print(f"  Name: {admin.get('name', 'Admin User')}")
-        print(f"  Email: {admin['email']}")
-        print(f"  Password: {admin['password']}")
-        print(f"  ID: {admin['id']}")
-        print()
+    print(f"\nADMIN: {credentials['admin'][0]['email']} / {credentials['admin'][0]['password']}")
 
-    print("HOSPITALS:")
+    print(f"\nHOSPITALS ({len(credentials['hospitals'])}):")
     for i, hospital in enumerate(credentials["hospitals"]):
-        print(f"  Hospital {i+1}:")
-        print(f"    Name: {hospital.get('name', f'Hospital {i+1}')}")
-        print(f"    Email: {hospital['email']}")
-        print(f"    Password: {hospital['password']}")
-        print(f"    ID: {hospital['id']}")
-        print()
+        print(f"  {hospital['email']} / {hospital['password']}")
 
-    print("DOCTORS:")
+    print(f"\nDOCTORS ({len(credentials['doctors'])}):")
     for i, doctor in enumerate(credentials["doctors"]):
-        print(f"  Doctor {i+1} ({doctor['specialty']}):")
-        print(f"    Name: {doctor.get('name', f'Doctor {i+1}')}")
-        print(f"    Email: {doctor['email']}")
-        print(f"    Password: {doctor['password']}")
-        print(f"    ID: {doctor['id']}")
-        print()
+        print(f"  {doctor['email']} / {doctor['password']} ({doctor['specialty']})")
 
-    print("PATIENTS:")
+    print(f"\nPATIENTS ({len(credentials['patients'])}):")
     for i, patient in enumerate(credentials["patients"]):
-        print(f"  Patient User {i+1}:")
-        print(f"    Name: {patient.get('name', f'Patient User {i+1}')}")
-        print(f"    Email: {patient['email']}")
-        print(f"    Password: {patient['password']}")
-        print(f"    ID: {patient['id']}")
-        print(f"    Associated Patients:")
-        for j, p in enumerate(patient["patients"]):
-            print(f"      Patient {j+1}: {p['name']} (Relation: {p['relation']}, ID: {p['id']})")
-        print()
+        print(f"  {patient['email']} / {patient['password']} ({len(patient['patients'])} patient records)")
 
     print("=== MAPPING INFORMATION ===\n")
     print("Hospital-Doctor Mappings:")

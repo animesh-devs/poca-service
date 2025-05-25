@@ -11,7 +11,7 @@ services:
     env_file:
       - .env
     command: >
-      bash -c "python init_db.py --force && python3 ./clean_db_create_test_data.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+      bash -c "python init_db.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
