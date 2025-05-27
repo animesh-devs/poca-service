@@ -25,6 +25,7 @@ router = APIRouter()
 
 
 @router.get("/{patient_id}/case-history", response_model=CaseHistoryResponse)
+@standardize_response
 async def get_case_history(
     patient_id: str,
     create_if_not_exists: bool = False,
@@ -185,6 +186,7 @@ async def get_case_history(
         )
 
 @router.post("/{patient_id}/case-history", response_model=CaseHistoryResponse)
+@standardize_response
 async def create_case_history(
     patient_id: str,
     case_history_data: CaseHistoryCreate,
@@ -317,6 +319,7 @@ async def create_case_history(
     )
 
 @router.put("/{patient_id}/case-history", response_model=CaseHistoryResponse)
+@standardize_response
 async def update_case_history(
     patient_id: str,
     case_history_data: CaseHistoryUpdate,
@@ -583,6 +586,7 @@ async def get_patient_documents(
         )
 
 @router.get("/{patient_id}/reports", response_model=ReportListResponse)
+@standardize_response
 async def get_patient_reports(
     patient_id: str,
     db: Session = Depends(get_db),
@@ -751,6 +755,7 @@ async def get_patient_reports(
         )
 
 @router.get("/{patient_id}/reports/{report_id}", response_model=ReportResponse)
+@standardize_response
 async def get_patient_report(
     patient_id: str,
     report_id: str,
@@ -858,6 +863,7 @@ async def get_patient_report(
     )
 
 @router.post("/{patient_id}/reports", response_model=ReportResponse)
+@standardize_response
 async def create_patient_report(
     patient_id: str,
     report_data: ReportCreate,
@@ -977,6 +983,7 @@ async def create_patient_report(
     )
 
 @router.put("/{patient_id}/reports/{report_id}", response_model=ReportResponse)
+@standardize_response
 async def update_patient_report(
     patient_id: str,
     report_id: str,

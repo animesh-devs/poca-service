@@ -33,6 +33,7 @@ async def get_doctors(
     }
 
 @router.get("/{doctor_id}", response_model=DoctorResponse)
+@standardize_response
 async def get_doctor(
     doctor_id: str,
     db: Session = Depends(get_db),
@@ -55,6 +56,7 @@ async def get_doctor(
     return doctor
 
 @router.put("/{doctor_id}", response_model=DoctorResponse)
+@standardize_response
 async def update_doctor(
     doctor_id: str,
     doctor_data: DoctorUpdate,

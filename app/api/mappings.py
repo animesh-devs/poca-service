@@ -24,10 +24,12 @@ from app.schemas.mapping import (
 from app.schemas.patient import PatientListResponse, PatientListItem
 from app.dependencies import get_current_user, get_admin_user, get_doctor_user, get_hospital_user
 from app.errors import ErrorCode, create_error_response
+from app.utils.decorators import standardize_response
 
 router = APIRouter()
 
 @router.post("/hospital-doctor", response_model=HospitalDoctorMappingResponse)
+@standardize_response
 async def create_hospital_doctor_mapping(
     mapping_data: HospitalDoctorMappingCreate,
     db: Session = Depends(get_db),
@@ -86,6 +88,7 @@ async def create_hospital_doctor_mapping(
     return db_mapping
 
 @router.post("/hospital-patient", response_model=HospitalPatientMappingResponse)
+@standardize_response
 async def create_hospital_patient_mapping(
     mapping_data: HospitalPatientMappingCreate,
     db: Session = Depends(get_db),
@@ -144,6 +147,7 @@ async def create_hospital_patient_mapping(
     return db_mapping
 
 @router.post("/doctor-patient", response_model=DoctorPatientMappingResponse)
+@standardize_response
 async def create_doctor_patient_mapping(
     mapping_data: DoctorPatientMappingCreate,
     db: Session = Depends(get_db),
@@ -271,6 +275,7 @@ async def delete_doctor_patient_mapping(
     db.commit()
 
 @router.post("/user-patient", response_model=UserPatientRelationResponse)
+@standardize_response
 async def create_user_patient_relation(
     relation_data: UserPatientRelationCreate,
     db: Session = Depends(get_db),
@@ -403,6 +408,7 @@ async def create_user_patient_relation(
         )
 
 @router.put("/user-patient/{relation_id}", response_model=UserPatientRelationResponse)
+@standardize_response
 async def update_user_patient_relation(
     relation_id: str,
     relation_data: UserPatientRelationUpdate,
@@ -510,6 +516,7 @@ async def delete_user_patient_relation(
         )
 
 @router.post("/user/{user_id}/patients", response_model=UserPatientRelationResponse)
+@standardize_response
 async def create_user_patient_mapping(
     user_id: str,
     relation_data: UserPatientRelationCreate,

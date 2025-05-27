@@ -20,6 +20,7 @@ from app.utils.decorators import standardize_response
 router = APIRouter()
 
 @router.post("", response_model=ChatResponse)
+@standardize_response
 async def create_chat(
     chat_data: ChatCreate,
     db: Session = Depends(get_db),
@@ -258,6 +259,7 @@ async def get_chat(
         )
 
 @router.put("/{chat_id}/deactivate-for-doctor", response_model=ChatResponse)
+@standardize_response
 async def deactivate_chat_for_doctor(
     chat_id: str,
     db: Session = Depends(get_db),
@@ -326,6 +328,7 @@ async def deactivate_chat_for_doctor(
         )
 
 @router.put("/{chat_id}/deactivate-for-patient", response_model=ChatResponse)
+@standardize_response
 async def deactivate_chat_for_patient(
     chat_id: str,
     db: Session = Depends(get_db),
@@ -404,6 +407,7 @@ async def deactivate_chat_for_patient(
         )
 
 @router.put("/{chat_id}/activate-for-doctor", response_model=ChatResponse)
+@standardize_response
 async def activate_chat_for_doctor(
     chat_id: str,
     db: Session = Depends(get_db),
@@ -472,6 +476,7 @@ async def activate_chat_for_doctor(
         )
 
 @router.put("/{chat_id}/activate-for-patient", response_model=ChatResponse)
+@standardize_response
 async def activate_chat_for_patient(
     chat_id: str,
     db: Session = Depends(get_db),

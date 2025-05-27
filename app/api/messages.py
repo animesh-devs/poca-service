@@ -21,6 +21,7 @@ from app.utils.decorators import standardize_response
 router = APIRouter()
 
 @router.post("", response_model=MessageResponse)
+@standardize_response
 async def create_message(
     message_data: MessageCreate,
     db: Session = Depends(get_db),
@@ -436,6 +437,7 @@ async def update_read_status(
         )
 
 @router.post("/with-attachment", response_model=MessageResponse)
+@standardize_response
 async def create_message_with_attachment(
     chat_id: str = Form(...),
     receiver_id: str = Form(...),
@@ -682,6 +684,7 @@ async def create_message_with_attachment(
         )
 
 @router.put("/{message_id}/read", status_code=status.HTTP_200_OK)
+@standardize_response
 async def update_message_read_status(
     message_id: str,
     is_read: bool = True,

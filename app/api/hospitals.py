@@ -18,6 +18,7 @@ from app.utils.decorators import standardize_response
 router = APIRouter()
 
 @router.post("", response_model=HospitalResponse)
+@standardize_response
 async def create_hospital(
     hospital_data: HospitalCreate,
     db: Session = Depends(get_db),
@@ -93,6 +94,7 @@ async def get_hospitals(
     }
 
 @router.get("/{hospital_id}", response_model=HospitalResponse)
+@standardize_response
 async def get_hospital(
     hospital_id: str,
     db: Session = Depends(get_db),
@@ -124,6 +126,7 @@ async def get_hospital(
     return hospital
 
 @router.put("/{hospital_id}", response_model=HospitalResponse)
+@standardize_response
 async def update_hospital(
     hospital_id: str,
     hospital_data: HospitalUpdate,
