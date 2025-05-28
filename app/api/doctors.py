@@ -101,6 +101,7 @@ async def update_doctor(
     return doctor
 
 @router.get("/{doctor_id}/patients", response_model=List[dict])
+@standardize_response
 async def get_doctor_patients(
     doctor_id: str,
     skip: int = 0,
@@ -164,6 +165,7 @@ async def get_doctor_patients(
     ]
 
 @router.get("/{doctor_id}/hospitals", response_model=List[dict])
+@standardize_response
 async def get_doctor_hospitals(
     doctor_id: str,
     skip: int = 0,

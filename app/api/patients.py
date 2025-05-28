@@ -1096,6 +1096,7 @@ async def update_patient_report(
 
 
 @router.post("/admin/create", response_model=PatientResponse)
+@standardize_response
 async def admin_create_patient(
     patient_data: AdminPatientCreate,
     db: Session = Depends(get_db),
