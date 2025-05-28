@@ -12,7 +12,7 @@ from app.models.report import Report, PatientReportMapping, ReportDocument, Repo
 from app.models.document import FileDocument, DocumentType
 from app.schemas.patient import PatientResponse, AdminPatientCreate
 from app.schemas.case_history import CaseHistoryCreate, CaseHistoryUpdate, CaseHistoryResponse, DocumentResponse
-from app.schemas.report import ReportCreate, ReportUpdate, ReportResponse, ReportListResponse, ReportDocumentResponse
+from app.schemas.report import ReportCreate, ReportUpdate, ReportResponse, ReportDocumentResponse
 from app.utils.document_utils import enhance_case_history_documents, enhance_report_documents
 from app.utils.decorators import standardize_response
 from app.dependencies import get_current_user, get_admin_user, get_user_entity_id
@@ -585,7 +585,7 @@ async def get_patient_documents(
             )
         )
 
-@router.get("/{patient_id}/reports", response_model=ReportListResponse)
+@router.get("/{patient_id}/reports")
 @standardize_response
 async def get_patient_reports(
     patient_id: str,
@@ -594,7 +594,10 @@ async def get_patient_reports(
     user_entity_id: str = Depends(get_user_entity_id)
 ) -> Any:
     """
-    Get all reports for a patient
+    Get all reports for a patient with complete report information including documents
+
+    Returns the same complete report objects as the get_patient_report endpoint,
+    including description, updated_at, and report_documents with download links.
     """
     try:
         # Check if patient exists
@@ -726,23 +729,36 @@ async def get_patient_reports(
                 # Add to report mappings
                 report_mappings = [mapping]
 
-        # Get all reports
+        # Get all reports with complete information
         reports = []
         for mapping in report_mappings:
             report = db.query(Report).filter(Report.id == mapping.report_id).first()
             if report:
-                reports.append(report)
+                # Get report documents for this report
+                report_documents = db.query(ReportDocument).filter(
+                    ReportDocument.report_id == report.id
+                ).all()
 
-        # Construct response
-        return ReportListResponse(
-            reports=[{
-                "id": report.id,
-                "title": report.title,
-                "report_type": report.report_type,
-                "created_at": report.created_at
-            } for report in reports],
-            total=len(reports)
-        )
+                # Enhance report documents with download links
+                enhanced_report_documents = enhance_report_documents(report_documents)
+
+                # Create complete ReportResponse object
+                complete_report = ReportResponse(
+                    id=report.id,
+                    title=report.title,
+                    description=report.description,
+                    report_type=report.report_type,
+                    created_at=report.created_at,
+                    updated_at=report.updated_at,
+                    report_documents=[ReportDocumentResponse(**doc) for doc in enhanced_report_documents]
+                )
+                reports.append(complete_report)
+
+        # Construct response with complete report objects
+        return {
+            "reports": reports,
+            "total": len(reports)
+        }
     except Exception as e:
         db.rollback()
         raise HTTPException(
