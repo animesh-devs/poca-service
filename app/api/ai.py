@@ -832,6 +832,7 @@ async def update_ai_summary(
         )
 
 @router.post("/suggested-response", response_model=AISuggestedResponseResponse)
+@standardize_response
 async def generate_suggested_response(
     request_data: AISuggestedResponseRequest,
     db: Session = Depends(get_db),
@@ -920,7 +921,13 @@ async def generate_suggested_response(
             {"role": "user", "content": f"Patient summary: {request_data.summary}"}
         ]
 
-        suggested_response = await ai_service.generate_response("Please provide a suggested response to this patient summary.", context)
+        suggested_response_data = await ai_service.generate_response("Please provide a suggested response to this patient summary.", context)
+
+        # Handle response based on type (similar to other AI endpoints)
+        if isinstance(suggested_response_data, dict):
+            suggested_response = suggested_response_data.get("message", "")
+        else:
+            suggested_response = suggested_response_data
 
         # Create a new AI message for the suggested response
         db_message = AIMessage(
@@ -934,13 +941,14 @@ async def generate_suggested_response(
         db.commit()
         db.refresh(db_message)
 
-        # Create a response object
-        response_data = {
-            "id": db_message.id,
-            "session_id": session_id,
-            "suggested_response": suggested_response,
-            "timestamp": db_message.timestamp
-        }
+        # Create a response object that matches the AISuggestedResponseResponse schema
+        # The @standardize_response decorator will wrap this in the standard format
+        response_data = AISuggestedResponseResponse(
+            id=db_message.id,
+            session_id=session_id,
+            suggested_response=suggested_response,
+            timestamp=db_message.timestamp
+        )
 
         return response_data
 

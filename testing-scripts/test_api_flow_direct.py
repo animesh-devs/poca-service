@@ -1933,6 +1933,37 @@ def update_ai_summary(token: str, session_id: str, summary: str) -> Optional[Dic
         logging.error(f"Error updating AI session summary: {str(e)}")
         return None
 
+def generate_ai_suggested_response(token: str, session_id: str, summary: str, user_entity_id: str = None) -> Optional[Dict[str, Any]]:
+    """Generate a suggested response for a doctor based on a patient summary"""
+    logging.info(f"Generating AI suggested response for session {session_id}...")
+
+    try:
+        data = {
+            "session_id": session_id,
+            "summary": summary
+        }
+
+        headers = {"Authorization": f"Bearer {token}"}
+        if user_entity_id:
+            headers["user-entity-id"] = user_entity_id
+
+        response = requests.post(
+            f"{AI_URL}/suggested-response",
+            json=data,
+            headers=headers
+        )
+
+        if response.status_code in [200, 201]:
+            response_data = response.json()
+            logging.info(f"Generated AI suggested response successfully")
+            return response_data
+        else:
+            logging.error(f"Failed to generate AI suggested response: {response.status_code} - {response.text}")
+            return None
+    except Exception as e:
+        logging.error(f"Error generating AI suggested response: {str(e)}")
+        return None
+
 def get_current_user_profile(token: str) -> Optional[Dict[str, Any]]:
     """Get current user profile"""
     logging.info("Getting current user profile...")
@@ -3930,6 +3961,17 @@ def main():
                 ai_messages = get_ai_session_messages(patient_token, session_id)
                 if ai_messages is not None:
                     logging.info("Get AI session messages successful")
+
+                # Test AI suggested response (doctor functionality)
+                doctor_profile_id = get_doctor_profile_id(admin_token, doctor_id) or doctor_id
+                suggested_response = generate_ai_suggested_response(
+                    doctor_token,
+                    session_id,
+                    "Patient reports headache and fever for 2 days. Symptoms are getting worse.",
+                    doctor_profile_id
+                )
+                if suggested_response:
+                    logging.info("Generate AI suggested response successful")
         else:
             logging.error("Failed to create chat. Skipping chat and message tests.")
 

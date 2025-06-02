@@ -100,6 +100,29 @@ def test_messages_api(token: str, chat_id: str):
     else:
         print(f"✗ GET /messages/chat/{chat_id} failed: {response.status_code} - {response.text}")
 
+def test_ai_api(token: str):
+    """Test AI API endpoints"""
+    print("\n=== Testing AI API ===")
+
+    headers = {"Authorization": f"Bearer {token}", "user-entity-id": "admin"}
+
+    # Test AI suggested response endpoint
+    suggested_response_data = {
+        "session_id": "test-session-id",
+        "summary": "Patient reports headache and fever for 2 days. Symptoms are getting worse."
+    }
+
+    response = requests.post(
+        f"{BASE_URL}/ai/suggested-response",
+        json=suggested_response_data,
+        headers=headers
+    )
+    if response.status_code in [200, 201]:
+        result = response.json()
+        check_standardized_format(result, "POST /ai/suggested-response")
+    else:
+        print(f"✗ POST /ai/suggested-response failed: {response.status_code} - {response.text}")
+
 def test_users_api(token: str):
     """Test users API endpoints"""
     print("\n=== Testing Users API ===")
@@ -180,6 +203,7 @@ def main():
     test_users_api(admin_token)
     test_documents_api(admin_token)
     test_chats_api(admin_token)
+    test_ai_api(admin_token)
 
     # Use test data IDs
     patient_id = "2dd7955d-0218-4b08-879a-de40b4e8aea9"  # Alice Smith

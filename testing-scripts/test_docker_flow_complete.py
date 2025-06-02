@@ -106,7 +106,8 @@ chat_id = None
 ai_session_id = None
 
 def make_request(method: str, url: str, token: Optional[str] = None, data: Optional[Dict] = None,
-                 files: Optional[Dict] = None, expected_status: int = 200) -> Tuple[Dict, bool]:
+                 files: Optional[Dict] = None, expected_status: int = 200,
+                 additional_headers: Optional[Dict] = None) -> Tuple[Dict, bool]:
     """
     Make an HTTP request with proper error handling
 
@@ -124,6 +125,8 @@ def make_request(method: str, url: str, token: Optional[str] = None, data: Optio
     headers = {}
     if token:
         headers["Authorization"] = f"Bearer {token}"
+    if additional_headers:
+        headers.update(additional_headers)
 
     try:
         if method == "GET":
@@ -1044,15 +1047,16 @@ def test_doctor_gets_suggested_response():
         return False
 
     suggested_response_data = {
-        "chat_id": chat_id,
-        "patient_message": "I have a headache, fever, sore throat, and cough."
+        "session_id": ai_session_id if ai_session_id else "test-session-id",
+        "summary": "Patient reports headache, fever, sore throat, and cough. Symptoms started 2 days ago and are getting worse."
     }
 
     response, success = make_request(
         "POST",
         f"{AI_URL}/suggested-response",
         token=doctor_token,
-        data=suggested_response_data
+        data=suggested_response_data,
+        additional_headers={"user-entity-id": doctor_id if doctor_id else "test-doctor-id"}
     )
 
     if success:
