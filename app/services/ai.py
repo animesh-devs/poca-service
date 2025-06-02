@@ -15,6 +15,11 @@ class AIService(ABC):
         """Generate a response to a message"""
         pass
 
+    @abstractmethod
+    async def generate_suggested_response(self, patient_summary: str) -> str:
+        """Generate a suggested medical response for a doctor based on patient summary"""
+        pass
+
 class OpenAIService(AIService):
     """OpenAI service implementation"""
 
@@ -177,6 +182,117 @@ class OpenAIService(AIService):
             "message": response_text.strip(),
             "isSummary": is_summary
         }
+
+    async def generate_suggested_response(self, patient_summary: str) -> str:
+        """Generate a suggested medical response for a doctor based on patient summary"""
+        if not self.api_key or self.api_key == "your_openai_api_key":
+            logger.warning("OpenAI API key not set or using default value. Using mock response.")
+            return self._generate_mock_suggested_response(patient_summary)
+
+        try:
+            # System prompt for doctor's suggested response
+            doctor_prompt = """
+            You are an experienced medical professional providing a suggested response to a colleague based on a patient summary.
+
+            Based on the patient summary provided, generate a thoughtful, professional medical response that includes:
+            1. Assessment of the symptoms and possible differential diagnoses
+            2. Recommended diagnostic tests or examinations if needed
+            3. Suggested treatment options or management plan
+            4. Any red flags or urgent concerns to watch for
+            5. Follow-up recommendations
+
+            Keep your response professional, evidence-based, and practical for clinical use.
+            Be empathetic but maintain medical objectivity.
+            If the symptoms suggest serious conditions, emphasize the need for immediate evaluation.
+
+            Provide your response as plain text (not JSON format).
+            """
+
+            messages = [
+                {"role": "system", "content": doctor_prompt},
+                {"role": "user", "content": f"Patient Summary: {patient_summary}\n\nPlease provide your suggested medical response:"}
+            ]
+
+            logger.info(f"Generating suggested response for patient summary: {patient_summary[:100]}...")
+
+            # Call the OpenAI API
+            client = openai.OpenAI(api_key=self.api_key)
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.7,  # Slightly more creative for varied responses
+                max_tokens=500    # Limit response length
+            )
+
+            # Extract the response text
+            response_text = response.choices[0].message.content.strip()
+            logger.info(f"Generated suggested response: {response_text[:100]}...")
+
+            return response_text
+
+        except Exception as e:
+            logger.error(f"Error generating suggested response from OpenAI: {str(e)}")
+            return f"Error generating suggested medical response: {str(e)}"
+
+    def _generate_mock_suggested_response(self, patient_summary: str) -> str:
+        """Generate a mock suggested response for testing when no API key is available"""
+
+        # Analyze the summary for key symptoms
+        summary_lower = patient_summary.lower()
+
+        if any(symptom in summary_lower for symptom in ["fever", "headache", "sore throat", "cough"]):
+            return """
+Based on the patient's presentation with fever, headache, sore throat, and cough, this appears consistent with a viral upper respiratory infection, possibly influenza.
+
+Assessment:
+- Viral syndrome most likely given the constellation of symptoms
+- Consider bacterial pharyngitis if severe throat pain with exudate
+- Monitor for complications such as pneumonia
+
+Recommendations:
+1. Symptomatic treatment with rest, fluids, and fever reducers (acetaminophen/ibuprofen)
+2. Throat lozenges or warm salt water gargles for sore throat
+3. Consider rapid strep test if bacterial pharyngitis suspected
+4. Return if symptoms worsen, fever persists >3 days, or difficulty breathing develops
+
+Follow-up: Routine unless symptoms deteriorate or patient develops concerning features.
+            """.strip()
+
+        elif any(symptom in summary_lower for symptom in ["chest pain", "shortness of breath"]):
+            return """
+The patient's presentation with chest pain and shortness of breath requires immediate evaluation to rule out serious cardiopulmonary conditions.
+
+Assessment:
+- Differential includes cardiac (MI, angina), pulmonary (PE, pneumonia), or other causes
+- This presentation warrants urgent evaluation
+
+Recommendations:
+1. IMMEDIATE: Obtain vital signs, ECG, chest X-ray
+2. Consider cardiac enzymes, D-dimer based on clinical suspicion
+3. Oxygen saturation monitoring
+4. Pain assessment and management as appropriate
+
+RED FLAGS: Any signs of hemodynamic instability, severe respiratory distress, or cardiac symptoms require immediate emergency evaluation.
+
+Follow-up: Urgent/emergent evaluation recommended.
+            """.strip()
+
+        else:
+            return """
+Based on the patient summary provided, a comprehensive evaluation is recommended.
+
+Assessment:
+- Further history and physical examination needed for accurate diagnosis
+- Consider relevant differential diagnoses based on presenting symptoms
+
+Recommendations:
+1. Complete history and physical examination
+2. Appropriate diagnostic testing based on clinical findings
+3. Symptomatic management as indicated
+4. Patient education regarding symptoms and when to seek care
+
+Follow-up: As clinically indicated based on findings and patient response to treatment.
+            """.strip()
 
 # Gemini implementation removed as per requirements
 

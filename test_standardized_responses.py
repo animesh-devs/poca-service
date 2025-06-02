@@ -109,7 +109,7 @@ def test_ai_api(token: str):
     # Test AI suggested response endpoint
     suggested_response_data = {
         "session_id": "test-session-id",
-        "summary": "Patient reports headache and fever for 2 days. Symptoms are getting worse."
+        "summary": "Patient is a 45-year-old male presenting with chest pain and shortness of breath for 1 hour. Pain is substernal, crushing in nature, radiating to left arm. Associated with diaphoresis and nausea. No known cardiac history. Patient is anxious and requests immediate evaluation."
     }
 
     response = requests.post(

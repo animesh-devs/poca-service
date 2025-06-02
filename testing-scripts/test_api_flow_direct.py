@@ -3967,7 +3967,7 @@ def main():
                 suggested_response = generate_ai_suggested_response(
                     doctor_token,
                     session_id,
-                    "Patient reports headache and fever for 2 days. Symptoms are getting worse.",
+                    "Patient is a 28-year-old female presenting with severe headache and fever (102°F) for 2 days. Associated with nausea and photophobia. No recent travel or sick contacts. Patient reports symptoms are progressively worsening and requests evaluation for possible serious causes.",
                     doctor_profile_id
                 )
                 if suggested_response:

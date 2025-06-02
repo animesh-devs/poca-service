@@ -1048,7 +1048,7 @@ def test_doctor_gets_suggested_response():
 
     suggested_response_data = {
         "session_id": ai_session_id if ai_session_id else "test-session-id",
-        "summary": "Patient reports headache, fever, sore throat, and cough. Symptoms started 2 days ago and are getting worse."
+        "summary": "Patient is a 35-year-old presenting with fever (101.2°F), headache, sore throat, and dry cough for 3 days. No significant medical history. Denies shortness of breath or chest pain. Symptoms started gradually and are progressively worsening. Patient is concerned about possible flu and requests guidance on treatment and when to seek further medical attention."
     }
 
     response, success = make_request(

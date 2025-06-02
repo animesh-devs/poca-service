@@ -913,21 +913,8 @@ async def generate_suggested_response(
         # Generate a suggested response using the AI service
         ai_service = get_ai_service()
 
-        # Create a system prompt for the doctor's suggested response
-        doctor_prompt = "You are a medical professional. Based on the patient's summary, provide a thoughtful, professional response. Include possible diagnoses, recommended next steps, and any advice you would give to the patient. Be empathetic and clear."
-
-        context = [
-            {"role": "system", "content": doctor_prompt},
-            {"role": "user", "content": f"Patient summary: {request_data.summary}"}
-        ]
-
-        suggested_response_data = await ai_service.generate_response("Please provide a suggested response to this patient summary.", context)
-
-        # Handle response based on type (similar to other AI endpoints)
-        if isinstance(suggested_response_data, dict):
-            suggested_response = suggested_response_data.get("message", "")
-        else:
-            suggested_response = suggested_response_data
+        # Use the dedicated suggested response method (not the assistant mode)
+        suggested_response = await ai_service.generate_suggested_response(request_data.summary)
 
         # Create a new AI message for the suggested response
         db_message = AIMessage(
