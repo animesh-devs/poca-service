@@ -28,13 +28,14 @@ router = APIRouter()
 @standardize_response
 async def get_case_history(
     patient_id: str,
-    create_if_not_exists: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     user_entity_id: str = Depends(get_user_entity_id)
 ) -> Any:
     """
     Get the most recent case history for a patient
+
+    Returns only existing case history. If no case history exists, returns 404.
 
     This endpoint uses the user_entity_id header to determine which entity (doctor, patient)
     the user is operating as. This simplifies permission checks.
@@ -120,33 +121,8 @@ async def get_case_history(
             CaseHistory.patient_id == patient_id
         ).order_by(CaseHistory.created_at.desc()).first()
 
-        # If no case history exists and create_if_not_exists is True, create one
-        if not case_history and create_if_not_exists:
-            # Create a new case history
-            case_history = CaseHistory(
-                patient_id=patient_id,
-                summary="Patient case history",
-                documents=[]  # Empty document IDs array
-            )
-
-            db.add(case_history)
-            db.flush()  # Flush to get the ID
-
-            # Create a document
-            document = Document(
-                case_history_id=case_history.id,
-                file_name="patient_record.pdf",
-                size=1024,
-                link="https://example.com/documents/patient_record.pdf",
-                uploaded_by=UploadedBy.DOCTOR if is_doctor else (UploadedBy.ADMIN if is_admin else UploadedBy.PATIENT),
-                remark="Patient record"
-            )
-
-            db.add(document)
-            db.commit()
-            db.refresh(case_history)
-            db.refresh(document)
-        elif not case_history:
+        # If no case history exists, return 404
+        if not case_history:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=create_error_response(
@@ -435,7 +411,9 @@ async def get_patient_documents(
     user_entity_id: str = Depends(get_user_entity_id)
 ) -> Any:
     """
-    Get all documents for a patient across all case histories
+    Get all existing documents for a patient across all case histories
+
+    Returns only existing documents. If no case histories or documents exist, returns an empty list.
     """
     try:
         # Check if patient exists
@@ -517,47 +495,6 @@ async def get_patient_documents(
         case_histories = db.query(CaseHistory).filter(
             CaseHistory.patient_id == patient_id
         ).all()
-
-        # If no case histories exist, run the migration to add dummy data
-        if not case_histories:
-            # Run the migration to add dummy case history data
-            from app.db.migrations.add_dummy_case_history_data import run_migration
-            run_migration()
-
-            # Try to get the case histories again
-            case_histories = db.query(CaseHistory).filter(
-                CaseHistory.patient_id == patient_id
-            ).all()
-
-            # If still no case histories, create a new one with a document
-            if not case_histories:
-                # Create a new case history
-                case_history = CaseHistory(
-                    patient_id=patient_id,
-                    summary="Patient case history",
-                    documents=[]  # Empty document IDs array
-                )
-
-                db.add(case_history)
-                db.flush()  # Flush to get the ID
-
-                # Create a document
-                document = Document(
-                    case_history_id=case_history.id,
-                    file_name="patient_record.pdf",
-                    size=1024,
-                    link="https://example.com/documents/patient_record.pdf",
-                    uploaded_by=UploadedBy.DOCTOR,
-                    remark="Patient record"
-                )
-
-                db.add(document)
-                db.commit()
-                db.refresh(case_history)
-                db.refresh(document)
-
-                # Add to case histories
-                case_histories = [case_history]
 
         # Get all documents across all case histories
         all_documents = []
