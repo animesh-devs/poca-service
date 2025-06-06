@@ -9,6 +9,7 @@ from app.db.database import Base
 class UploadedBy(str, enum.Enum):
     DOCTOR = "doctor"
     PATIENT = "patient"
+    ADMIN = "admin"
 
 class CaseHistory(Base):
     __tablename__ = "case_histories"
