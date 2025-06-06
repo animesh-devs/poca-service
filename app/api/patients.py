@@ -594,10 +594,10 @@ async def get_patient_reports(
     user_entity_id: str = Depends(get_user_entity_id)
 ) -> Any:
     """
-    Get all reports for a patient with complete report information including documents
+    Get all existing reports for a patient with complete report information including documents
 
-    Returns the same complete report objects as the get_patient_report endpoint,
-    including description, updated_at, and report_documents with download links.
+    Returns only existing reports for the patient. If no reports exist, returns an empty list.
+    Each report includes description, updated_at, and report_documents with download links.
     """
     try:
         # Check if patient exists
@@ -678,56 +678,6 @@ async def get_patient_reports(
         report_mappings = db.query(PatientReportMapping).filter(
             PatientReportMapping.patient_id == patient_id
         ).all()
-
-        # If no report mappings exist, run the migration to add dummy data
-        if not report_mappings:
-            # Run the migration to add dummy case history data (which also adds reports)
-            from app.db.migrations.add_dummy_case_history_data import run_migration
-            run_migration()
-
-            # Try to get the report mappings again
-            report_mappings = db.query(PatientReportMapping).filter(
-                PatientReportMapping.patient_id == patient_id
-            ).all()
-
-            # If still no report mappings, create a new report and mapping
-            if not report_mappings:
-                # Create a new report
-                report = Report(
-                    title="Patient Health Report",
-                    description="General health assessment",
-                    report_type=ReportType.LAB_TEST
-                )
-
-                db.add(report)
-                db.flush()  # Flush to get the ID
-
-                # Create patient-report mapping
-                mapping = PatientReportMapping(
-                    patient_id=patient_id,
-                    report_id=report.id
-                )
-
-                db.add(mapping)
-
-                # Add a document to the report
-                report_doc = ReportDocument(
-                    report_id=report.id,
-                    file_name="health_report.pdf",
-                    size=2048,
-                    link="https://example.com/reports/health_report.pdf",
-                    uploaded_by=current_user.id,  # User ID who uploaded the document
-                    remark="Health assessment report"
-                )
-
-                db.add(report_doc)
-                db.commit()
-                db.refresh(report)
-                db.refresh(mapping)
-                db.refresh(report_doc)
-
-                # Add to report mappings
-                report_mappings = [mapping]
 
         # Get all reports with complete information
         reports = []

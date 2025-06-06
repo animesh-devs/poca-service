@@ -269,7 +269,6 @@ async def patient_signup(
         gender=patient_data.gender,
         contact=patient_data.contact,
         photo=patient_data.photo
-        # Note: Additional fields like age, blood_group, etc. are stored in the patient's case history
     )
 
     db.add(db_patient)
@@ -306,47 +305,6 @@ async def patient_signup(
     db.add(db_relation)
     db.commit()
     db.refresh(db_relation)
-
-    # Create initial case history with additional patient data if provided
-    if any([
-        patient_data.age, patient_data.blood_group, patient_data.height,
-        patient_data.weight, patient_data.allergies, patient_data.medications,
-        patient_data.conditions, patient_data.emergency_contact_name,
-        patient_data.emergency_contact_number
-    ]):
-        from app.models.case_history import CaseHistory
-
-        # Prepare summary with additional patient data
-        summary_parts = []
-        if patient_data.age:
-            summary_parts.append(f"Age: {patient_data.age}")
-        if patient_data.blood_group:
-            summary_parts.append(f"Blood Group: {patient_data.blood_group}")
-        if patient_data.height:
-            summary_parts.append(f"Height: {patient_data.height} cm")
-        if patient_data.weight:
-            summary_parts.append(f"Weight: {patient_data.weight} kg")
-        if patient_data.allergies:
-            summary_parts.append(f"Allergies: {', '.join(patient_data.allergies)}")
-        if patient_data.medications:
-            summary_parts.append(f"Medications: {', '.join(patient_data.medications)}")
-        if patient_data.conditions:
-            summary_parts.append(f"Conditions: {', '.join(patient_data.conditions)}")
-        if patient_data.emergency_contact_name:
-            summary_parts.append(f"Emergency Contact: {patient_data.emergency_contact_name}")
-        if patient_data.emergency_contact_number:
-            summary_parts.append(f"Emergency Contact Number: {patient_data.emergency_contact_number}")
-
-        summary = "\n".join(summary_parts)
-
-        db_case_history = CaseHistory(
-            patient_id=db_patient.id,
-            summary=summary
-        )
-
-        db.add(db_case_history)
-        db.commit()
-        db.refresh(db_case_history)
 
     # Create access and refresh tokens
     access_token = create_access_token(
