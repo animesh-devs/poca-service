@@ -11,6 +11,7 @@ from app.models.user import User, UserRole
 from app.models.doctor import Doctor
 from app.models.patient import Patient
 from app.models.hospital import Hospital
+from app.models.mapping import UserPatientRelation, RelationType
 from app.schemas.auth import (
     Token, TokenPayload, UserCreate, UserLogin, RefreshToken,
     DoctorSignup, PatientSignup, HospitalSignup, AdminSignup,
@@ -287,9 +288,24 @@ async def patient_signup(
         profile_id=db_patient.id
     )
 
+    # Link the patient to the user
+    db_patient.user_id = db_user.id
+
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
+    db.refresh(db_patient)
+
+    # Create user-patient relation with SELF relation
+    db_relation = UserPatientRelation(
+        user_id=db_user.id,
+        patient_id=db_patient.id,
+        relation=RelationType.SELF
+    )
+
+    db.add(db_relation)
+    db.commit()
+    db.refresh(db_relation)
 
     # Create initial case history with additional patient data if provided
     if any([
