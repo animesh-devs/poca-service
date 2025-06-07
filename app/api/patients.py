@@ -777,14 +777,6 @@ async def create_patient_report(
     """
     Create a new report for a patient
     """
-    logger = logging.getLogger(__name__)
-
-    # Debug: Log the incoming request data
-    logger.info(f"Creating report for patient {patient_id}")
-    logger.info(f"Report data: title='{report_data.title}', description='{report_data.description}', report_type='{report_data.report_type}'")
-    logger.info(f"Document IDs received: {report_data.document_ids}")
-    logger.info(f"Patient ID in request: {report_data.patient_id}")
-
     # Check if user is admin, doctor, or the patient themselves
     is_admin = current_user.role == UserRole.ADMIN
     is_doctor = current_user.role == UserRole.DOCTOR
@@ -847,27 +839,11 @@ async def create_patient_report(
 
     # Process document IDs if provided
     report_documents = []
-    missing_document_ids = []
-
-    logger.info(f"Document IDs check: document_ids={report_data.document_ids}, type={type(report_data.document_ids)}")
-
-    if report_data.document_ids and len(report_data.document_ids) > 0:
-        logger = logging.getLogger(__name__)
-        logger.info(f"Processing {len(report_data.document_ids)} document IDs for report {db_report.id}")
-
-        # Debug: Check what documents exist in the database
-        all_documents = db.query(FileDocument).all()
-        logger.info(f"Total documents in FileDocument table: {len(all_documents)}")
-        for doc in all_documents[:5]:  # Log first 5 documents
-            logger.info(f"Existing document: ID={doc.id}, filename={doc.file_name}, type={doc.document_type}")
-
+    if report_data.document_ids:
         for doc_id in report_data.document_ids:
-            logger.info(f"Looking for document with ID: {doc_id}")
             # Get the document from the FileDocument table
             file_document = db.query(FileDocument).filter(FileDocument.id == doc_id).first()
             if file_document:
-                logger.info(f"Found document {doc_id} in FileDocument table: {file_document.file_name}")
-
                 # Create a report document record
                 report_doc = ReportDocument(
                     report_id=db_report.id,
@@ -885,41 +861,10 @@ async def create_patient_report(
                 file_document.entity_id = db_report.id
                 file_document.document_type = DocumentType.REPORT
 
-                logger.info(f"Created ReportDocument record for document {doc_id}")
-            else:
-                # Track missing documents
-                missing_document_ids.append(doc_id)
-                logger.warning(f"Document with ID {doc_id} not found in FileDocument table")
-
-        # Commit document changes if any documents were processed
         if report_documents:
-            try:
-                db.commit()
-                for doc in report_documents:
-                    db.refresh(doc)
-                logger.info(f"Successfully committed {len(report_documents)} report documents")
-            except Exception as e:
-                logger.error(f"Error committing report documents: {str(e)}")
-                db.rollback()
-                raise
-
-        # Log summary and optionally raise error for missing documents
-        if missing_document_ids:
-            logger.warning(f"Missing document IDs: {missing_document_ids}")
-            # Optionally, you can uncomment the following lines to return an error for missing documents
-            # raise HTTPException(
-            #     status_code=status.HTTP_400_BAD_REQUEST,
-            #     detail=create_error_response(
-            #         status_code=status.HTTP_400_BAD_REQUEST,
-            #         message=f"Documents not found: {missing_document_ids}. Please upload documents first using POST /api/v1/documents/upload",
-            #         error_code=ErrorCode.RES_001
-            #     )
-            # )
-
-        if not report_documents and report_data.document_ids:
-            logger.warning(f"None of the provided document IDs {report_data.document_ids} were found in FileDocument table")
-    else:
-        logger.info("No document IDs provided or document_ids list is empty")
+            db.commit()
+            for doc in report_documents:
+                db.refresh(doc)
 
     # Get all report documents
     all_report_documents = db.query(ReportDocument).filter(

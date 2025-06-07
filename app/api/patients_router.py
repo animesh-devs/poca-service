@@ -27,7 +27,7 @@ async def get_patients(
     Get all patients
     """
     # Only admins and doctors can see all patients
-    if current_user.role not in ["admin", "doctor"]:
+    if current_user.role not in [UserRole.ADMIN, UserRole.DOCTOR]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=create_error_response(
@@ -63,21 +63,21 @@ async def get_patient(
     # If not found, check if it's a user_id and get the profile_id
     if not patient:
         # For admin, check any user ID
-        if current_user.role == "admin":
+        if current_user.role == UserRole.ADMIN:
             user = db.query(User).filter(User.id == patient_id).first()
-            if user and user.role == "patient" and user.profile_id:
+            if user and user.role == UserRole.PATIENT and user.profile_id:
                 patient = db.query(Patient).filter(Patient.id == user.profile_id).first()
         # For patient, check if it's their own user ID
-        elif current_user.role == "patient":
+        elif current_user.role == UserRole.PATIENT:
             if patient_id == current_user.id and current_user.profile_id:
                 patient = db.query(Patient).filter(Patient.id == current_user.profile_id).first()
             # Also allow patient to access their profile directly with profile_id
             elif patient_id == current_user.profile_id:
                 patient = db.query(Patient).filter(Patient.id == current_user.profile_id).first()
         # For doctor, allow access to any patient (doctors need to see patient profiles)
-        elif current_user.role == "doctor":
+        elif current_user.role == UserRole.DOCTOR:
             user = db.query(User).filter(User.id == patient_id).first()
-            if user and user.role == "patient" and user.profile_id:
+            if user and user.role == UserRole.PATIENT and user.profile_id:
                 patient = db.query(Patient).filter(Patient.id == user.profile_id).first()
 
     if not patient:
@@ -98,7 +98,8 @@ async def update_patient(
     patient_id: str,
     patient_data: PatientUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    user_entity_id: str = Depends(get_user_entity_id)
 ) -> Any:
     """
     Update patient profile
@@ -107,9 +108,9 @@ async def update_patient(
     patient = db.query(Patient).filter(Patient.id == patient_id).first()
 
     # If not found, check if it's a user_id and get the profile_id
-    if not patient and current_user.role == "admin":
+    if not patient and current_user.role == UserRole.ADMIN:
         user = db.query(User).filter(User.id == patient_id).first()
-        if user and user.role == "patient" and user.profile_id:
+        if user and user.role == UserRole.PATIENT and user.profile_id:
             patient = db.query(Patient).filter(Patient.id == user.profile_id).first()
             patient_id = user.profile_id  # Update patient_id to the profile_id
 
@@ -123,15 +124,32 @@ async def update_patient(
             )
         )
 
-    # Check if the current user is an admin or the patient being updated
-    is_admin = current_user.role == "admin"
-    is_patient_owner = (
-        current_user.role == "patient" and
-        (current_user.profile_id == patient_id or  # Using profile_id
-         (patient and patient.id == current_user.profile_id))  # Using user_id
-    )
+    # Check if user has access to this patient - using the same pattern as chat APIs
+    if current_user.role == UserRole.ADMIN:
+        # Admins can update any patient
+        pass
+    elif current_user.role == UserRole.PATIENT:
+        # Check if patient has access to this patient using user_entity_id
+        # For patients, we need to check if the user_entity_id is the patient_id
+        # This is because patients can have multiple patient profiles (1:n relationship)
+        if user_entity_id != patient_id:
+            # Check if the user has a relation to this patient
+            relation = db.query(UserPatientRelation).filter(
+                UserPatientRelation.user_id == current_user.id,
+                UserPatientRelation.patient_id == patient_id
+            ).first()
 
-    if not (is_admin or is_patient_owner):
+            if not relation:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=create_error_response(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="Not enough permissions",
+                        error_code=ErrorCode.AUTH_004
+                    )
+                )
+    else:
+        # Other roles (doctor, hospital) don't have update access to patient profiles
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=create_error_response(
