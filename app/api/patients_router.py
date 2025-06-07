@@ -9,7 +9,7 @@ from app.models.hospital import Hospital
 from app.models.mapping import HospitalPatientMapping, DoctorPatientMapping, UserPatientRelation
 from app.schemas.patient import PatientUpdate, PatientResponse, PatientListResponse, PatientListItem
 from app.schemas.hospital import HospitalListItem
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, get_user_entity_id
 from app.errors import ErrorCode, create_error_response
 from app.utils.decorators import standardize_response
 
