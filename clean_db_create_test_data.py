@@ -235,22 +235,10 @@ def create_test_data():
             patient_contact = f"+1777{i}77{i}777"
             patient_address = f"{200+i} Patient St, Patientville"
 
-            # Create patient user
-            patient_user = User(
-                id=patient_user_id,
-                email=patient_email,
-                hashed_password=get_password_hash(patient_password),
-                name=patient_user_name,
-                role=UserRole.PATIENT,
-                contact=patient_contact,
-                address=patient_address,
-                is_active=True
-            )
-            db.add(patient_user)
-
             # Create 2-3 patients for this user
             num_patients = random.randint(2, 3)
             patient_records = []
+            self_patient_id = None  # Track the self patient ID for profile_id
 
             for j in range(num_patients):
                 patient_id = str(uuid.uuid4())
@@ -270,6 +258,7 @@ def create_test_data():
                 # Create patient profile
                 patient = Patient(
                     id=patient_id,
+                    user_id=patient_user_id,  # Link patient to user
                     name=patient_name,
                     dob=patient_dob,
                     gender=gender,
@@ -289,6 +278,10 @@ def create_test_data():
                 )
                 db.add(relation)
 
+                # Track the self patient ID for setting profile_id
+                if relation_type == RelationType.SELF:
+                    self_patient_id = patient_id
+
                 patient_info = {
                     "id": patient_id,
                     "name": patient_name,
@@ -303,6 +296,27 @@ def create_test_data():
                 }
 
                 patient_records.append(patient_info)
+
+            # Create patient user with profile_id set to self patient ID
+            patient_user = User(
+                id=patient_user_id,
+                email=patient_email,
+                hashed_password=get_password_hash(patient_password),
+                name=patient_user_name,
+                role=UserRole.PATIENT,
+                contact=patient_contact,
+                address=patient_address,
+                profile_id=self_patient_id,  # Set profile_id to self patient ID
+                is_active=True
+            )
+            db.add(patient_user)
+
+            # Now continue with the rest of the patient processing loop
+            for j in range(num_patients):
+                patient_info = patient_records[j]
+                patient_id = patient_info["id"]
+                patient_name = patient_info["name"]
+                patient_first_name = patient_info["first_name"]
 
                 # Map patients to hospitals and doctors
                 # Map to either hospital

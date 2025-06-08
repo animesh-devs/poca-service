@@ -167,16 +167,25 @@ try:
         patient_user_id = str(uuid.uuid4())
         patient_password = 'patient123'
         patient_hashed_password = pwd_context.hash(patient_password)
-        cursor.execute(
-            'INSERT INTO users (id, email, hashed_password, name, role, is_active) VALUES (?, ?, ?, ?, ?, ?)',
-            (patient_user_id, 'patient@example.com', patient_hashed_password, 'Test Patient', 'PATIENT', 1)
-        )
 
-        # Create patient record
+        # Create patient record first
         patient_id = patient_user_id
         cursor.execute(
-            'INSERT INTO patients (id, name, dob, gender, contact) VALUES (?, ?, ?, ?, ?)',
-            (patient_id, 'Test Patient', '1990-01-01', 'male', '1234567890')
+            'INSERT INTO patients (id, user_id, name, dob, gender, contact) VALUES (?, ?, ?, ?, ?, ?)',
+            (patient_id, patient_user_id, 'Test Patient', '1990-01-01', 'male', '1234567890')
+        )
+
+        # Create user with profile_id set to patient_id
+        cursor.execute(
+            'INSERT INTO users (id, email, hashed_password, name, role, profile_id, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            (patient_user_id, 'patient@example.com', patient_hashed_password, 'Test Patient', 'PATIENT', patient_id, 1)
+        )
+
+        # Create user-patient self relation
+        relation_id = str(uuid.uuid4())
+        cursor.execute(
+            'INSERT INTO user_patient_relations (id, user_id, patient_id, relation) VALUES (?, ?, ?, ?)',
+            (relation_id, patient_user_id, patient_id, 'self')
         )
 
         print(f'Created patient user and record: patient@example.com / {patient_password}')

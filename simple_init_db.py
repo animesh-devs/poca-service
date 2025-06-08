@@ -14,7 +14,7 @@ from app.models.user import User, UserRole
 from app.models.doctor import Doctor
 from app.models.patient import Patient
 from app.models.hospital import Hospital
-from app.models.mapping import HospitalDoctorMapping, HospitalPatientMapping, DoctorPatientMapping
+from app.models.mapping import HospitalDoctorMapping, HospitalPatientMapping, DoctorPatientMapping, UserPatientRelation, RelationType
 from app.models.chat import Chat
 from app.models.ai import AISession, AIMessage
 
@@ -119,6 +119,18 @@ def create_test_data():
             profile_id=patient.id
         )
         db.add(patient_user)
+
+        # Link patient to user
+        patient.user_id = patient_user.id
+
+        # Create user-patient self relation
+        user_patient_relation = UserPatientRelation(
+            id=str(uuid4()),
+            user_id=patient_user.id,
+            patient_id=patient.id,
+            relation=RelationType.SELF
+        )
+        db.add(user_patient_relation)
 
         # Create mappings
         hospital_doctor_mapping = HospitalDoctorMapping(
