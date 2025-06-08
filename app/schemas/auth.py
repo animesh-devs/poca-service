@@ -10,6 +10,7 @@ class TokenData(BaseModel):
     token_type: str = "bearer"
     user_id: str
     role: UserRole
+    profile_id: Optional[str] = None
 
 class Token(BaseModel):
     status_code: int = 200

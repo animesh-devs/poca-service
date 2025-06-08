@@ -34,12 +34,15 @@ All API responses in the POCA Service follow a standardized format:
     "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "token_type": "bearer",
     "user_id": "72530021-8af3-43cc-bc26-38255c6ed17d",
-    "role": "admin"
+    "role": "patient",
+    "profile_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
   }
 }
 ```
 
-### Example 2: Get User Profile Response
+**Note**: The `profile_id` field is included in authentication responses and contains the entity ID for the user's role (patient ID for patients, doctor ID for doctors, hospital ID for hospitals, null for admins).
+
+### Example 2: Get User Profile Response (Admin)
 
 ```json
 {
@@ -53,11 +56,37 @@ All API responses in the POCA Service follow a standardized format:
     "role": "admin",
     "contact": "+1234567890",
     "address": "123 Admin St, Adminville, USA",
+    "profile_id": null,
+    "is_active": true,
     "created_at": "2023-05-01T12:00:00Z",
     "updated_at": "2023-05-01T12:00:00Z"
   }
 }
 ```
+
+### Example 2b: Get User Profile Response (Patient)
+
+```json
+{
+  "status_code": 200,
+  "status": true,
+  "message": "successful",
+  "data": {
+    "id": "72530021-8af3-43cc-bc26-38255c6ed17d",
+    "name": "John Doe",
+    "email": "patient@example.com",
+    "role": "patient",
+    "contact": "+1234567890",
+    "address": "123 Patient St, Patientville, USA",
+    "profile_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "is_active": true,
+    "created_at": "2023-05-01T12:00:00Z",
+    "updated_at": "2023-05-01T12:00:00Z"
+  }
+}
+```
+
+**Note**: For users with patient role, the `profile_id` field contains the patient entity ID, which is the same as the patient ID with self-relation. This allows direct access to the patient entity using the profile_id.
 
 ### Example 3: Document Upload Response
 

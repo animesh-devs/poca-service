@@ -86,7 +86,8 @@ async def signup(
         "refresh_token": refresh_token,
         "token_type": "bearer",
         "user_id": db_user.id,
-        "role": db_user.role
+        "role": db_user.role,
+        "profile_id": db_user.profile_id  # Include profile_id in response
     }
 
     return {
@@ -161,7 +162,8 @@ async def admin_signup(
         "refresh_token": refresh_token,
         "token_type": "bearer",
         "user_id": db_user.id,
-        "role": db_user.role
+        "role": db_user.role,
+        "profile_id": db_user.profile_id  # Include profile_id in response
     }
 
     return {
@@ -232,7 +234,8 @@ async def doctor_signup(
         "refresh_token": refresh_token,
         "token_type": "bearer",
         "user_id": db_user.id,
-        "role": db_user.role
+        "role": db_user.role,
+        "profile_id": db_user.profile_id  # Include profile_id in response
     }
 
     return {
@@ -249,84 +252,96 @@ async def patient_signup(
 ) -> Any:
     """
     Create a new patient account
+    For users with patient role, the profile_id is set as the patient ID with self-relation
     """
-    # Check if user with this email already exists
-    db_user = db.query(User).filter(User.email == patient_data.email).first()
-    if db_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=create_error_response(
+    try:
+        # Check if user with this email already exists
+        db_user = db.query(User).filter(User.email == patient_data.email).first()
+        if db_user:
+            raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                message="Email already registered",
-                error_code=ErrorCode.RES_002
+                detail=create_error_response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message="Email already registered",
+                    error_code=ErrorCode.RES_002
+                )
             )
+
+        # Create patient profile first
+        db_patient = Patient(
+            name=patient_data.name,
+            dob=patient_data.dob,
+            gender=patient_data.gender,
+            contact=patient_data.contact,
+            photo=patient_data.photo
         )
 
-    # Create patient profile
-    db_patient = Patient(
-        name=patient_data.name,
-        dob=patient_data.dob,
-        gender=patient_data.gender,
-        contact=patient_data.contact,
-        photo=patient_data.photo
-    )
+        db.add(db_patient)
+        db.flush()  # Flush to get the patient ID
 
-    db.add(db_patient)
-    db.commit()
-    db.refresh(db_patient)
+        # Create user account with profile_id set to patient ID
+        hashed_password = get_password_hash(patient_data.password)
+        db_user = User(
+            email=patient_data.email,
+            hashed_password=hashed_password,
+            name=patient_data.name,
+            role=UserRole.PATIENT,
+            contact=patient_data.contact,
+            address=patient_data.address,
+            profile_id=db_patient.id  # Set profile_id as patient ID
+        )
 
-    # Create user account
-    hashed_password = get_password_hash(patient_data.password)
-    db_user = User(
-        email=patient_data.email,
-        hashed_password=hashed_password,
-        name=patient_data.name,
-        role=UserRole.PATIENT,
-        contact=patient_data.contact,
-        address=patient_data.address,
-        profile_id=db_patient.id
-    )
+        db.add(db_user)
+        db.flush()  # Flush to get the user ID
 
-    # Link the patient to the user
-    db_patient.user_id = db_user.id
+        # Link the patient to the user
+        db_patient.user_id = db_user.id
 
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    db.refresh(db_patient)
+        # Create user-patient relation with SELF relation
+        db_relation = UserPatientRelation(
+            user_id=db_user.id,
+            patient_id=db_patient.id,
+            relation=RelationType.SELF
+        )
 
-    # Create user-patient relation with SELF relation
-    db_relation = UserPatientRelation(
-        user_id=db_user.id,
-        patient_id=db_patient.id,
-        relation=RelationType.SELF
-    )
+        db.add(db_relation)
+        db.commit()
+        db.refresh(db_user)
+        db.refresh(db_patient)
+        db.refresh(db_relation)
 
-    db.add(db_relation)
-    db.commit()
-    db.refresh(db_relation)
+        # Create access and refresh tokens
+        access_token = create_access_token(
+            data={"sub": db_user.id},
+            expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        )
+        refresh_token = create_refresh_token(data={"sub": db_user.id})
 
-    # Create access and refresh tokens
-    access_token = create_access_token(
-        data={"sub": db_user.id},
-        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
-    refresh_token = create_refresh_token(data={"sub": db_user.id})
+        token_data = {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+            "user_id": db_user.id,
+            "role": db_user.role,
+            "profile_id": db_user.profile_id  # Include profile_id in response
+        }
 
-    token_data = {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-        "user_id": db_user.id,
-        "role": db_user.role
-    }
-
-    return {
-        "status_code": status.HTTP_201_CREATED,
-        "status": True,
-        "message": "Patient account created successfully",
-        "data": token_data
-    }
+        return {
+            "status_code": status.HTTP_201_CREATED,
+            "status": True,
+            "message": "Patient account created successfully",
+            "data": token_data
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=create_error_response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred: {str(e)}",
+                error_code=ErrorCode.SRV_001
+            )
+        )
 
 @router.post("/hospital-signup", response_model=Token)
 async def hospital_signup(
@@ -399,7 +414,8 @@ async def hospital_signup(
             "refresh_token": refresh_token,
             "token_type": "bearer",
             "user_id": db_user.id,
-            "role": db_user.role
+            "role": db_user.role,
+            "profile_id": db_user.profile_id  # Include profile_id in response
         }
 
         return {
@@ -531,7 +547,8 @@ async def login(
         "refresh_token": refresh_token,
         "token_type": "bearer",
         "user_id": user.id,
-        "role": user.role
+        "role": user.role,
+        "profile_id": user.profile_id  # Include profile_id in response
     }
 
     return {
@@ -635,7 +652,8 @@ async def refresh_token(
             "refresh_token": refresh_data.refresh_token,
             "token_type": "bearer",
             "user_id": user.id,
-            "role": user.role
+            "role": user.role,
+            "profile_id": user.profile_id  # Include profile_id in response
         }
 
         return {
