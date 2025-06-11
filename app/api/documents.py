@@ -12,7 +12,7 @@ from app.schemas.document import FileDocumentCreate, FileDocumentResponse, FileD
 from app.dependencies import get_current_user
 from app.errors import create_error_response, ErrorCode
 from app.services.document_storage import document_storage
-from app.services.document_access import document_access_control
+# Removed document_access_control import - no longer using access control
 from app.config import settings
 from app.utils.decorators import standardize_response
 from app.utils.document_utils import enhance_file_document
@@ -103,11 +103,10 @@ async def upload_document(
 @standardize_response
 async def get_document(
     document_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_db)
 ) -> Any:
     """
-    Get document metadata by ID with access control
+    Get document metadata by ID - Open access for everyone
     """
     document = db.query(FileDocument).filter(FileDocument.id == document_id).first()
     if not document:
@@ -120,16 +119,7 @@ async def get_document(
             )
         )
 
-    # Check access permissions
-    if not document_access_control.can_access_document(current_user, document, db):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=create_error_response(
-                status_code=status.HTTP_403_FORBIDDEN,
-                message="Access denied. You don't have permission to access this document.",
-                error_code=ErrorCode.AUTH_003
-            )
-        )
+    # No access control - everyone can access document metadata
 
     # Enhance document with download link
     enhanced_document = enhance_file_document(document)
@@ -139,14 +129,13 @@ async def get_document(
 @router.get("/{document_id}/download")
 async def download_document(
     document_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_db)
 ) -> StreamingResponse:
     """
-    Download a document by ID with access control
+    Download a document by ID - Open access for everyone
 
     Returns the actual file content as a streaming response.
-    Access is controlled based on user roles and relationships.
+    No authentication or access control required.
     """
     # Get document metadata from database
     document = db.query(FileDocument).filter(FileDocument.id == document_id).first()
@@ -160,16 +149,7 @@ async def download_document(
             )
         )
 
-    # Check access permissions
-    if not document_access_control.can_access_document(current_user, document, db):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=create_error_response(
-                status_code=status.HTTP_403_FORBIDDEN,
-                message="Access denied. You don't have permission to access this document.",
-                error_code=ErrorCode.AUTH_003
-            )
-        )
+    # No access control - everyone can download documents
 
     # Get document content from storage
     document_data = document_storage.get_document(document_id)
@@ -270,14 +250,14 @@ temp_download_tokens = {}
 @standardize_response
 async def create_download_token(
     document_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_db)
 ) -> Any:
     """
-    Create a temporary download token for a document
+    Create a temporary download token for a document - Open access for everyone
 
     This allows frontend applications to generate temporary download links
     that can be used in browsers without requiring Authorization headers.
+    No authentication required.
     """
     # Check if document exists
     document = db.query(FileDocument).filter(FileDocument.id == document_id).first()
@@ -291,16 +271,7 @@ async def create_download_token(
             )
         )
 
-    # Check access permissions
-    if not document_access_control.can_access_document(current_user, document, db):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=create_error_response(
-                status_code=status.HTTP_403_FORBIDDEN,
-                message="Access denied. You don't have permission to access this document.",
-                error_code=ErrorCode.AUTH_003
-            )
-        )
+    # No access control - everyone can create download tokens
 
     # Generate temporary token (valid for 1 hour)
     temp_token = secrets.token_urlsafe(32)
@@ -310,7 +281,7 @@ async def create_download_token(
     expiry = datetime.utcnow() + timedelta(hours=1)
     temp_download_tokens[temp_token] = {
         "document_id": document_id,
-        "user_id": current_user.id,
+        "user_id": "anonymous",  # No user authentication required
         "expires_at": expiry
     }
 

@@ -169,15 +169,17 @@ GET /api/v1/chats/{chat_id}/messages
 ```
 Messages with attachments include `download_link` in `file_details`.
 
-## 🔒 Access Control Rules
+## 🔓 Access Control Rules
 
-Documents can be accessed by:
+**Document downloads are now open access - no authentication required!**
 
-1. **Admin users**: Can access any document
-2. **Document uploaders**: Can access documents they uploaded
-3. **Patients**: Can access documents uploaded by their treating doctors
-4. **Doctors**: Can access documents uploaded by their patients and colleague doctors treating the same patients
-5. **Relationship-based access**: Uses doctor-patient mappings to determine permissions
+The following endpoints are publicly accessible:
+- `GET /api/v1/documents/{document_id}/download` - Direct download (no auth required)
+- `GET /api/v1/documents/{document_id}` - Document metadata (no auth required)
+- `POST /api/v1/documents/{document_id}/download-token` - Create download token (no auth required)
+- `GET /api/v1/documents/download-with-token?token={token}` - Download with token (no auth required)
+
+**Note**: Document upload and other management operations still require authentication.
 
 ## 🌐 Frontend Integration Best Practices
 
