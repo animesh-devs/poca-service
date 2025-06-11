@@ -441,9 +441,9 @@ async def hospital_signup(
 # Track failed login attempts: {email: [(timestamp, ip_address), ...]}
 failed_login_attempts = {}
 # Max failed attempts before temporary lockout
-MAX_FAILED_ATTEMPTS = 5
+MAX_FAILED_ATTEMPTS = 50
 # Lockout duration in minutes
-LOCKOUT_DURATION_MINUTES = 15
+LOCKOUT_DURATION_MINUTES = 1
 
 logger = logging.getLogger(__name__)
 
