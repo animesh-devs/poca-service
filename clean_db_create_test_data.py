@@ -385,30 +385,6 @@ def create_test_data():
                         "is_active_for_patient": True
                     })
 
-                    # Create some initial messages for the chat
-                    doctor_message_id = str(uuid.uuid4())
-                    doctor_message = Message(
-                        id=doctor_message_id,
-                        chat_id=chat_id,
-                        sender_id=doctor.id,
-                        receiver_id=patient_id,
-                        message=f"Hello {patient_first_name}, how can I help you today?",
-                        message_type=MessageType.TEXT,
-                        is_read=True
-                    )
-                    db.add(doctor_message)
-
-                    patient_message_id = str(uuid.uuid4())
-                    patient_message = Message(
-                        id=patient_message_id,
-                        chat_id=chat_id,
-                        sender_id=patient_id,
-                        receiver_id=doctor.id,
-                        message=f"Hi Dr. {last_names[doctor_idx]}, I've been having some symptoms I'd like to discuss.",
-                        message_type=MessageType.TEXT,
-                        is_read=False
-                    )
-                    db.add(patient_message)
 
                     # Create an AI session for some chats (every other chat)
                     if (i + j) % 2 == 0:
@@ -430,25 +406,8 @@ def create_test_data():
                         })
 
                         # Create some AI messages
-                        ai_message_id = str(uuid.uuid4())
-                        ai_message = AIMessage(
-                            id=ai_message_id,
-                            session_id=ai_session_id,
-                            message="What symptoms have you been experiencing?",
-                            response="I've been analyzing your symptoms and have some initial thoughts to share with your doctor.",
-                            is_summary=False
-                        )
-                        db.add(ai_message)
 
                         ai_summary_id = str(uuid.uuid4())
-                        ai_summary = AIMessage(
-                            id=ai_summary_id,
-                            session_id=ai_session_id,
-                            message="Can you provide a summary of my condition?",
-                            response=f"Based on our conversation, {patient_first_name} has been experiencing symptoms that may indicate a minor condition. Recommend further evaluation by Dr. {last_names[doctor_idx]}.",
-                            is_summary=True
-                        )
-                        db.add(ai_summary)
 
                         # Store AI message information
                         credentials["ai_messages"].append({
