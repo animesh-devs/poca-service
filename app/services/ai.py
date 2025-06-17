@@ -192,6 +192,9 @@ class OpenAIService(AIService):
         try:
             # System prompt for doctor's suggested response
             doctor_prompt = """
+
+            Mkae what ever chanegs you want here
+
             You are an experienced medical professional providing a suggested response to a colleague based on a patient summary.
 
             Based on the patient summary provided, generate a thoughtful, professional medical response that includes:
