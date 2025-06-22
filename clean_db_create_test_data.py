@@ -43,7 +43,6 @@ from app.models.chat import Chat, Message, MessageType
 from app.models.ai import AISession, AIMessage
 from app.models.document import FileDocument, DocumentType, UploadedBy
 from app.api.auth import get_password_hash
-from app.services.document_storage import document_storage
 from app.config import settings
 
 # Store credentials and entity information for output
@@ -60,54 +59,76 @@ credentials = {
     "ai_messages": []
 }
 
-def upload_profile_photo(photo_path: str, admin_user_id: str, db) -> str:
-    """Upload a profile photo and return the download link"""
+def create_profile_photo_record(photo_filename: str, admin_user_id: str, db) -> str:
+    """Create a database record for a profile photo using environment-based URL"""
     try:
-        # Read the photo file
-        with open(photo_path, 'rb') as f:
-            file_content = f.read()
+        # Create a predictable document ID based on filename
+        import hashlib
+        photo_hash = hashlib.md5(photo_filename.encode()).hexdigest()
+        storage_id = f"profile-{photo_hash}"
 
-        # Get filename from path
-        filename = os.path.basename(photo_path)
+        # Get the public base URL from environment variable or use default
+        public_base_url = os.getenv("PUBLIC_BASE_URL", settings.PUBLIC_BASE_URL)
 
-        # Determine content type based on file extension
-        if filename.lower().endswith('.png'):
-            content_type = 'image/png'
-        elif filename.lower().endswith('.jpg') or filename.lower().endswith('.jpeg'):
-            content_type = 'image/jpeg'
-        else:
-            content_type = 'image/png'  # default
+        # Create downloadable link using the public base URL from environment
+        download_link = f"{public_base_url}{settings.API_V1_PREFIX}/documents/{storage_id}/download"
 
-        # Store document in memory storage
-        storage_id = document_storage.store_document(
-            file_content=file_content,
-            filename=filename,
-            content_type=content_type
-        )
+        # Check if document already exists
+        existing_doc = db.query(FileDocument).filter(FileDocument.id == storage_id).first()
+        if existing_doc:
+            # Update the link in case the PUBLIC_BASE_URL has changed
+            if existing_doc.link != download_link:
+                existing_doc.link = download_link
+                db.flush()
+                logger.info(f"Updated profile photo URL: {photo_filename} -> {download_link}")
+            else:
+                logger.info(f"Profile photo record already exists: {photo_filename} -> {download_link}")
+            return download_link
 
-        # Create downloadable link using the public base URL
-        download_link = f"{settings.PUBLIC_BASE_URL}{settings.API_V1_PREFIX}/documents/{storage_id}/download"
+        # Try to find the photo file in possible locations
+        possible_paths = [
+            os.path.join('data', 'doctor profile photos', photo_filename),
+            os.path.join('data', 'patient profile photos', photo_filename),
+            os.path.join('..', 'data', 'doctor profile photos', photo_filename),
+            os.path.join('..', 'data', 'patient profile photos', photo_filename),
+            photo_filename  # Just the filename in current directory
+        ]
+
+        photo_path = None
+        file_size = 0
+
+        for path in possible_paths:
+            if os.path.exists(path):
+                photo_path = path
+                file_size = os.path.getsize(path)
+                break
+
+        if not photo_path:
+            logger.warning(f"Profile photo file not found: {photo_filename}")
+            # Use a placeholder URL that works on any server
+            return f"https://via.placeholder.com/150x150/cccccc/666666?text={photo_filename.split('.')[0]}"
 
         # Create document record in database
         db_document = FileDocument(
-            id=storage_id,  # Use the storage ID as the document ID
-            file_name=filename,
-            size=len(file_content),
+            id=storage_id,
+            file_name=photo_filename,
+            size=file_size,
             link=download_link,
             document_type=DocumentType.OTHER,
             uploaded_by=admin_user_id,
             uploaded_by_role=UploadedBy.ADMIN,
-            remark="Profile photo uploaded during test data creation",
+            remark=f"Profile photo for test data - Path: {photo_path}",
             entity_id=None
         )
         db.add(db_document)
+        db.flush()
 
-        logger.info(f"Uploaded profile photo: {filename} -> {download_link}")
+        logger.info(f"Created profile photo record: {photo_filename} -> {download_link} (Path: {photo_path})")
         return download_link
 
     except Exception as e:
-        logger.error(f"Failed to upload profile photo {photo_path}: {e}")
-        return f"https://example.com/default-profile.jpg"  # fallback
+        logger.error(f"Failed to create profile photo record {photo_filename}: {e}")
+        return f"https://via.placeholder.com/150x150/cccccc/666666?text={photo_filename.split('.')[0]}"
 
 def clean_db():
     """Drop all tables and recreate them"""
@@ -230,10 +251,9 @@ def create_test_data():
             doctor_contact = f"+91-98765-{43210 + i}"
             doctor_details = f"Experienced {doctor_specialty} with {doctor_experience} years of practice in maternal and child healthcare"
 
-            # Upload doctor profile photo based on specialty
+            # Create doctor profile photo record based on specialty
             photo_file = doctor_photo_files[doctor_specialty]
-            photo_path = os.path.join('data', 'doctor profile photos', photo_file)
-            doctor_photo_url = upload_profile_photo(photo_path, admin_id, db)
+            doctor_photo_url = create_profile_photo_record(photo_file, admin_id, db)
 
             # Create doctor profile
             doctor = Doctor(
@@ -333,8 +353,7 @@ def create_test_data():
             else:
                 photo_file = patient_photo_files['male'][i % len(patient_photo_files['male'])]
 
-            photo_path = os.path.join('data', 'patient profile photos', photo_file)
-            patient_photo_url = upload_profile_photo(photo_path, admin_id, db)
+            patient_photo_url = create_profile_photo_record(photo_file, admin_id, db)
 
             # Create patient profile
             patient = Patient(

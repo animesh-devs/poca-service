@@ -42,6 +42,13 @@ patch_passlib_bcrypt()
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
+# Load profile photos into memory storage on startup
+try:
+    from app.startup.profile_photos import load_profile_photos_into_storage
+    load_profile_photos_into_storage()
+except Exception as e:
+    logging.getLogger(__name__).warning(f"Failed to load profile photos on startup: {e}")
+
 # Create FastAPI app
 app = FastAPI(
     title=settings.PROJECT_NAME,
