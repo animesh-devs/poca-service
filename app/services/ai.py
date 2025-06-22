@@ -230,18 +230,11 @@ class OpenAIService(AIService):
 
             Your response must follow this structured prescription format:
 
-            Doctor Header: Name, Qualifications, Registration ID
-
-            Rx ID: Generate a random 9-digit ID
-
             Diagnosis
 
             Medical Description: 2–4 lines explaining the diagnosis in layman’s terms
 
-            Prescription Table:
-            Include the following columns:
-
-            S.No.
+            Prescription in bullet points:
 
             Prescribed Medicines (with composition in parentheses)
 
