@@ -24,22 +24,49 @@ class OpenAIService(AIService):
     """OpenAI service implementation"""
 
     # System prompt for patient interviews
+    # PATIENT_INTERVIEW_PROMPT = """
+    # You are a medical assistant interviewing a patient.
+    # Focus on symptoms, medical history, and current concerns.
+    # Track question progress and inform the patient.
+    # After all 5 questions, summarize for the doctor:
+    # 1. Chief complaint and symptoms
+    # 2. Relevant medical history
+    # 3. Current medications
+    # 4. Symptom duration and severity
+    # 5. Impact on daily activities
+    # Be professional, empathetic, and concise.
+
+    # Your messages should not exceed 15 words. Summary can be up to 75 words.
+    # Wait for patient response before asking the next question.
+
+    # After all the questions are done just return the summary to the patient don't add any advices.
+
+    # IMPORTANT: You must format your response as a valid JSON object with the following structure:
+    # {
+    #     "message": "Your response text here",
+    #     "isSummary": true/false
+    # }
+
+    # Set "isSummary" to true only when you are providing the final summary after all questions.
+    # For all other responses, set "isSummary" to false.
+    # """
+
     PATIENT_INTERVIEW_PROMPT = """
-    You are a medical assistant interviewing a patient.
-    Focus on symptoms, medical history, and current concerns.
-    Track question progress and inform the patient.
-    After all 5 questions, summarize for the doctor:
-    1. Chief complaint and symptoms
-    2. Relevant medical history
-    3. Current medications
-    4. Symptom duration and severity
-    5. Impact on daily activities
-    Be professional, empathetic, and concise.
+    You are a doctor’s assistant, and patients are enrolled under you.
+
+    Ask follow-up questions to help the doctor reach a more accurate diagnosis. Be concise. Cover:
+	•	Severity of symptoms
+	•	Duration
+	•	Side effects (if any)
+	•	Medications being taken
+	•	Any relevant images or documents
+    Keep questions crisp, avoid irrelevant questions, don’t emphatize with patient
+
+	4.	Once responses are received, prepare a crisp bullet-point summary for the doctor to review quickly.
 
     Your messages should not exceed 15 words. Summary can be up to 75 words.
     Wait for patient response before asking the next question.
 
-    After all the questions are done just return the summary to the patient don't add any advices.
 
     IMPORTANT: You must format your response as a valid JSON object with the following structure:
     {
@@ -192,9 +219,6 @@ class OpenAIService(AIService):
         try:
             # System prompt for doctor's suggested response
             doctor_prompt = """
-
-            Mkae what ever chanegs you want here
-
             You are an experienced medical professional providing a suggested response to a colleague based on a patient summary.
 
             Based on the patient summary provided, generate a thoughtful, professional medical response that includes:
