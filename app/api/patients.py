@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import Any, List
+import logging
 
 from app.db.database import get_db
 from app.models.user import User, UserRole
@@ -13,6 +14,7 @@ from app.models.document import FileDocument, DocumentType
 from app.schemas.patient import PatientResponse, AdminPatientCreate
 from app.schemas.case_history import CaseHistoryCreate, CaseHistoryUpdate, CaseHistoryResponse, DocumentResponse
 from app.schemas.report import ReportCreate, ReportUpdate, ReportResponse, ReportDocumentResponse
+from app.services.document_processor import document_processor
 from app.utils.document_utils import enhance_case_history_documents, enhance_report_documents
 from app.utils.decorators import standardize_response
 from app.dependencies import get_current_user, get_admin_user, get_user_entity_id
@@ -21,6 +23,7 @@ from app.errors import ErrorCode, create_error_response
 import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 
@@ -231,10 +234,24 @@ async def create_case_history(
             )
         )
 
-    # Create new case history
+    # Generate AI-enhanced summary if documents are provided
+    enhanced_summary = case_history_data.summary
+    if case_history_data.documents and case_history_data.summary:
+        try:
+            logger.info(f"Generating AI-enhanced summary for {len(case_history_data.documents)} documents")
+            enhanced_summary = await document_processor.generate_case_history_summary(
+                document_ids=case_history_data.documents,
+                user_summary=case_history_data.summary
+            )
+            logger.info("AI-enhanced summary generated successfully")
+        except Exception as e:
+            logger.error(f"Failed to generate AI summary, using original: {e}")
+            enhanced_summary = case_history_data.summary
+
+    # Create new case history with enhanced summary
     db_case_history = CaseHistory(
         patient_id=patient_id,
-        summary=case_history_data.summary,
+        summary=enhanced_summary,
         documents=case_history_data.documents or []  # Store document IDs as JSON array
     )
 
@@ -373,9 +390,25 @@ async def update_case_history(
             )
         )
 
+    # Generate AI-enhanced summary if both summary and documents are being updated
+    enhanced_summary = case_history_data.summary
+    if (case_history_data.summary is not None and
+        case_history_data.documents is not None and
+        case_history_data.documents):
+        try:
+            logger.info(f"Generating AI-enhanced summary for updated case history with {len(case_history_data.documents)} documents")
+            enhanced_summary = await document_processor.generate_case_history_summary(
+                document_ids=case_history_data.documents,
+                user_summary=case_history_data.summary
+            )
+            logger.info("AI-enhanced summary generated successfully for update")
+        except Exception as e:
+            logger.error(f"Failed to generate AI summary for update, using original: {e}")
+            enhanced_summary = case_history_data.summary
+
     # Update case history fields
     if case_history_data.summary is not None:
-        case_history.summary = case_history_data.summary
+        case_history.summary = enhanced_summary
 
     if case_history_data.documents is not None:
         case_history.documents = case_history_data.documents
