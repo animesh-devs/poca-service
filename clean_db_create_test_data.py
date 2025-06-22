@@ -41,7 +41,10 @@ from app.models.mapping import (
 )
 from app.models.chat import Chat, Message, MessageType
 from app.models.ai import AISession, AIMessage
+from app.models.document import FileDocument, DocumentType, UploadedBy
 from app.api.auth import get_password_hash
+from app.services.document_storage import document_storage
+from app.config import settings
 
 # Store credentials and entity information for output
 credentials = {
@@ -57,6 +60,55 @@ credentials = {
     "ai_messages": []
 }
 
+def upload_profile_photo(photo_path: str, admin_user_id: str, db) -> str:
+    """Upload a profile photo and return the download link"""
+    try:
+        # Read the photo file
+        with open(photo_path, 'rb') as f:
+            file_content = f.read()
+
+        # Get filename from path
+        filename = os.path.basename(photo_path)
+
+        # Determine content type based on file extension
+        if filename.lower().endswith('.png'):
+            content_type = 'image/png'
+        elif filename.lower().endswith('.jpg') or filename.lower().endswith('.jpeg'):
+            content_type = 'image/jpeg'
+        else:
+            content_type = 'image/png'  # default
+
+        # Store document in memory storage
+        storage_id = document_storage.store_document(
+            file_content=file_content,
+            filename=filename,
+            content_type=content_type
+        )
+
+        # Create downloadable link using the public base URL
+        download_link = f"{settings.PUBLIC_BASE_URL}{settings.API_V1_PREFIX}/documents/{storage_id}/download"
+
+        # Create document record in database
+        db_document = FileDocument(
+            id=storage_id,  # Use the storage ID as the document ID
+            file_name=filename,
+            size=len(file_content),
+            link=download_link,
+            document_type=DocumentType.OTHER,
+            uploaded_by=admin_user_id,
+            uploaded_by_role=UploadedBy.ADMIN,
+            remark="Profile photo uploaded during test data creation",
+            entity_id=None
+        )
+        db.add(db_document)
+
+        logger.info(f"Uploaded profile photo: {filename} -> {download_link}")
+        return download_link
+
+    except Exception as e:
+        logger.error(f"Failed to upload profile photo {photo_path}: {e}")
+        return f"https://example.com/default-profile.jpg"  # fallback
+
 def clean_db():
     """Drop all tables and recreate them"""
     logger.info("Initializing database...")
@@ -65,7 +117,7 @@ def clean_db():
     logger.info("Database initialized successfully.")
 
 def create_test_data():
-    """Create test data with 2 hospitals, 4 users, 2-3 patients per user, and 4-5 doctors"""
+    """Create test data with 2 hospitals, 5 patients with Indian names, and 5 doctors with specific specialties"""
     # Get database session
     db = next(get_db())
 
@@ -145,11 +197,26 @@ def create_test_data():
                 "contact": hospital_contact
             })
 
-        # Create 5 doctors
+        # Profile photo mapping for patients based on gender
+        patient_photo_files = {
+            'female': ['female1.png', 'female2.png', 'female3.png'],
+            'male': ['male1.png', 'male2.png']
+        }
+
+        # Create 5 doctors with Indian names and specific specialties
         doctors = []
-        specialties = ["Cardiologist", "Neurologist", "Pediatrician", "Orthopedic Surgeon", "General Practitioner"]
-        first_names = ['John', 'Sarah', 'Michael', 'Emily', 'David']
-        last_names = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones']
+        specialties = ["Pediatrician", "Gynecologist", "Dietitian", "Physiotherapist", "Lactation Expert"]
+        first_names = ['Rajesh', 'Priya', 'Amit', 'Kavya', 'Suresh']
+        last_names = ['Sharma', 'Patel', 'Kumar', 'Reddy', 'Singh']
+
+        # Doctor profile photo mapping based on specialty
+        doctor_photo_files = {
+            "Pediatrician": "pediatrist.png",
+            "Gynecologist": "gynocologist.png",
+            "Dietitian": "dietitian.png",
+            "Physiotherapist": "physiotharapist.png",
+            "Lactation Expert": "lactation.png"
+        }
 
         for i in range(5):
             doctor_id = str(uuid.uuid4())
@@ -159,15 +226,20 @@ def create_test_data():
             doctor_email = f"doctor{i+1}@example.com"
             doctor_password = f"doctor{i+1}"
             doctor_specialty = specialties[i]
-            doctor_experience = 5 + i
-            doctor_contact = f"+1666{i}66{i}666"
-            doctor_details = f"Experienced {doctor_specialty} with {doctor_experience} years of practice"
+            doctor_experience = 8 + i * 2  # 8, 10, 12, 14, 16 years
+            doctor_contact = f"+91-98765-{43210 + i}"
+            doctor_details = f"Experienced {doctor_specialty} with {doctor_experience} years of practice in maternal and child healthcare"
+
+            # Upload doctor profile photo based on specialty
+            photo_file = doctor_photo_files[doctor_specialty]
+            photo_path = os.path.join('data', 'doctor profile photos', photo_file)
+            doctor_photo_url = upload_profile_photo(photo_path, admin_id, db)
 
             # Create doctor profile
             doctor = Doctor(
                 id=doctor_id,
                 name=doctor_name,
-                photo=f"https://example.com/doctors/doctor{i+1}.jpg",
+                photo=doctor_photo_url,  # Use the uploaded photo URL
                 designation=doctor_specialty,
                 experience=doctor_experience,
                 details=doctor_details,
@@ -226,76 +298,81 @@ def create_test_data():
                 "doctor_name": doctor_name
             })
 
-        # Create 4 patient users with 2-3 patients each
-        for i in range(4):
+        # Create 5 patients with Indian names (each patient is a separate user with self relation)
+        patient_names = [
+            ("Ananya", "Gupta"),
+            ("Rohan", "Mehta"),
+            ("Sneha", "Iyer"),
+            ("Arjun", "Joshi"),
+            ("Meera", "Nair")
+        ]
+
+        for i in range(5):
             patient_user_id = str(uuid.uuid4())
-            patient_user_name = f"Patient User {i+1}"
+            patient_id = str(uuid.uuid4())
+
+            # Use Indian names
+            patient_first_name, patient_last_name = patient_names[i]
+            patient_name = f"{patient_first_name} {patient_last_name}"
+            patient_user_name = patient_name  # patient_user_name should be the name of patient with relation 'self'
             patient_email = f"patient{i+1}@example.com"
             patient_password = f"patient{i+1}"
-            patient_contact = f"+1777{i}77{i}777"
-            patient_address = f"{200+i} Patient St, Patientville"
+            patient_contact = f"+91-98765-{54321 + i}"
+            patient_address = f"{i+1}/123, {['Koramangala', 'Indiranagar', 'Jayanagar', 'Whitefield', 'HSR Layout'][i]}, Bangalore, Karnataka"
 
-            # Create 2-3 patients for this user
-            num_patients = random.randint(2, 3)
+            # Create single patient record with self relation
+            gender = [Gender.FEMALE, Gender.MALE, Gender.FEMALE, Gender.MALE, Gender.FEMALE][i]
+            patient_age = 25 + i * 2  # Ages: 25, 27, 29, 31, 33
+            patient_dob = datetime.now() - timedelta(days=365*patient_age)
             patient_records = []
-            self_patient_id = None  # Track the self patient ID for profile_id
+            self_patient_id = patient_id  # This will be the self patient ID for profile_id
 
-            for j in range(num_patients):
-                patient_id = str(uuid.uuid4())
-                # Make sure we don't go out of bounds with our name arrays
-                first_names = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eva', 'Frank', 'Grace', 'Henry', 'Ivy', 'Jack', 'Kate', 'Leo']
-                last_names = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Miller', 'Davis', 'Garcia', 'Rodriguez', 'Wilson']
-                first_name_idx = (i*3+j) % len(first_names)
-                last_name_idx = i % len(last_names)
-                patient_first_name = first_names[first_name_idx]
-                patient_last_name = last_names[last_name_idx]
-                patient_name = f"{patient_first_name} {patient_last_name}"
-                gender = random.choice([Gender.MALE, Gender.FEMALE])
-                patient_age = 20 + i + j
-                patient_dob = datetime.now() - timedelta(days=365*patient_age)
-                patient_contact = f"+1888{i}{j}8{i}{j}888"
+            # Upload profile photo based on gender
+            if gender == Gender.FEMALE:
+                photo_file = patient_photo_files['female'][i % len(patient_photo_files['female'])]
+            else:
+                photo_file = patient_photo_files['male'][i % len(patient_photo_files['male'])]
 
-                # Create patient profile
-                patient = Patient(
-                    id=patient_id,
-                    user_id=patient_user_id,  # Link patient to user
-                    name=patient_name,
-                    dob=patient_dob,
-                    gender=gender,
-                    contact=patient_contact,
-                    photo=f"https://example.com/patients/patient{i+1}_{j+1}.jpg"
-                )
-                db.add(patient)
+            photo_path = os.path.join('data', 'patient profile photos', photo_file)
+            patient_photo_url = upload_profile_photo(photo_path, admin_id, db)
 
-                # Create user-patient relation
-                relation_type = RelationType.SELF if j == 0 else random.choice([RelationType.CHILD, RelationType.PARENT, RelationType.GUARDIAN, RelationType.FRIEND])
-                relation_id = str(uuid.uuid4())
-                relation = UserPatientRelation(
-                    id=relation_id,
-                    user_id=patient_user_id,
-                    patient_id=patient_id,
-                    relation=relation_type
-                )
-                db.add(relation)
+            # Create patient profile
+            patient = Patient(
+                id=patient_id,
+                user_id=patient_user_id,  # Link patient to user
+                name=patient_name,
+                dob=patient_dob,
+                gender=gender,
+                contact=patient_contact,
+                photo=patient_photo_url  # Use the uploaded photo URL
+            )
+            db.add(patient)
 
-                # Track the self patient ID for setting profile_id
-                if relation_type == RelationType.SELF:
-                    self_patient_id = patient_id
+            # Create user-patient relation (always SELF for single patient per user)
+            relation_type = RelationType.SELF
+            relation_id = str(uuid.uuid4())
+            relation = UserPatientRelation(
+                id=relation_id,
+                user_id=patient_user_id,
+                patient_id=patient_id,
+                relation=relation_type
+            )
+            db.add(relation)
 
-                patient_info = {
-                    "id": patient_id,
-                    "name": patient_name,
-                    "first_name": patient_first_name,
-                    "last_name": patient_last_name,
-                    "gender": gender.value,
-                    "age": patient_age,
-                    "dob": patient_dob.isoformat(),
-                    "contact": patient_contact,
-                    "relation": relation_type.value,
-                    "relation_id": relation_id
-                }
+            patient_info = {
+                "id": patient_id,
+                "name": patient_name,
+                "first_name": patient_first_name,
+                "last_name": patient_last_name,
+                "gender": gender.value,
+                "age": patient_age,
+                "dob": patient_dob.isoformat(),
+                "contact": patient_contact,
+                "relation": relation_type.value,
+                "relation_id": relation_id
+            }
 
-                patient_records.append(patient_info)
+            patient_records.append(patient_info)
 
             # Create patient user with profile_id set to self patient ID
             patient_user = User(
@@ -311,80 +388,67 @@ def create_test_data():
             )
             db.add(patient_user)
 
-            # Now continue with the rest of the patient processing loop
-            for j in range(num_patients):
-                patient_info = patient_records[j]
-                patient_id = patient_info["id"]
-                patient_name = patient_info["name"]
-                patient_first_name = patient_info["first_name"]
+            # Map patient to hospitals (randomly choose one hospital)
+            hospital_idx = random.randint(0, len(hospitals) - 1)
+            hospital = hospitals[hospital_idx]
 
-                # Map patients to hospitals and doctors
-                # Map to either hospital
-                hospital_idx = random.randint(0, len(hospitals) - 1)
-                hospital = hospitals[hospital_idx]
+            mapping_id = str(uuid.uuid4())
+            hospital_patient_mapping = HospitalPatientMapping(
+                id=mapping_id,
+                hospital_id=hospital.id,
+                patient_id=patient_id
+            )
+            db.add(hospital_patient_mapping)
 
+            # Store hospital-patient mapping
+            credentials["hospital_patient_mappings"].append({
+                "id": mapping_id,
+                "hospital_id": hospital.id,
+                "hospital_name": hospital.name,
+                "patient_id": patient_id,
+                "patient_name": patient_name
+            })
+
+            # Map to ALL 5 doctors (as per requirement)
+            for doctor in doctors:
                 mapping_id = str(uuid.uuid4())
-                hospital_patient_mapping = HospitalPatientMapping(
+                doctor_patient_mapping = DoctorPatientMapping(
                     id=mapping_id,
-                    hospital_id=hospital.id,
+                    doctor_id=doctor.id,
                     patient_id=patient_id
                 )
-                db.add(hospital_patient_mapping)
+                db.add(doctor_patient_mapping)
 
-                # Store hospital-patient mapping
-                credentials["hospital_patient_mappings"].append({
+                # Store doctor-patient mapping
+                credentials["doctor_patient_mappings"].append({
                     "id": mapping_id,
-                    "hospital_id": hospital.id,
-                    "hospital_name": hospital.name,
+                    "doctor_id": doctor.id,
+                    "doctor_name": doctor.name,
                     "patient_id": patient_id,
                     "patient_name": patient_name
                 })
 
-                # Map to 1-2 doctors
-                num_doctors = random.randint(1, 2)
-                for _ in range(num_doctors):
-                    doctor_idx = random.randint(0, len(doctors) - 1)
-                    doctor = doctors[doctor_idx]
+                # Create a chat between doctor and patient
+                chat_id = str(uuid.uuid4())
+                chat = Chat(
+                    id=chat_id,
+                    doctor_id=doctor.id,
+                    patient_id=patient_id,
+                    is_active_for_doctor=True,
+                    is_active_for_patient=True
+                )
+                db.add(chat)
 
-                    mapping_id = str(uuid.uuid4())
-                    doctor_patient_mapping = DoctorPatientMapping(
-                        id=mapping_id,
-                        doctor_id=doctor.id,
-                        patient_id=patient_id
-                    )
-                    db.add(doctor_patient_mapping)
-
-                    # Store doctor-patient mapping
-                    credentials["doctor_patient_mappings"].append({
-                        "id": mapping_id,
-                        "doctor_id": doctor.id,
-                        "doctor_name": doctor.name,
-                        "patient_id": patient_id,
-                        "patient_name": patient_name
-                    })
-
-                    # Create a chat between doctor and patient
-                    chat_id = str(uuid.uuid4())
-                    chat = Chat(
-                        id=chat_id,
-                        doctor_id=doctor.id,
-                        patient_id=patient_id,
-                        is_active_for_doctor=True,
-                        is_active_for_patient=True
-                    )
-                    db.add(chat)
-
-                    # Store chat information
-                    credentials["chats"].append({
-                        "id": chat_id,
-                        "doctor_id": doctor.id,
-                        "doctor_name": doctor.name,
-                        "patient_id": patient_id,
-                        "patient_name": patient_name,
-                        "is_active_for_doctor": True,
-                        "is_active_for_patient": True
-                    })
-
+                # Store chat information
+                credentials["chats"].append({
+                    "id": chat_id,
+                    "doctor_id": doctor.id,
+                    "doctor_name": doctor.name,
+                    "patient_id": patient_id,
+                    "patient_name": patient_name,
+                    "is_active_for_doctor": True,
+                    "is_active_for_patient": True
+                })
 
 
             credentials["patients"].append({
@@ -424,7 +488,7 @@ def print_credentials():
 
     print(f"\nPATIENTS ({len(credentials['patients'])}):")
     for i, patient in enumerate(credentials["patients"]):
-        print(f"  {patient['email']} / {patient['password']} ({len(patient['patients'])} patient records)")
+        print(f"  {patient['email']} / {patient['password']} ({patient['name']})")
 
     print("=== MAPPING INFORMATION ===\n")
     print("Hospital-Doctor Mappings:")
