@@ -243,7 +243,7 @@ class OpenAIService(AIService):
             Break your response into following sections:
             1. Assesment
             2. Recommendations
-            3. Medications
+            3. Medications - with routine
             4. Follow-up
             """
 
