@@ -244,8 +244,8 @@ def create_test_data():
             doctor_first_name = first_names[i]
             doctor_last_name = last_names[i]
             doctor_name = f"Dr. {doctor_first_name} {doctor_last_name}"
-            doctor_email = f"doctor{i+1}@example.com"
-            doctor_password = f"doctor{i+1}"
+            doctor_email = f"{doctor_first_name.lower()}@example.com"
+            doctor_password = doctor_first_name.lower()
             doctor_specialty = specialties[i]
             doctor_experience = 8 + i * 2  # 8, 10, 12, 14, 16 years
             doctor_contact = f"+91-98765-{43210 + i}"

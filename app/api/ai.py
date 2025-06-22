@@ -2,11 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import Dict
 from datetime import datetime
+import logging
 
 from app.db.database import get_db
 from app.models.ai import AISession, AIMessage
 from app.models.chat import Chat
 from app.models.user import User, UserRole
+from app.models.case_history import CaseHistory
 from app.schemas.ai import (
     AISessionCreate, AISessionResponse,
     AIMessageCreate, AIMessageResponse, AIMessageListResponse,
@@ -16,6 +18,9 @@ from app.dependencies import get_current_user, get_user_entity_id
 from app.services.ai import get_ai_service
 from app.errors import ErrorCode, create_error_response
 from app.utils.decorators import standardize_response
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -910,11 +915,30 @@ async def generate_suggested_response(
                 )
             )
 
+        # Retrieve patient's case history for discharge summary
+        discharge_summary = None
+        try:
+            # Get the most recent case history for the patient
+            case_history = db.query(CaseHistory).filter(
+                CaseHistory.patient_id == chat.patient_id
+            ).order_by(CaseHistory.created_at.desc()).first()
+
+            if case_history and case_history.summary:
+                discharge_summary = case_history.summary
+                logger.info(f"Retrieved case history summary for patient {chat.patient_id}")
+            else:
+                logger.info(f"No case history found for patient {chat.patient_id}")
+        except Exception as e:
+            logger.warning(f"Failed to retrieve case history for patient {chat.patient_id}: {e}")
+
         # Generate a suggested response using the AI service
         ai_service = get_ai_service()
 
-        # Use the dedicated suggested response method (not the assistant mode)
-        suggested_response = await ai_service.generate_suggested_response(request_data.summary)
+        # Use the dedicated suggested response method with discharge summary
+        suggested_response = await ai_service.generate_suggested_response(
+            request_data.summary,
+            discharge_summary
+        )
 
         # Create a new AI message for the suggested response
         db_message = AIMessage(

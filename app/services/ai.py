@@ -210,11 +210,11 @@ class OpenAIService(AIService):
             "isSummary": is_summary
         }
 
-    async def generate_suggested_response(self, patient_summary: str) -> str:
-        """Generate a suggested medical response for a doctor based on patient summary"""
+    async def generate_suggested_response(self, patient_summary: str, discharge_summary: str = None) -> str:
+        """Generate a suggested medical response for a doctor based on patient summary and optional discharge summary"""
         if not self.api_key or self.api_key == "your_openai_api_key":
             logger.warning("OpenAI API key not set or using default value. Using mock response.")
-            return self._generate_mock_suggested_response(patient_summary)
+            return self._generate_mock_suggested_response(patient_summary, discharge_summary)
 
         try:
             # System prompt for doctor's suggested response
@@ -249,43 +249,16 @@ class OpenAIService(AIService):
             Doctor's Advice: 3–5 specific, actionable bullet points
             """
 
-            discharge_summary = """
-            Discharge Summary – Baby (DOB: 18-05-2024)
-            Hospital: Cloudnine Hospital, Noida
-            Consultant: Dr. Saurabh Kataria
+            
 
-            Birth Details:
-            Delivered via LSCS at 38+2 weeks, AGA, no resuscitation required
-            APGAR: 7 & 9 at 1 and 5 mins
-            Birth Weight: 2.66 kg, Length: 47 cm, OFC: 32 cm
-            Blood Group: A Positive
-
-            Hospital Course:
-            Baby was roomed-in, breastfed, passed urine and meconium early
-            No congenital anomalies or facial dysmorphism noted
-            Red reflex present bilaterally
-            Screening for Developmental Dysplasia (Ortolani/Barlow) and Critical CHDs: Negative
-            BCG, OPV, Hep B vaccines given
-
-            Investigations & Screening:
-
-            Blood group: A Positive
-
-            Guthrie Test: Done (report awaited)
-
-            Hearing (OAE): Both ears passed
-
-            TCB and discharge weight recorded
-
-            Discharge Condition:
-            Stable; advised routine newborn care and exclusive breastfeeding
-            Vitamin D3 supplementation advised
-            Follow-up with pediatrician and lactation consultant as scheduled
-            """
+            # Prepare the user message with patient summary and optional discharge summary
+            user_content = f"Patient Summary: {patient_summary}"
+            if discharge_summary:
+                user_content += f"\n\nDischarge Summary: {discharge_summary}"
 
             messages = [
                 {"role": "system", "content": doctor_prompt},
-                {"role": "user", "content": f"Patient Summary: {patient_summary}\n\n Discharge Summary: {discharge_summary}"}
+                {"role": "user", "content": user_content}
             ]
 
             logger.info(f"Generating suggested response for patient summary: {patient_summary[:100]}...")
@@ -309,11 +282,15 @@ class OpenAIService(AIService):
             logger.error(f"Error generating suggested response from OpenAI: {str(e)}")
             return f"Error generating suggested medical response: {str(e)}"
 
-    def _generate_mock_suggested_response(self, patient_summary: str) -> str:
+    def _generate_mock_suggested_response(self, patient_summary: str, discharge_summary: str = None) -> str:
         """Generate a mock suggested response for testing when no API key is available"""
 
         # Analyze the summary for key symptoms
         summary_lower = patient_summary.lower()
+
+        # Include discharge summary information if available
+        if discharge_summary:
+            summary_lower += " " + discharge_summary.lower()
 
         if any(symptom in summary_lower for symptom in ["fever", "headache", "sore throat", "cough"]):
             return """
