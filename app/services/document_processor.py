@@ -9,6 +9,26 @@ import openai
 from app.config import settings
 from app.services.document_storage import document_storage
 
+# Try to import PDF processing libraries
+try:
+    import PyPDF2
+    PDF_AVAILABLE = True
+except ImportError:
+    try:
+        import pypdf
+        import PyPDF2
+        PDF_AVAILABLE = True
+    except ImportError:
+        PDF_AVAILABLE = False
+
+# Try to import image processing libraries
+try:
+    import pytesseract
+    from PIL import Image
+    OCR_AVAILABLE = True
+except ImportError:
+    OCR_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 class DocumentProcessor:
@@ -49,16 +69,41 @@ class DocumentProcessor:
                 return file_content.decode('utf-8', errors='ignore')
             
             elif "application/pdf" in content_type or filename.endswith('.pdf'):
-                # PDF files - would need PyPDF2 or similar library
-                # For now, return a placeholder
-                logger.warning(f"PDF text extraction not implemented for {document_id}")
-                return f"[PDF Document: {metadata.get('filename', 'Unknown')} - Text extraction not available]"
+                # PDF files - extract text using PyPDF2
+                if PDF_AVAILABLE:
+                    try:
+                        pdf_text = self._extract_pdf_text(file_content)
+                        if pdf_text.strip():
+                            logger.info(f"Successfully extracted {len(pdf_text)} characters from PDF {document_id}")
+                            return pdf_text
+                        else:
+                            logger.warning(f"PDF {document_id} appears to be empty or contains no extractable text")
+                            return f"[PDF Document: {metadata.get('filename', 'Unknown')} - No extractable text found]"
+                    except Exception as e:
+                        logger.error(f"Failed to extract text from PDF {document_id}: {e}")
+                        return f"[PDF Document: {metadata.get('filename', 'Unknown')} - Text extraction failed: {str(e)}]"
+                else:
+                    logger.warning(f"PDF text extraction not available for {document_id} - PyPDF2 not installed")
+                    return f"[PDF Document: {metadata.get('filename', 'Unknown')} - PyPDF2 library not available]"
             
             elif any(img_type in content_type for img_type in ["image/", "image/jpeg", "image/png", "image/gif"]) or \
                  any(filename.endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']):
-                # Image files - would need OCR (tesseract) for text extraction
-                logger.warning(f"Image text extraction not implemented for {document_id}")
-                return f"[Image Document: {metadata.get('filename', 'Unknown')} - OCR text extraction not available]"
+                # Image files - extract text using OCR
+                if OCR_AVAILABLE:
+                    try:
+                        image_text = self._extract_image_text(file_content)
+                        if image_text.strip():
+                            logger.info(f"Successfully extracted {len(image_text)} characters from image {document_id}")
+                            return image_text
+                        else:
+                            logger.warning(f"Image {document_id} appears to contain no readable text")
+                            return f"[Image Document: {metadata.get('filename', 'Unknown')} - No readable text found]"
+                    except Exception as e:
+                        logger.error(f"Failed to extract text from image {document_id}: {e}")
+                        return f"[Image Document: {metadata.get('filename', 'Unknown')} - OCR extraction failed: {str(e)}]"
+                else:
+                    logger.warning(f"OCR text extraction not available for {document_id} - pytesseract/PIL not installed")
+                    return f"[Image Document: {metadata.get('filename', 'Unknown')} - OCR libraries not available]"
             
             elif any(doc_type in content_type for doc_type in ["application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]) or \
                  any(filename.endswith(ext) for ext in ['.doc', '.docx']):
@@ -77,6 +122,114 @@ class DocumentProcessor:
         except Exception as e:
             logger.error(f"Error extracting text from document {document_id}: {e}")
             return None
+
+    def _extract_pdf_text(self, file_content: bytes) -> str:
+        """
+        Extract text from PDF file content
+
+        Args:
+            file_content: PDF file content as bytes
+
+        Returns:
+            str: Extracted text content
+        """
+        try:
+            # Create a BytesIO object from the file content
+            pdf_file = io.BytesIO(file_content)
+
+            # Create PDF reader object
+            pdf_reader = PyPDF2.PdfReader(pdf_file)
+
+            # Extract text from all pages
+            text_content = []
+            for page_num in range(len(pdf_reader.pages)):
+                page = pdf_reader.pages[page_num]
+                page_text = page.extract_text()
+                if page_text.strip():
+                    text_content.append(page_text.strip())
+
+            # Join all page text
+            full_text = "\n\n".join(text_content)
+
+            # Clean up the text (remove excessive whitespace, etc.)
+            full_text = " ".join(full_text.split())
+
+            return full_text
+
+        except Exception as e:
+            logger.error(f"Error extracting text from PDF: {e}")
+            raise e
+
+    def _extract_image_text(self, file_content: bytes) -> str:
+        """
+        Extract text from image file content using OCR
+
+        Args:
+            file_content: Image file content as bytes
+
+        Returns:
+            str: Extracted text content
+        """
+        try:
+            # Create a BytesIO object from the file content
+            image_file = io.BytesIO(file_content)
+
+            # Open image with PIL
+            image = Image.open(image_file)
+
+            # Use pytesseract to extract text
+            try:
+                extracted_text = pytesseract.image_to_string(image)
+            except pytesseract.TesseractNotFoundError:
+                raise Exception("Tesseract OCR engine not installed. Please install tesseract-ocr system package.")
+            except Exception as ocr_error:
+                raise Exception(f"OCR processing failed: {str(ocr_error)}")
+
+            # Clean up the text
+            cleaned_text = " ".join(extracted_text.split())
+
+            return cleaned_text
+
+        except Exception as e:
+            logger.error(f"Error extracting text from image: {e}")
+            raise e
+
+    def _extract_pdf_text(self, file_content: bytes) -> str:
+        """
+        Extract text from PDF file content
+
+        Args:
+            file_content: PDF file content as bytes
+
+        Returns:
+            str: Extracted text content
+        """
+        try:
+            # Create a BytesIO object from the file content
+            pdf_file = io.BytesIO(file_content)
+
+            # Create PDF reader object
+            pdf_reader = PyPDF2.PdfReader(pdf_file)
+
+            # Extract text from all pages
+            text_content = []
+            for page_num in range(len(pdf_reader.pages)):
+                page = pdf_reader.pages[page_num]
+                page_text = page.extract_text()
+                if page_text.strip():
+                    text_content.append(page_text.strip())
+
+            # Join all page text
+            full_text = "\n\n".join(text_content)
+
+            # Clean up the text (remove excessive whitespace, etc.)
+            full_text = " ".join(full_text.split())
+
+            return full_text
+
+        except Exception as e:
+            logger.error(f"Error extracting text from PDF: {e}")
+            raise e
     
     async def generate_case_history_summary(self, document_ids: list, user_summary: str) -> str:
         """
