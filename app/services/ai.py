@@ -237,6 +237,14 @@ class OpenAIService(AIService):
             Maintains a tone appropriate for a senior doctor: calm, supportive, and authoritative
 
             Avoids generic or vague suggestions—be specific based on the patient's history
+
+            Limit your response upto 100 - 150 words, don't try to justify your reply while replying to patients
+
+            Break your response into following sections:
+            1. Assesment
+            2. Recommendations
+            3. Medications
+            4. Follow-up
             """
 
             discharge_summary = """
