@@ -131,7 +131,7 @@ class OpenAIService(AIService):
             if self.summary_mode:
                 messages.append({
                     "role": "system",
-                    "content": "Now generate a comprehensive summary of the patient's condition based on all the information gathered."
+                    "content": "Now generate a comprehensive summary of the patient's condition based on all the information gathered. Give this summary as a first person."
                 })
 
             response = client.chat.completions.create(
