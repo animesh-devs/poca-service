@@ -453,8 +453,8 @@ def create_test_data():
                     id=chat_id,
                     doctor_id=doctor.id,
                     patient_id=patient_id,
-                    is_active_for_doctor=True,
-                    is_active_for_patient=True
+                    is_active_for_doctor=False,
+                    is_active_for_patient=False
                 )
                 db.add(chat)
 
@@ -465,8 +465,8 @@ def create_test_data():
                     "doctor_name": doctor.name,
                     "patient_id": patient_id,
                     "patient_name": patient_name,
-                    "is_active_for_doctor": True,
-                    "is_active_for_patient": True
+                    "is_active_for_doctor": False,
+                    "is_active_for_patient": False
                 })
 
 
