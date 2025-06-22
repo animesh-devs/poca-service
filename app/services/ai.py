@@ -257,29 +257,37 @@ class OpenAIService(AIService):
             """
 
             discharge_summary = """
-            Diagnosis: Suspected Acute Appendicitis
+            Discharge Summary – Baby (DOB: 18-05-2024)
+            Hospital: Cloudnine Hospital, Noida
+            Consultant: Dr. Saurabh Kataria
 
-            Complaints:
+            Birth Details:
+            Delivered via LSCS at 38+2 weeks, AGA, no resuscitation required
+            APGAR: 7 & 9 at 1 and 5 mins
+            Birth Weight: 2.66 kg, Length: 47 cm, OFC: 32 cm
+            Blood Group: A Positive
 
-            Right-sided abdominal pain
+            Hospital Course:
+            Baby was roomed-in, breastfed, passed urine and meconium early
+            No congenital anomalies or facial dysmorphism noted
+            Red reflex present bilaterally
+            Screening for Developmental Dysplasia (Ortolani/Barlow) and Critical CHDs: Negative
+            BCG, OPV, Hep B vaccines given
 
-            Vomiting
+            Investigations & Screening:
 
-            Vitals: BP 162/110, Pulse 97, SpO₂ 97%
+            Blood group: A Positive
 
-            Investigations: USG Abdomen suggestive of appendicitis
+            Guthrie Test: Done (report awaited)
 
-            Treatment Given:
+            Hearing (OAE): Both ears passed
 
-            IV fluids and supportive care
+            TCB and discharge weight recorded
 
-            Painkillers, antibiotics, antispasmodics prescribed
-
-            Advice:
-
-            Planned surgery (appendectomy)
-
-            Keep NPO, follow up urgently with surgeon
+            Discharge Condition:
+            Stable; advised routine newborn care and exclusive breastfeeding
+            Vitamin D3 supplementation advised
+            Follow-up with pediatrician and lactation consultant as scheduled
             """
 
             messages = [
