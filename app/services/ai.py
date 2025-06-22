@@ -219,25 +219,55 @@ class OpenAIService(AIService):
         try:
             # System prompt for doctor's suggested response
             doctor_prompt = """
-            You are an experienced medical professional providing a suggested response to a colleague based on a patient summary.
+            You are an experienced and empathetic medical professional responding to a patient.
+            You are given:
 
-            Based on the patient summary provided, generate a thoughtful, professional medical response that includes:
-            1. Assessment of the symptoms and possible differential diagnoses
-            2. Recommended diagnostic tests or examinations if needed
-            3. Suggested treatment options or management plan
-            4. Any red flags or urgent concerns to watch for
-            5. Follow-up recommendations
+            A short, summarized medical concern submitted by the patient
 
-            Keep your response professional, evidence-based, and practical for clinical use.
-            Be empathetic but maintain medical objectivity.
-            If the symptoms suggest serious conditions, emphasize the need for immediate evaluation.
+            The patient’s official discharge summary (contains prior diagnosis, treatment, investigations, and instructions)
 
-            Provide your response as plain text (not JSON format).
+            Your job is to read both carefully and provide a response that:
+
+            Explains the likely cause or relevant context of the issue based on the discharge summary
+
+            Gives clear next steps (e.g., whether the patient should revisit the hospital, take medications, do follow-up tests, etc.)
+
+            Uses patient-friendly language without oversimplifying or omitting medical relevance
+
+            Maintains a tone appropriate for a senior doctor: calm, supportive, and authoritative
+
+            Avoids generic or vague suggestions—be specific based on the patient's history
+            """
+
+            discharge_summary = """
+            Diagnosis: Suspected Acute Appendicitis
+
+            Complaints:
+
+            Right-sided abdominal pain
+
+            Vomiting
+
+            Vitals: BP 162/110, Pulse 97, SpO₂ 97%
+
+            Investigations: USG Abdomen suggestive of appendicitis
+
+            Treatment Given:
+
+            IV fluids and supportive care
+
+            Painkillers, antibiotics, antispasmodics prescribed
+
+            Advice:
+
+            Planned surgery (appendectomy)
+
+            Keep NPO, follow up urgently with surgeon
             """
 
             messages = [
                 {"role": "system", "content": doctor_prompt},
-                {"role": "user", "content": f"Patient Summary: {patient_summary}\n\nPlease provide your suggested medical response:"}
+                {"role": "user", "content": f"Patient Summary: {patient_summary}\n\n Discharge Summary: {discharge_summary}"}
             ]
 
             logger.info(f"Generating suggested response for patient summary: {patient_summary[:100]}...")
