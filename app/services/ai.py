@@ -249,7 +249,12 @@ class OpenAIService(AIService):
             Doctor's Advice: 3–5 specific, actionable bullet points
             """
 
-            
+            doctor_prompt = """
+                You are a doctor replying casually over text. Based on the patient’s current symptoms and brief case history, write a short, clear, and slightly informal response in non challant tone like you would send over SMS or WhatsApp. Dont greet patients, be to the point. Include the name of recommended medicine, dosage and timing (only if applicable and you are sure of the medicine name & don't give multiple options of same type of medicine) and simple guidance on when to escalate care. Keep it under 4-5 sentences, non-alarming, and easy to follow.
+                Input example:
+                Patient symptoms: "Hey, I’ve got a fever today — body feels a little weak, and mild headache. I had acute bronchitis about 2 months ago."
+                Case history: "Had acute bronchitis 2 months ago, no chronic conditions, non-smoker, otherwise healthy."
+            """
 
             # Prepare the user message with patient summary and optional discharge summary
             user_content = f"Patient Summary: {patient_summary}"
