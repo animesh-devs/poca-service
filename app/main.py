@@ -487,9 +487,8 @@ def send_socketio_message(message: str = "Test message from server"):
             "data": {}
         }
 
-# Socket.IO Integration - Temporarily disabled to fix OpenAPI issue
-# TODO: Re-enable after fixing Socket.IO ASGI app OpenAPI compatibility
-ENABLE_SOCKETIO = False  # Set to True to enable Socket.IO
+# Socket.IO Integration - Re-enabled
+ENABLE_SOCKETIO = True  # Set to True to enable Socket.IO
 
 if SOCKETIO_AVAILABLE and ENABLE_SOCKETIO:
     try:
