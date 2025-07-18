@@ -40,14 +40,6 @@ class OpenAIService(AIService):
     # Wait for patient response before asking the next question.
 
     # After all the questions are done just return the summary to the patient don't add any advices.
-
-    # IMPORTANT: You must format your response as a valid JSON object with the following structure:
-    # {
-    #     "message": "Your response text here",
-    #     "isSummary": true/false
-    # }
-
-    # Set "isSummary" to true only when you are providing the final summary after all questions.
     # For all other responses, set "isSummary" to false.
     # """
 
@@ -140,11 +132,16 @@ If NO: Please book an appointment by calling <doctor_contact>."
 If Green:
  → No reminder needed unless otherwise instructed
 
-IMPORTANT: You must format your response as a valid JSON object with the following structure:
-   {
-       "message": "Your response text here",
-       "isSummary": true/false
-   }
+CRITICAL: You MUST ALWAYS respond with valid JSON only. No plain text responses allowed.
+
+Your response must be a valid JSON object with exactly this structure:
+{
+    "message": "Your response text here",
+    "isSummary": false
+}
+
+Set "isSummary": true only when providing the final summary after all questions are complete.
+Do not include any text outside of this JSON structure.
     """
 
     def __init__(self):
@@ -315,8 +312,8 @@ IMPORTANT: You must format your response as a valid JSON object with the followi
                         "isSummary": self.summary_mode
                     }
             except json.JSONDecodeError:
-                logger.warning(f"Failed to parse response as JSON: {response_text}")
-                # If parsing fails, return a properly formatted response
+                logger.warning(f"AI returned invalid JSON, wrapping plain text response: {response_text[:100]}...")
+                # If parsing fails, wrap the plain text in proper JSON format
                 return {
                     "message": response_text,
                     "isSummary": self.summary_mode
