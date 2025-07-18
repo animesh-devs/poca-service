@@ -148,9 +148,6 @@ Do not include any text outside of this JSON structure.
         """Initialize the OpenAI service"""
         self.api_key = settings.OPENAI_API_KEY
         self.model = settings.OPENAI_MODEL
-        self.question_count = 0
-        self.max_questions = 5
-        self.summary_mode = False
 
         if not self.api_key:
             logger.warning("OpenAI API key not set. OpenAI service will not work.")
@@ -250,35 +247,17 @@ Do not include any text outside of this JSON structure.
             # Add system prompt
             messages.append({"role": "system", "content": resolved_prompt})
 
-            # Track question count and determine if we should generate a summary
+            # Add context if provided
             if context:
-                # Count user messages to track question progress
-                user_messages = [msg for msg in context if msg["role"] == "user"]
-                self.question_count = len(user_messages)
-
-                # Add context if provided
                 messages.extend(context)
-
-                # Check if we should generate a summary
-                if self.question_count >= self.max_questions:
-                    self.summary_mode = True
 
             # Add the current message
             messages.append({"role": "user", "content": message})
-            self.question_count += 1
 
             logger.info(f"Sending request to OpenAI API with message: {message}")
-            logger.info(f"Question count: {self.question_count}, Summary mode: {self.summary_mode}")
 
             # Call the OpenAI API with the updated client
             client = openai.OpenAI(api_key=self.api_key)
-
-            # If in summary mode, explicitly ask for a summary
-            if self.summary_mode:
-                messages.append({
-                    "role": "system",
-                    "content": "Now generate a comprehensive summary of the patient's condition based on all the information gathered. Give this summary as a first person."
-                })
 
             response = client.chat.completions.create(
                 model=self.model,
@@ -288,12 +267,6 @@ Do not include any text outside of this JSON structure.
             # Extract the response text
             response_text = response.choices[0].message.content
             logger.info(f"Received response from OpenAI API: {response_text[:100]}...")
-
-            # Reset summary mode after generating a summary
-            if self.summary_mode:
-                self.summary_mode = False
-                self.question_count = 0
-                logger.info("Summary generated and state reset")
 
             # Try to parse the response as JSON
             try:
@@ -306,17 +279,17 @@ Do not include any text outside of this JSON structure.
                     return response_json
                 else:
                     logger.warning(f"Response JSON missing required fields: {response_json}")
-                    # Create a properly formatted response
+                    # Create a properly formatted response, defaulting isSummary to false
                     return {
                         "message": response_text,
-                        "isSummary": self.summary_mode
+                        "isSummary": False
                     }
             except json.JSONDecodeError:
                 logger.warning(f"AI returned invalid JSON, wrapping plain text response: {response_text[:100]}...")
-                # If parsing fails, wrap the plain text in proper JSON format
+                # If parsing fails, wrap the plain text in proper JSON format, defaulting isSummary to false
                 return {
                     "message": response_text,
-                    "isSummary": self.summary_mode
+                    "isSummary": False
                 }
 
         except Exception as e:
@@ -328,8 +301,8 @@ Do not include any text outside of this JSON structure.
         response_text = ""
         is_summary = False
 
-        # Track question count
-        if self.question_count >= self.max_questions:
+        # Generate appropriate mock responses based on message content
+        if "summary" in message.lower() or "summarize" in message.lower():
             is_summary = True
             response_text = """
             Patient Summary:

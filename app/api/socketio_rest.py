@@ -324,7 +324,7 @@ async def send_ai_message(sid: str, request: SocketIOMessageRequest, db: Session
             db_message.is_summary = is_summary
         else:
             response_message = response_data
-            is_summary = question_count >= 5 and "summary" in response_message.lower()
+            is_summary = "summary" in response_message.lower()
             db_message.response = response_message
             db_message.is_summary = is_summary
 
