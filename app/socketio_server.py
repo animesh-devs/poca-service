@@ -101,6 +101,28 @@ def register_socketio_handlers():
                         db = next(get_db())
                         current_user = auth_data['user']
 
+                        # Auto-resolve user_entity_id for patient users (same as WebSocket)
+                        if current_user.role == UserRole.PATIENT and not user_entity_id:
+                            # Try to find a "self" relation first
+                            from app.models.mapping import UserPatientRelation, RelationType
+                            self_relation = db.query(UserPatientRelation).filter(
+                                UserPatientRelation.user_id == current_user.id,
+                                UserPatientRelation.relation == RelationType.SELF
+                            ).first()
+
+                            if self_relation:
+                                user_entity_id = self_relation.patient_id
+                                logger.info(f"Auto-resolved user_entity_id to self relation patient ID {user_entity_id} for user {current_user.id}")
+                            else:
+                                # Try to find any relation
+                                any_relation = db.query(UserPatientRelation).filter(
+                                    UserPatientRelation.user_id == current_user.id
+                                ).first()
+
+                                if any_relation:
+                                    user_entity_id = any_relation.patient_id
+                                    logger.info(f"Auto-resolved user_entity_id to patient relation {user_entity_id} for user {current_user.id}")
+
                         # Verify AI session exists and user has access
                         ai_session = db.query(AISession).filter(AISession.id == session_id).first()
                         if not ai_session:
@@ -122,20 +144,30 @@ def register_socketio_handlers():
                         # Access control (same as WebSocket)
                         has_access = False
 
+                        logger.debug(f"Access control check - User: {current_user.id}, Role: {current_user.role}, user_entity_id: {user_entity_id}")
+                        logger.debug(f"Chat details - doctor_id: {chat.doctor_id}, patient_id: {chat.patient_id}")
+
                         if current_user.role == UserRole.ADMIN:
                             has_access = True
+                            logger.debug("Access granted: Admin user")
                         elif current_user.role == UserRole.DOCTOR:
                             if user_entity_id == chat.doctor_id:
                                 has_access = True
+                                logger.debug("Access granted: Doctor matches chat doctor_id")
+                            else:
+                                logger.debug(f"Access denied: Doctor user_entity_id {user_entity_id} != chat.doctor_id {chat.doctor_id}")
                         elif current_user.role == UserRole.PATIENT:
-                            if user_entity_id == chat.patient_id:
-                                from app.models.mapping import UserPatientRelation
-                                relation = db.query(UserPatientRelation).filter(
-                                    UserPatientRelation.user_id == current_user.id,
-                                    UserPatientRelation.patient_id == chat.patient_id
-                                ).first()
-                                if relation:
-                                    has_access = True
+                            # Check if user has access to this patient (through user-patient relation)
+                            from app.models.mapping import UserPatientRelation
+                            relation = db.query(UserPatientRelation).filter(
+                                UserPatientRelation.user_id == current_user.id,
+                                UserPatientRelation.patient_id == chat.patient_id
+                            ).first()
+                            if relation:
+                                has_access = True
+                                logger.debug(f"Access granted: Patient user has relation to patient {chat.patient_id}")
+                            else:
+                                logger.debug(f"Access denied: No user-patient relation found for user {current_user.id} and patient {chat.patient_id}")
 
                         if not has_access:
                             logger.warning(f"User {current_user.id} denied access to AI session {session_id}")
