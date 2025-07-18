@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Date, DateTime, Enum, ForeignKey
+from sqlalchemy import Column, String, Date, DateTime, Enum, ForeignKey, Integer, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from uuid import uuid4
@@ -22,6 +22,16 @@ class Patient(Base):
     gender = Column(Enum(Gender), nullable=True)
     contact = Column(String, nullable=True)
     photo = Column(String, nullable=True)  # Link to image
+
+    # Health information fields
+    age = Column(Integer, nullable=True)
+    blood_group = Column(String, nullable=True)
+    height = Column(Integer, nullable=True)  # Height in cm
+    weight = Column(Integer, nullable=True)  # Weight in kg
+    medical_info = Column(JSON, nullable=True)  # JSON object containing allergies, medications, conditions
+    emergency_contact_name = Column(String, nullable=True)
+    emergency_contact_number = Column(String, nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

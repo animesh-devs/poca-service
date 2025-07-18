@@ -267,13 +267,29 @@ async def patient_signup(
                 )
             )
 
-        # Create patient profile first
+        # Create patient profile first with health information
+        # Prepare medical_info JSON object
+        medical_info = {}
+        if patient_data.allergies:
+            medical_info['allergies'] = patient_data.allergies
+        if patient_data.medications:
+            medical_info['medications'] = patient_data.medications
+        if patient_data.conditions:
+            medical_info['conditions'] = patient_data.conditions
+
         db_patient = Patient(
             name=patient_data.name,
             dob=patient_data.dob,
             gender=patient_data.gender,
             contact=patient_data.contact,
-            photo=patient_data.photo
+            photo=patient_data.photo,
+            age=patient_data.age,
+            blood_group=patient_data.blood_group,
+            height=patient_data.height,
+            weight=patient_data.weight,
+            medical_info=medical_info if medical_info else None,
+            emergency_contact_name=patient_data.emergency_contact_name,
+            emergency_contact_number=patient_data.emergency_contact_number
         )
 
         db.add(db_patient)

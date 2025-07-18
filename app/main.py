@@ -144,6 +144,33 @@ def health_check():
         }
     }
 
+@app.get("/debug/openapi")
+def debug_openapi():
+    """Debug endpoint to check OpenAPI schema generation"""
+    try:
+        # Try to generate the OpenAPI schema
+        openapi_schema = app.openapi()
+        return {
+            "status_code": status.HTTP_200_OK,
+            "status": True,
+            "message": "OpenAPI schema generated successfully",
+            "data": {
+                "schema_keys": list(openapi_schema.keys()) if openapi_schema else [],
+                "paths_count": len(openapi_schema.get("paths", {})) if openapi_schema else 0,
+                "components_count": len(openapi_schema.get("components", {})) if openapi_schema else 0
+            }
+        }
+    except Exception as e:
+        return {
+            "status_code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "status": False,
+            "message": f"OpenAPI schema generation failed: {str(e)}",
+            "data": {
+                "error_type": type(e).__name__,
+                "error_details": str(e)
+            }
+        }
+
 @app.get("/socketio-status")
 def socketio_status():
     """Check Socket.IO native support status"""
@@ -460,8 +487,11 @@ def send_socketio_message(message: str = "Test message from server"):
             "data": {}
         }
 
-# Socket.IO Integration
-if SOCKETIO_AVAILABLE:
+# Socket.IO Integration - Temporarily disabled to fix OpenAPI issue
+# TODO: Re-enable after fixing Socket.IO ASGI app OpenAPI compatibility
+ENABLE_SOCKETIO = False  # Set to True to enable Socket.IO
+
+if SOCKETIO_AVAILABLE and ENABLE_SOCKETIO:
     try:
         from app.socketio_server import initialize_socketio, get_socketio_app
 
@@ -471,8 +501,9 @@ if SOCKETIO_AVAILABLE:
             socketio_asgi_app = get_socketio_app(app)
             if socketio_asgi_app:
                 # Replace FastAPI app with integrated Socket.IO ASGI app
+                # This preserves all FastAPI functionality including OpenAPI
                 app = socketio_asgi_app
-                logger.info("Socket.IO server integrated successfully")
+                logger.info("Socket.IO server integrated successfully with FastAPI")
             else:
                 logger.error("Failed to create Socket.IO ASGI app")
         else:
@@ -482,7 +513,10 @@ if SOCKETIO_AVAILABLE:
         logger.error(f"Socket.IO integration failed: {e}")
         logger.info("Continuing with standard FastAPI app")
 else:
-    logger.info("Socket.IO not available - using standard FastAPI app")
+    if SOCKETIO_AVAILABLE:
+        logger.info("Socket.IO available but disabled - using standard FastAPI app")
+    else:
+        logger.info("Socket.IO not available - using standard FastAPI app")
 
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

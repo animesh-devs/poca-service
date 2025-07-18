@@ -18,9 +18,13 @@ from api_helpers import (
     get_or_create_patient,
     map_doctor_to_patient,
     create_chat,
+    create_case_history,
+    create_patient_report,
+    MAPPINGS_URL,
     DEFAULT_ADMIN_EMAIL,
     DEFAULT_ADMIN_PASSWORD
 )
+import requests
 
 # Configure logging
 logging.basicConfig(
@@ -43,15 +47,15 @@ def generate_random_email(prefix):
 # Use hardcoded hospital IDs
 HOSPITALS = [
     {
-        "id": "1",  # Hardcoded ID for General Hospital
-        "name": "General Hospital",
-        "email": "general@example.com",
+        "id": "1",  # Hardcoded ID for Mother & Child Care Hospital
+        "name": "Mother & Child Care Hospital",
+        "email": "motherchild@example.com",
         "password": "hospital123"
     },
     {
-        "id": "2",  # Hardcoded ID for City Medical Center
-        "name": "City Medical Center",
-        "email": "city@example.com",
+        "id": "2",  # Hardcoded ID for Maternity & Newborn Center
+        "name": "Maternity & Newborn Center",
+        "email": "maternity@example.com",
         "password": "hospital123"
     }
 ]
@@ -64,31 +68,38 @@ def generate_random_doctor_email(name):
 
 DOCTORS = [
     {
-        "name": "Dr. John Smith",
-        "email": generate_random_doctor_email("John Smith"),
+        "name": "Dr. Priya Patel",
+        "email": generate_random_doctor_email("Priya Patel"),
         "password": "doctor123",
-        "specialization": "Cardiology",
+        "specialization": "Gynecologist",
         "hospital_index": 0  # Index in the HOSPITALS list
     },
     {
-        "name": "Dr. Sarah Johnson",
-        "email": generate_random_doctor_email("Sarah Johnson"),
+        "name": "Dr. Rajesh Kumar",
+        "email": generate_random_doctor_email("Rajesh Kumar"),
         "password": "doctor123",
-        "specialization": "Neurology",
+        "specialization": "Pediatrician",
         "hospital_index": 0
     },
     {
-        "name": "Dr. Michael Brown",
-        "email": generate_random_doctor_email("Michael Brown"),
+        "name": "Dr. Sunita Mehta",
+        "email": generate_random_doctor_email("Sunita Mehta"),
         "password": "doctor123",
-        "specialization": "Pediatrics",
+        "specialization": "Lactation Expert",
+        "hospital_index": 0
+    },
+    {
+        "name": "Dr. Amit Sharma",
+        "email": generate_random_doctor_email("Amit Sharma"),
+        "password": "doctor123",
+        "specialization": "Neonatologist",
         "hospital_index": 1
     },
     {
-        "name": "Dr. Emily Davis",
-        "email": generate_random_doctor_email("Emily Davis"),
+        "name": "Dr. Kavya Reddy",
+        "email": generate_random_doctor_email("Kavya Reddy"),
         "password": "doctor123",
-        "specialization": "Dermatology",
+        "specialization": "Dietitian",
         "hospital_index": 1
     }
 ]
@@ -153,6 +164,50 @@ PATIENTS = [
         "gender": "female",
         "hospital_index": 1,
         "doctor_indices": [2, 3]
+    },
+    # Mother and Newborn care test patients
+    {
+        "name": "Priya Sharma",
+        "email": "mother@example.com",
+        "password": "password123",
+        "age": 28,
+        "gender": "female",
+        "blood_group": "O+",
+        "height": 165,
+        "weight": 68,  # Post-delivery weight
+        "allergies": ["None"],
+        "medications": ["Prenatal vitamins", "Iron supplements", "Calcium tablets"],
+        "conditions": ["Post-delivery recovery", "Breastfeeding"],
+        "emergency_contact_name": "Rajesh Sharma (Husband)",
+        "emergency_contact_number": "+91-9876543213",
+        "hospital_index": 0,
+        "doctor_indices": [1, 2],  # Gynecologist and Lactation expert
+        "relation": "mother",
+        "delivery_date": "2024-06-15",
+        "delivery_type": "Normal delivery"
+    },
+    {
+        "name": "Baby Arjun Sharma",
+        "email": "child@example.com",
+        "password": "password123",
+        "age": 0,  # Newborn (in months)
+        "gender": "male",
+        "blood_group": "O+",
+        "height": 50,  # 50cm birth length
+        "weight": 3,   # 3.2kg birth weight
+        "allergies": ["None known"],
+        "medications": ["Vitamin D drops"],
+        "conditions": ["Healthy newborn", "Breastfeeding"],
+        "emergency_contact_name": "Priya Sharma (Mother)",
+        "emergency_contact_number": "+91-9876543212",
+        "hospital_index": 0,
+        "doctor_indices": [1],  # Pediatrician
+        "relation": "child",
+        "mother_email": "mother@example.com",
+        "birth_date": "2024-06-15",
+        "birth_weight": 3200,  # grams
+        "birth_length": 50,    # cm
+        "gestational_age": "39 weeks"
     }
 ]
 
@@ -221,7 +276,15 @@ def create_test_data():
             patient["password"],
             patient["age"],
             patient["gender"],
-            hospital_id
+            hospital_id,
+            blood_group=patient.get("blood_group", "O+"),
+            height=patient.get("height", 170),
+            weight=patient.get("weight", 70),
+            allergies=patient.get("allergies", ["None"]),
+            medications=patient.get("medications", ["None"]),
+            conditions=patient.get("conditions", ["None"]),
+            emergency_contact_name=patient.get("emergency_contact_name", "Emergency Contact"),
+            emergency_contact_number=patient.get("emergency_contact_number", "9876543210")
         )
         if not patient_data:
             logging.error(f"Failed to create patient: {patient['name']}. Continuing with other patients.")
@@ -231,6 +294,43 @@ def create_test_data():
         patient_data_list.append(patient_data)
         # Add a small delay to avoid rate limiting
         time.sleep(1)
+
+    # Handle mother-child relationships
+    logging.info("Setting up mother-child relationships...")
+    mother_patient_data = None
+    child_patient_data = None
+
+    # Find mother and child patients
+    for i, patient in enumerate(PATIENTS):
+        if patient.get("relation") == "mother":
+            mother_patient_data = patient_data_list[i]
+        elif patient.get("relation") == "child":
+            child_patient_data = patient_data_list[i]
+
+    # Create mother-child relationship if both exist
+    if mother_patient_data and child_patient_data:
+        try:
+            # Create user-patient relation mapping (mother -> child)
+            relation_data = {
+                "user_id": mother_patient_data["user_id"],
+                "patient_id": child_patient_data["id"],
+                "relation": "child"
+            }
+
+            headers = {"Authorization": f"Bearer {admin_token}"}
+            response = requests.post(
+                f"{MAPPINGS_URL}/user-patient",
+                json=relation_data,
+                headers=headers
+            )
+
+            if response.status_code in [200, 201]:
+                logging.info(f"✅ Created mother-child relationship: {mother_patient_data['name']} -> {child_patient_data['name']}")
+            else:
+                logging.warning(f"Failed to create mother-child relationship: {response.text}")
+
+        except Exception as e:
+            logging.error(f"Error creating mother-child relationship: {e}")
 
     # Map doctors to patients
     for i, patient in enumerate(PATIENTS):
@@ -254,6 +354,70 @@ def create_test_data():
 
             # Add a small delay to avoid rate limiting
             time.sleep(1)
+
+    # Create case histories and reports for mother and newborn patients
+    logging.info("Creating case histories and reports for mother and newborn patients...")
+
+    for i, patient in enumerate(PATIENTS):
+        patient_data = patient_data_list[i]
+        if not patient_data:
+            continue
+
+        # Create case histories with summaries
+        if patient.get("relation") == "mother":
+            # Mother's post-delivery case history
+            case_summary = f"""Post-Delivery Care Summary: 28-year-old female, delivered healthy baby boy on {patient.get('delivery_date', '2024-06-15')} via {patient.get('delivery_type', 'normal delivery')}. Current status: Post-delivery recovery progressing well. Breastfeeding established successfully. Current medications: Prenatal vitamins, Iron supplements, Calcium tablets. No known allergies. Concerns: Post-delivery recovery, breastfeeding support, maternal nutrition. Recommendations: Continue current supplements, adequate rest, proper nutrition for breastfeeding, regular follow-up visits."""
+            create_case_history(admin_token, patient_data["id"], case_summary.strip())
+
+            # Mother's reports
+            create_patient_report(
+                admin_token,
+                patient_data["id"],
+                "post_delivery",
+                "Post-Delivery Health Assessment",
+                "Post-delivery recovery excellent. Uterine involution normal. Breastfeeding well established. Hemoglobin: 11.2 g/dL. Blood pressure: 120/80 mmHg. Recommended: Continue iron supplements, adequate nutrition."
+            )
+
+            create_patient_report(
+                admin_token,
+                patient_data["id"],
+                "lactation",
+                "Breastfeeding Assessment",
+                "Breastfeeding established successfully. Good latch observed. Milk supply adequate. No signs of mastitis or nipple trauma. Recommendations: Continue exclusive breastfeeding, proper positioning techniques."
+            )
+
+        elif patient.get("relation") == "child":
+            # Newborn's case history
+            case_summary = f"""Newborn Care Summary: Healthy baby boy born on {patient.get('birth_date', '2024-06-15')} at {patient.get('gestational_age', '39 weeks')} gestation. Birth weight: {patient.get('birth_weight', 3200)}g, Birth length: {patient.get('birth_length', 50)}cm. Current status: Thriving newborn, exclusively breastfed. Current medications: Vitamin D drops as per pediatric guidelines. No known allergies. Concerns: Growth monitoring, feeding patterns, developmental milestones, vaccination schedule. Recommendations: Continue exclusive breastfeeding, regular weight monitoring, follow vaccination schedule, developmental assessments."""
+            create_case_history(admin_token, patient_data["id"], case_summary.strip())
+
+            # Newborn's reports
+            create_patient_report(
+                admin_token,
+                patient_data["id"],
+                "newborn_screening",
+                "Newborn Health Assessment",
+                "Healthy newborn male. Birth weight: 3.2kg (appropriate for gestational age). APGAR scores: 9/10. All newborn screening tests normal. Feeding well, good weight gain pattern."
+            )
+
+            create_patient_report(
+                admin_token,
+                patient_data["id"],
+                "growth_monitoring",
+                "Growth and Development Chart",
+                "Current weight: 3.2kg, Length: 50cm, Head circumference: 35cm. Growth parameters within normal percentiles. Developmental milestones appropriate for age."
+            )
+
+            create_patient_report(
+                admin_token,
+                patient_data["id"],
+                "vaccination_schedule",
+                "Immunization Record",
+                "Birth vaccines completed: BCG, Hepatitis B (birth dose). Next due: 6 weeks - DPT, Polio, Hepatitis B, Hib, PCV, Rotavirus vaccines."
+            )
+
+        # Add delay between operations
+        time.sleep(0.5)
 
     # Print summary
     print("\nTest data creation completed!")

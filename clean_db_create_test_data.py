@@ -138,11 +138,20 @@ def clean_db():
     logger.info("Database initialized successfully.")
 
 def create_test_data():
-    """Create test data with 2 hospitals, 5 patients with Indian names, and 5 doctors with specific specialties"""
+    """Create test data with 2 hospitals, 5 patients with Indian names, 5 doctors with specific specialties, plus mother and newborn care patients"""
     # Get database session
     db = next(get_db())
 
     try:
+        # Run migration to add health fields to patients table
+        logger.info("Running migration to add health fields to patients table...")
+        try:
+            from app.db.migrations.add_patient_health_fields import run_migration
+            run_migration(db)
+            logger.info("Migration completed successfully")
+        except Exception as e:
+            logger.warning(f"Migration may have already been run: {e}")
+            # Continue with test data creation even if migration fails
         # Create admin user
         admin_id = str(uuid.uuid4())
         admin_name = "Admin User"
@@ -480,6 +489,330 @@ def create_test_data():
                 "patients": patient_records
             })
 
+        # Create Mother and Newborn Care Test Patients
+        logger.info("Creating mother and newborn care test patients...")
+
+        # Mother Patient
+        mother_user_id = str(uuid.uuid4())
+        mother_patient_id = str(uuid.uuid4())
+        mother_name = "Priya Sharma"
+        mother_email = "mother@example.com"
+        mother_password = "password123"
+        mother_contact = "+91-9876543212"
+        mother_address = "456 Family Street, Mumbai, Maharashtra"
+
+        # Mother's health information
+        mother_medical_info = {
+            "allergies": ["None"],
+            "medications": ["Prenatal vitamins", "Iron supplements", "Calcium tablets"],
+            "conditions": ["Post-delivery recovery", "Breastfeeding"]
+        }
+
+        # Upload mother's profile photo
+        mother_photo_url = create_profile_photo_record(patient_photo_files['female'][0], admin_id, db)
+
+        # Create mother patient profile with health info
+        from datetime import date
+        mother_patient = Patient(
+            id=mother_patient_id,
+            user_id=mother_user_id,
+            name=mother_name,
+            dob=date(1996, 3, 15),  # 28 years old
+            gender=Gender.FEMALE,
+            contact=mother_contact,
+            photo=mother_photo_url,
+            age=28,
+            blood_group="O+",
+            height=165,
+            weight=68,  # Post-delivery weight
+            medical_info=mother_medical_info,
+            emergency_contact_name="Rajesh Sharma (Husband)",
+            emergency_contact_number="+91-9876543213"
+        )
+        db.add(mother_patient)
+
+        # Create mother user-patient relation (self)
+        mother_relation_id = str(uuid.uuid4())
+        mother_relation = UserPatientRelation(
+            id=mother_relation_id,
+            user_id=mother_user_id,
+            patient_id=mother_patient_id,
+            relation=RelationType.SELF
+        )
+        db.add(mother_relation)
+
+        # Create mother user account
+        mother_user = User(
+            id=mother_user_id,
+            email=mother_email,
+            hashed_password=get_password_hash(mother_password),
+            name=mother_name,
+            role=UserRole.PATIENT,
+            contact=mother_contact,
+            address=mother_address,
+            profile_id=mother_patient_id,
+            is_active=True
+        )
+        db.add(mother_user)
+
+        # Newborn Patient
+        newborn_user_id = str(uuid.uuid4())
+        newborn_patient_id = str(uuid.uuid4())
+        newborn_name = "Baby Arjun Sharma"
+        newborn_email = "child@example.com"
+        newborn_password = "password123"
+        newborn_contact = mother_contact  # Same as mother
+        newborn_address = mother_address  # Same as mother
+
+        # Newborn's health information
+        newborn_medical_info = {
+            "allergies": ["None known"],
+            "medications": ["Vitamin D drops"],
+            "conditions": ["Healthy newborn", "Breastfeeding"]
+        }
+
+        # Upload newborn's profile photo
+        newborn_photo_url = create_profile_photo_record(patient_photo_files['male'][0], admin_id, db)
+
+        # Create newborn patient profile with health info
+        newborn_patient = Patient(
+            id=newborn_patient_id,
+            user_id=newborn_user_id,
+            name=newborn_name,
+            dob=date(2024, 6, 15),  # Born June 15, 2024
+            gender=Gender.MALE,
+            contact=newborn_contact,
+            photo=newborn_photo_url,
+            age=0,  # Newborn
+            blood_group="O+",
+            height=50,  # 50cm birth length
+            weight=3,   # 3kg birth weight
+            medical_info=newborn_medical_info,
+            emergency_contact_name="Priya Sharma (Mother)",
+            emergency_contact_number=mother_contact
+        )
+        db.add(newborn_patient)
+
+        # Create newborn user-patient relation (self)
+        newborn_relation_id = str(uuid.uuid4())
+        newborn_self_relation = UserPatientRelation(
+            id=newborn_relation_id,
+            user_id=newborn_user_id,
+            patient_id=newborn_patient_id,
+            relation=RelationType.SELF
+        )
+        db.add(newborn_self_relation)
+
+        # Create mother-child relation (mother -> child)
+        mother_child_relation_id = str(uuid.uuid4())
+        mother_child_relation = UserPatientRelation(
+            id=mother_child_relation_id,
+            user_id=mother_user_id,
+            patient_id=newborn_patient_id,
+            relation=RelationType.CHILD
+        )
+        db.add(mother_child_relation)
+
+        # Create newborn user account
+        newborn_user = User(
+            id=newborn_user_id,
+            email=newborn_email,
+            hashed_password=get_password_hash(newborn_password),
+            name=newborn_name,
+            role=UserRole.PATIENT,
+            contact=newborn_contact,
+            address=newborn_address,
+            profile_id=newborn_patient_id,
+            is_active=True
+        )
+        db.add(newborn_user)
+
+        # Map mother and newborn to appropriate doctors and hospitals
+        # Find gynecologist and pediatrician from existing doctors
+        gynecologist = None
+        pediatrician = None
+        for doctor in doctors:
+            if "gynecologist" in doctor.designation.lower() or "gynaecologist" in doctor.designation.lower():
+                gynecologist = doctor
+            elif "pediatrician" in doctor.designation.lower():
+                pediatrician = doctor
+
+        # Map both patients to hospitals (use first hospital)
+        hospital = hospitals[0]
+
+        for patient_id, patient_name in [(mother_patient_id, mother_name), (newborn_patient_id, newborn_name)]:
+            # Hospital-patient mapping
+            mapping_id = str(uuid.uuid4())
+            hospital_patient_mapping = HospitalPatientMapping(
+                id=mapping_id,
+                hospital_id=hospital.id,
+                patient_id=patient_id
+            )
+            db.add(hospital_patient_mapping)
+
+            # Store hospital-patient mapping
+            credentials["hospital_patient_mappings"].append({
+                "id": mapping_id,
+                "hospital_id": hospital.id,
+                "hospital_name": hospital.name,
+                "patient_id": patient_id,
+                "patient_name": patient_name
+            })
+
+            # Map to all 5 doctors (as per existing pattern)
+            for doctor in doctors:
+                mapping_id = str(uuid.uuid4())
+                doctor_patient_mapping = DoctorPatientMapping(
+                    id=mapping_id,
+                    doctor_id=doctor.id,
+                    patient_id=patient_id
+                )
+                db.add(doctor_patient_mapping)
+
+                # Store doctor-patient mapping
+                credentials["doctor_patient_mappings"].append({
+                    "id": mapping_id,
+                    "doctor_id": doctor.id,
+                    "doctor_name": doctor.name,
+                    "patient_id": patient_id,
+                    "patient_name": patient_name
+                })
+
+                # Create chat between doctor and patient
+                chat_id = str(uuid.uuid4())
+                chat = Chat(
+                    id=chat_id,
+                    doctor_id=doctor.id,
+                    patient_id=patient_id,
+                    is_active_for_doctor=False,
+                    is_active_for_patient=False
+                )
+                db.add(chat)
+
+                # Store chat information
+                credentials["chats"].append({
+                    "id": chat_id,
+                    "doctor_id": doctor.id,
+                    "doctor_name": doctor.name,
+                    "patient_id": patient_id,
+                    "patient_name": patient_name,
+                    "is_active_for_doctor": False,
+                    "is_active_for_patient": False
+                })
+
+        # Add mother and newborn to credentials
+        credentials["patients"].extend([
+            {
+                "name": mother_name,
+                "email": mother_email,
+                "password": mother_password,
+                "id": mother_user_id,
+                "contact": mother_contact,
+                "address": mother_address,
+                "patients": [{
+                    "id": mother_patient_id,
+                    "name": mother_name,
+                    "gender": "female",
+                    "age": 28,
+                    "relation": "self"
+                }]
+            },
+            {
+                "name": newborn_name,
+                "email": newborn_email,
+                "password": newborn_password,
+                "id": newborn_user_id,
+                "contact": newborn_contact,
+                "address": newborn_address,
+                "patients": [{
+                    "id": newborn_patient_id,
+                    "name": newborn_name,
+                    "gender": "male",
+                    "age": 0,
+                    "relation": "self"
+                }]
+            }
+        ])
+
+        # Create case histories and reports for mother and newborn
+        logger.info("Creating case histories and reports for mother and newborn...")
+
+        # Import required models for case history and reports
+        from app.models.case_history import CaseHistory
+        from app.models.report import Report, ReportType
+
+        # Mother's case history
+        mother_case_history = CaseHistory(
+            id=str(uuid.uuid4()),
+            patient_id=mother_patient_id,
+            summary="Post-Delivery Care Summary: 28-year-old female, delivered healthy baby boy on June 15, 2024 via normal delivery. Current status: Post-delivery recovery progressing well. Breastfeeding established successfully. Current medications: Prenatal vitamins, Iron supplements, Calcium tablets. No known allergies. Concerns: Post-delivery recovery, breastfeeding support, maternal nutrition. Recommendations: Continue current supplements, adequate rest, proper nutrition for breastfeeding, regular follow-up visits.",
+            documents=[]
+        )
+        db.add(mother_case_history)
+
+        # Mother's reports
+        mother_report1 = Report(
+            id=str(uuid.uuid4()),
+            patient_id=mother_patient_id,
+            report_type=ReportType.BLOOD_TEST,
+            title="Post-Delivery Health Assessment",
+            summary="Post-delivery recovery excellent. Uterine involution normal. Breastfeeding well established. Hemoglobin: 11.2 g/dL. Blood pressure: 120/80 mmHg. Recommended: Continue iron supplements, adequate nutrition.",
+            documents=[]
+        )
+        db.add(mother_report1)
+
+        mother_report2 = Report(
+            id=str(uuid.uuid4()),
+            patient_id=mother_patient_id,
+            report_type=ReportType.OTHER,
+            title="Breastfeeding Assessment",
+            summary="Breastfeeding established successfully. Good latch observed. Milk supply adequate. No signs of mastitis or nipple trauma. Recommendations: Continue exclusive breastfeeding, proper positioning techniques.",
+            documents=[]
+        )
+        db.add(mother_report2)
+
+        # Newborn's case history
+        newborn_case_history = CaseHistory(
+            id=str(uuid.uuid4()),
+            patient_id=newborn_patient_id,
+            summary="Newborn Care Summary: Healthy baby boy born on June 15, 2024 at 39 weeks gestation. Birth weight: 3200g, Birth length: 50cm. Current status: Thriving newborn, exclusively breastfed. Current medications: Vitamin D drops as per pediatric guidelines. No known allergies. Concerns: Growth monitoring, feeding patterns, developmental milestones, vaccination schedule. Recommendations: Continue exclusive breastfeeding, regular weight monitoring, follow vaccination schedule, developmental assessments.",
+            documents=[]
+        )
+        db.add(newborn_case_history)
+
+        # Newborn's reports
+        newborn_report1 = Report(
+            id=str(uuid.uuid4()),
+            patient_id=newborn_patient_id,
+            report_type=ReportType.OTHER,
+            title="Newborn Health Assessment",
+            summary="Healthy newborn male. Birth weight: 3.2kg (appropriate for gestational age). APGAR scores: 9/10. All newborn screening tests normal. Feeding well, good weight gain pattern.",
+            documents=[]
+        )
+        db.add(newborn_report1)
+
+        newborn_report2 = Report(
+            id=str(uuid.uuid4()),
+            patient_id=newborn_patient_id,
+            report_type=ReportType.OTHER,
+            title="Growth and Development Chart",
+            summary="Current weight: 3.2kg, Length: 50cm, Head circumference: 35cm. Growth parameters within normal percentiles. Developmental milestones appropriate for age.",
+            documents=[]
+        )
+        db.add(newborn_report2)
+
+        newborn_report3 = Report(
+            id=str(uuid.uuid4()),
+            patient_id=newborn_patient_id,
+            report_type=ReportType.VACCINATION,
+            title="Immunization Record",
+            summary="Birth vaccines completed: BCG, Hepatitis B (birth dose). Next due: 6 weeks - DPT, Polio, Hepatitis B, Hib, PCV, Rotavirus vaccines.",
+            documents=[]
+        )
+        db.add(newborn_report3)
+
+        logger.info("✅ Mother and newborn test data created successfully!")
+
         # Commit all changes
         db.commit()
         logger.info("Test data created successfully.")
@@ -507,7 +840,10 @@ def print_credentials():
 
     print(f"\nPATIENTS ({len(credentials['patients'])}):")
     for i, patient in enumerate(credentials["patients"]):
-        print(f"  {patient['email']} / {patient['password']} ({patient['name']})")
+        if patient['email'] in ['mother@example.com', 'child@example.com']:
+            print(f"  🤱 {patient['email']} / {patient['password']} ({patient['name']}) [MOTHER & NEWBORN CARE]")
+        else:
+            print(f"  {patient['email']} / {patient['password']} ({patient['name']})")
 
     print("=== MAPPING INFORMATION ===\n")
     print("Hospital-Doctor Mappings:")
@@ -521,6 +857,22 @@ def print_credentials():
     print("\nDoctor-Patient Mappings:")
     for mapping in credentials.get("doctor_patient_mappings", []):
         print(f"  Doctor '{mapping['doctor_name']}' (ID: {mapping['doctor_id']}) -> Patient '{mapping['patient_name']}' (ID: {mapping['patient_id']})")
+
+    # Highlight Mother & Newborn Care Mappings
+    print("\n🤱 MOTHER & NEWBORN CARE MAPPINGS:")
+    mother_mappings = [m for m in credentials.get("doctor_patient_mappings", []) if m['patient_name'] in ['Priya Sharma', 'Baby Arjun Sharma']]
+    if mother_mappings:
+        print("  Mother (Priya Sharma) mapped to:")
+        for mapping in mother_mappings:
+            if mapping['patient_name'] == 'Priya Sharma':
+                print(f"    ✓ {mapping['doctor_name']} ({mapping['doctor_name'].split()[-1].replace('Dr.', '').strip()})")
+
+        print("  Newborn (Baby Arjun Sharma) mapped to:")
+        for mapping in mother_mappings:
+            if mapping['patient_name'] == 'Baby Arjun Sharma':
+                print(f"    ✓ {mapping['doctor_name']} ({mapping['doctor_name'].split()[-1].replace('Dr.', '').strip()})")
+
+        print("  🎯 Perfect for Mother & Newborn Care AI Context!")
 
     print("\nChat Sessions:")
     for chat in credentials.get("chats", []):

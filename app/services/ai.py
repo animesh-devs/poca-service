@@ -51,82 +51,100 @@ class OpenAIService(AIService):
     # For all other responses, set "isSummary" to false.
     # """
 
-    PATIENT_INTERVIEW_PROMPT = """
+    PATIENT_INTERVIEW_PROMPT_TEMPLATE = """
+You are a virtual assistant to a <doctor_type>. A patient will send you a message with either a basic educational question or a medical concern. Your job is to collect all relevant and necessary information from the patient through a text conversation so the doctor can make an informed assessment. Follow the steps below:
 
-        You are a doctor’s assistant. Patients will text you about their health problems. Your role is to ask only the most relevant follow-up questions to help the doctor understand their condition better.
-        Your Questioning Style:
-        Use simple, clear English that anyone can understand.
+Step 1: Read the question & Retrieve Patient information
+→ Read the patient question & refer the following stored patient information:
 
+<patient_details>
+<case_summary>
 
-        Be crisp and concise – your questions should be no longer than 15 words.
+→ Then move to Step 2
 
+Step 2: Check for Completeness of the Patient's Message
+Determine whether the message gives the doctor full clarity to assess the situation. Use the examples below as reference:
+Incomplete: "I have a fever, what to do?"
+ → Missing: Temperature, duration, medication taken, etc.
 
-        Don't ask everything at once – ask only what’s needed based on the patient's last response & ask one question at a time.
+Incomplete: "My baby sleeps 18 hours every day. Is it normal?"
+ → Missing: Baby's age (unless available in patient info)
 
+Incomplete: "My baby fell and has a blue mark on the head."
+ → Missing: Image or photo of the mark
 
-        Maintain a neutral, non-emotional tone (do not sympathize or express concern).
+Complete: "My 8-month-old baby has 2 front teeth. When will more come?"
+ → No further info needed.
 
+If the message is complete:
+→ Acknowledge
+→ Move to Step 4
+If the message is incomplete:
+→ Ask one follow-up question at a time to gather missing details
+→ Check and reuse information from <Patient stored information> case history, reports, images, and previous questions to avoid repetition (e.g., age, weight, etc.)
+Keep the tone nonchalant, neutral, and straight
+Use basic English, no emotions or empathy
+Ask only what's necessary
+Keep follow-up count ideally under 3–4
+Wait for the response before asking the next question
+To understand what type of questions to ask move to Step 3
 
-        Wait for the patient to respond before asking the next question.
+Step 3: Ask Smart, Crisp Follow-Up Questions
+Focus on medically relevant inputs: symptoms, timeline, medications, behavior
 
+Keep the question short and direct
 
-        Your Questions Should Help Cover:
-        (Only if relevant – don’t ask all these blindly)
-        Severity of symptoms
+Examples:
+Right type of question- "How much is the fever?"
+Right type of question- "Since when?"
+Right type of question- "Any other issue?"
+Wrong type of question- "Oh no, sorry to hear that. How high is the fever?"
+Wrong type of question- "Is your baby doing okay otherwise?"
 
+Step 4: Create a Summary to be sent to the Doctor
+After all information is collected, create a short summary for the doctor in the following format:
 
-        Duration – How long the issue has been happening
+Hi Doctor, basic details about patient (name, age, gender, weight):
+• Main Concern with duration <e.g., Fever: 99.5–100.5°F and <e.g., Since 2 days, comes every ~6 hours>
+• Behavior/Condition <e.g., Active, feeding okay, slightly irritable during fever>
+• Current Remedy/Medication <e.g., Taking paracetamol twice a day or NONE)
+• Additional Info (if any, else don't show this) <e.g., Attached image, recent reports, relevant case history>
+Key Questions-
+First question
+ (if any)
 
+The goal is to keep this summary simple, structured, and under 30 seconds to read, while covering all the critical details to help the doctor understand the issue clearly.
 
-        Additional symptoms (if any)
+Step 5: Categorize the Query by Urgency
+Tag the patient's concern into one of the following three urgency levels:
+🔴 Red – Serious condition, needs urgent attention
 
+🟡 Yellow – Moderate, could become serious if not resolved in <N1> days
 
-        Current medications
+🟢 Green – General or educational query, not urgent
 
+Based on the category:
+If Red:
+ → Send this message:
+ "This is serious. Your response will be sent to the doctor, but we strongly recommend booking an appointment immediately by calling <doctor_contact>."
 
-        Images or documents, only if they help diagnosis
+If Yellow:
+ → Set a reminder for <N1> days after the initial query
+ → Reminder message:
+ "Are you feeling better now? Is this  resolved?
 
+If YES: Reply 'Great & have a good day'
 
+If NO: Please book an appointment by calling <doctor_contact>."
 
-        Once You Get Patient Responses:
-        Do Two Things:
-        1. Summarize the case for the doctor in bullet points (max 75 words):
-        Use this format with bold headings:
-        Main Concern: The primary symptom or issue.
+If Green:
+ → No reminder needed unless otherwise instructed
 
-
-        Additional Symptoms: Any related complaints.
-
-
-        Medical History: Relevant past illnesses.
-
-
-        Current Medications: List of ongoing medicines.
-
-
-        Vitals (if available): Temperature, pulse, etc.
-
-
-        2. Categorize the query into one of the three urgency levels:
-        Red – Serious condition, needs urgent attention
-
-
-        Yellow – Moderate, could become serious if not resolved in a few days
-
-
-        Green – General or non-urgent concern, possibly educational
-
-
-        IMPORTANT: You must format your response as a valid JSON object with the following structure:
-        {
-            "message": "Your response text here",
-            "isSummary": true/false
-        }
-
-
-        Set "isSummary" to true only when you are providing the final summary after all questions.
-        For all other responses, set "isSummary" to false.
-
+IMPORTANT: You must format your response as a valid JSON object with the following structure:
+   {
+       "message": "Your response text here",
+       "isSummary": true/false
+   }
     """
 
     def __init__(self):
@@ -142,8 +160,85 @@ class OpenAIService(AIService):
         else:
             openai.api_key = self.api_key
 
-    async def generate_response(self, message: str, context: Optional[List[Dict[str, str]]] = None) -> str:
-        """Generate a response using OpenAI"""
+    def _resolve_patient_interview_prompt(self, patient_data=None, doctor_data=None, case_summary=None, patient_relation=None):
+        """Resolve dynamic fields in the patient interview prompt"""
+        prompt = self.PATIENT_INTERVIEW_PROMPT_TEMPLATE
+
+        # Resolve doctor type
+        doctor_type = "doctor"
+        if doctor_data and hasattr(doctor_data, 'designation') and doctor_data.designation:
+            doctor_type = doctor_data.designation
+        prompt = prompt.replace("<doctor_type>", doctor_type)
+
+        # Resolve patient details
+        patient_details = "Patient information not available"
+        if patient_data:
+            details = []
+            if hasattr(patient_data, 'name') and patient_data.name:
+                details.append(f"Name: {patient_data.name}")
+
+            # Use stored age or calculate from DOB if available
+            if hasattr(patient_data, 'age') and patient_data.age:
+                details.append(f"Age: {patient_data.age} years")
+            elif hasattr(patient_data, 'dob') and patient_data.dob:
+                from datetime import date
+                today = date.today()
+                age = today.year - patient_data.dob.year - ((today.month, today.day) < (patient_data.dob.month, patient_data.dob.day))
+                details.append(f"Age: {age} years")
+
+            if hasattr(patient_data, 'gender') and patient_data.gender:
+                details.append(f"Gender: {patient_data.gender.value if hasattr(patient_data.gender, 'value') else patient_data.gender}")
+
+            # Add weight if available
+            if hasattr(patient_data, 'weight') and patient_data.weight:
+                details.append(f"Weight: {patient_data.weight} kg")
+
+            # Add height if available
+            if hasattr(patient_data, 'height') and patient_data.height:
+                details.append(f"Height: {patient_data.height} cm")
+
+            # Add blood group if available
+            if hasattr(patient_data, 'blood_group') and patient_data.blood_group:
+                details.append(f"Blood Group: {patient_data.blood_group}")
+
+            # Add relation type if available
+            if patient_relation and hasattr(patient_relation, 'relation'):
+                relation_type = patient_relation.relation.value if hasattr(patient_relation.relation, 'value') else patient_relation.relation
+                details.append(f"Relation: {relation_type}")
+
+            # Add medical information if available
+            if hasattr(patient_data, 'medical_info') and patient_data.medical_info:
+                medical_info = patient_data.medical_info
+                if isinstance(medical_info, dict):
+                    if medical_info.get('allergies'):
+                        details.append(f"Allergies: {', '.join(medical_info['allergies'])}")
+                    if medical_info.get('medications'):
+                        details.append(f"Current Medications: {', '.join(medical_info['medications'])}")
+                    if medical_info.get('conditions'):
+                        details.append(f"Medical Conditions: {', '.join(medical_info['conditions'])}")
+
+            if details:
+                patient_details = ", ".join(details)
+
+        prompt = prompt.replace("<patient_details>", patient_details)
+
+        # Resolve case summary
+        case_summary_text = "No case history available"
+        if case_summary:
+            case_summary_text = case_summary
+        prompt = prompt.replace("<case_summary>", case_summary_text)
+
+        # Resolve doctor contact
+        doctor_contact = "doctor contact not available"
+        if doctor_data and hasattr(doctor_data, 'contact') and doctor_data.contact:
+            doctor_contact = doctor_data.contact
+        prompt = prompt.replace("<doctor_contact>", doctor_contact)
+
+        return prompt
+
+    async def generate_response(self, message: str, context: Optional[List[Dict[str, str]]] = None,
+                               patient_data=None, doctor_data=None, case_summary=None, patient_relation=None) -> str:
+        """Generate a response using OpenAI with dynamic prompt resolution"""
         if not self.api_key or self.api_key == "your_openai_api_key":
             logger.warning("OpenAI API key not set or using default value. Using mock response.")
             return self._generate_mock_response(message)
@@ -152,8 +247,11 @@ class OpenAIService(AIService):
             # Prepare messages for the API
             messages = []
 
+            # Resolve dynamic prompt with patient and doctor context
+            resolved_prompt = self._resolve_patient_interview_prompt(patient_data, doctor_data, case_summary, patient_relation)
+
             # Add system prompt
-            messages.append({"role": "system", "content": self.PATIENT_INTERVIEW_PROMPT})
+            messages.append({"role": "system", "content": resolved_prompt})
 
             # Track question count and determine if we should generate a summary
             if context:
