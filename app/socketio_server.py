@@ -413,7 +413,7 @@ async def handle_ai_message(sid, data):
             is_summary = response_data.get("isSummary", False)
         else:
             response_message = response_data
-            is_summary = question_count >= 5 and "summary" in response_message.lower()
+            is_summary = "summary" in response_message.lower()
 
         # Update database
         db_message.response = response_message
