@@ -770,7 +770,7 @@ def create_test_data():
 
         # Import required models for case history and reports
         from app.models.case_history import CaseHistory
-        from app.models.report import Report, ReportType
+        from app.models.report import Report, ReportType, PatientReportMapping
 
         # Mother's case history
         mother_case_history = CaseHistory(
@@ -782,25 +782,39 @@ def create_test_data():
         db.add(mother_case_history)
 
         # Mother's reports
+        mother_report1_id = str(uuid.uuid4())
         mother_report1 = Report(
-            id=str(uuid.uuid4()),
-            patient_id=mother_patient_id,
-            report_type=ReportType.POST_DELIVERY,
+            id=mother_report1_id,
             title="Post-Delivery Health Assessment",
-            summary="Post-delivery recovery excellent. Uterine involution normal. Breastfeeding well established. Hemoglobin: 11.2 g/dL. Blood pressure: 120/80 mmHg. Recommended: Continue iron supplements, adequate nutrition.",
-            documents=[]
+            description="Post-delivery recovery excellent. Uterine involution normal. Breastfeeding well established. Hemoglobin: 11.2 g/dL. Blood pressure: 120/80 mmHg. Recommended: Continue iron supplements, adequate nutrition.",
+            report_type=ReportType.POST_DELIVERY
         )
         db.add(mother_report1)
 
-        mother_report2 = Report(
+        # Create patient-report mapping for mother report 1
+        mother_report1_mapping = PatientReportMapping(
             id=str(uuid.uuid4()),
             patient_id=mother_patient_id,
-            report_type=ReportType.LACTATION,
+            report_id=mother_report1_id
+        )
+        db.add(mother_report1_mapping)
+
+        mother_report2_id = str(uuid.uuid4())
+        mother_report2 = Report(
+            id=mother_report2_id,
             title="Breastfeeding Assessment",
-            summary="Breastfeeding established successfully. Good latch observed. Milk supply adequate. No signs of mastitis or nipple trauma. Recommendations: Continue exclusive breastfeeding, proper positioning techniques.",
-            documents=[]
+            description="Breastfeeding established successfully. Good latch observed. Milk supply adequate. No signs of mastitis or nipple trauma. Recommendations: Continue exclusive breastfeeding, proper positioning techniques.",
+            report_type=ReportType.LACTATION
         )
         db.add(mother_report2)
+
+        # Create patient-report mapping for mother report 2
+        mother_report2_mapping = PatientReportMapping(
+            id=str(uuid.uuid4()),
+            patient_id=mother_patient_id,
+            report_id=mother_report2_id
+        )
+        db.add(mother_report2_mapping)
 
         # Newborn's case history
         newborn_case_history = CaseHistory(
@@ -812,35 +826,56 @@ def create_test_data():
         db.add(newborn_case_history)
 
         # Newborn's reports
+        newborn_report1_id = str(uuid.uuid4())
         newborn_report1 = Report(
-            id=str(uuid.uuid4()),
-            patient_id=newborn_patient_id,
-            report_type=ReportType.NEWBORN_SCREENING,
+            id=newborn_report1_id,
             title="Newborn Health Assessment",
-            summary="Healthy newborn male. Birth weight: 3.2kg (appropriate for gestational age). APGAR scores: 9/10. All newborn screening tests normal. Feeding well, good weight gain pattern.",
-            documents=[]
+            description="Healthy newborn male. Birth weight: 3.2kg (appropriate for gestational age). APGAR scores: 9/10. All newborn screening tests normal. Feeding well, good weight gain pattern.",
+            report_type=ReportType.NEWBORN_SCREENING
         )
         db.add(newborn_report1)
 
-        newborn_report2 = Report(
+        # Create patient-report mapping for newborn report 1
+        newborn_report1_mapping = PatientReportMapping(
             id=str(uuid.uuid4()),
             patient_id=newborn_patient_id,
-            report_type=ReportType.GROWTH_CHART,
+            report_id=newborn_report1_id
+        )
+        db.add(newborn_report1_mapping)
+
+        newborn_report2_id = str(uuid.uuid4())
+        newborn_report2 = Report(
+            id=newborn_report2_id,
             title="Growth and Development Chart",
-            summary="Current weight: 3.2kg, Length: 50cm, Head circumference: 35cm. Growth parameters within normal percentiles. Developmental milestones appropriate for age.",
-            documents=[]
+            description="Current weight: 3.2kg, Length: 50cm, Head circumference: 35cm. Growth parameters within normal percentiles. Developmental milestones appropriate for age.",
+            report_type=ReportType.GROWTH_CHART
         )
         db.add(newborn_report2)
 
-        newborn_report3 = Report(
+        # Create patient-report mapping for newborn report 2
+        newborn_report2_mapping = PatientReportMapping(
             id=str(uuid.uuid4()),
             patient_id=newborn_patient_id,
-            report_type=ReportType.VACCINATION,
+            report_id=newborn_report2_id
+        )
+        db.add(newborn_report2_mapping)
+
+        newborn_report3_id = str(uuid.uuid4())
+        newborn_report3 = Report(
+            id=newborn_report3_id,
             title="Immunization Record",
-            summary="Birth vaccines completed: BCG, Hepatitis B (birth dose). Next due: 6 weeks - DPT, Polio, Hepatitis B, Hib, PCV, Rotavirus vaccines.",
-            documents=[]
+            description="Birth vaccines completed: BCG, Hepatitis B (birth dose). Next due: 6 weeks - DPT, Polio, Hepatitis B, Hib, PCV, Rotavirus vaccines.",
+            report_type=ReportType.VACCINATION
         )
         db.add(newborn_report3)
+
+        # Create patient-report mapping for newborn report 3
+        newborn_report3_mapping = PatientReportMapping(
+            id=str(uuid.uuid4()),
+            patient_id=newborn_patient_id,
+            report_id=newborn_report3_id
+        )
+        db.add(newborn_report3_mapping)
 
         logger.info("✅ Mother and newborn test data created successfully!")
 
