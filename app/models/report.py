@@ -8,9 +8,15 @@ from app.db.database import Base
 
 class ReportType(str, enum.Enum):
     LAB_TEST = "lab_test"
+    BLOOD_TEST = "blood_test"
     IMAGING = "imaging"
     PRESCRIPTION = "prescription"
     DISCHARGE_SUMMARY = "discharge_summary"
+    VACCINATION = "vaccination"
+    GROWTH_CHART = "growth_chart"
+    NEWBORN_SCREENING = "newborn_screening"
+    POST_DELIVERY = "post_delivery"
+    LACTATION = "lactation"
     OTHER = "other"
 
 class Report(Base):

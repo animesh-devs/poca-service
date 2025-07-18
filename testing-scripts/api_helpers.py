@@ -315,7 +315,10 @@ def get_or_create_doctor(token: str, name: str, email: str, password: str, speci
 # Alias for backward compatibility
 create_doctor = get_or_create_doctor
 
-def get_or_create_patient(token: str, name: str, email: str, password: str, age: int, gender: str, hospital_id: str) -> Optional[Dict[str, Any]]:
+def get_or_create_patient(token: str, name: str, email: str, password: str, age: int, gender: str, hospital_id: str,
+                         blood_group: str = "O+", height: int = 170, weight: int = 70,
+                         allergies: list = None, medications: list = None, conditions: list = None,
+                         emergency_contact_name: str = "Emergency Contact", emergency_contact_number: str = "9876543210") -> Optional[Dict[str, Any]]:
     """Get or create a patient"""
     logging.info(f"Getting or creating patient: {name}...")
 
@@ -367,14 +370,14 @@ def get_or_create_patient(token: str, name: str, email: str, password: str, age:
             "password": password,
             "age": age,
             "gender": gender,
-            "blood_group": "O+",
-            "height": 170,
-            "weight": 70,
-            "allergies": ["None"],
-            "medications": ["None"],
-            "conditions": ["None"],
-            "emergency_contact_name": "Emergency Contact",
-            "emergency_contact_number": "9876543210",
+            "blood_group": blood_group,
+            "height": height,
+            "weight": weight,
+            "allergies": allergies or ["None"],
+            "medications": medications or ["None"],
+            "conditions": conditions or ["None"],
+            "emergency_contact_name": emergency_contact_name,
+            "emergency_contact_number": emergency_contact_number,
             "contact": "1234567890",
             "address": "123 Patient St"
         }
@@ -597,4 +600,66 @@ def send_ai_message(token: str, session_id: str, message: str) -> Optional[Dict[
         return response_data
     except Exception as e:
         logging.error(f"Error sending message to AI: {str(e)}")
+        return None
+
+def create_case_history(token: str, patient_id: str, summary: str) -> Optional[Dict[str, Any]]:
+    """Create a case history for a patient"""
+    logging.info(f"Creating case history for patient {patient_id}...")
+
+    headers = {"Authorization": f"Bearer {token}"}
+    case_history_data = {
+        "patient_id": patient_id,
+        "summary": summary,
+        "documents": []
+    }
+
+    try:
+        response = requests.post(
+            f"{PATIENTS_URL}/{patient_id}/case-history",
+            json=case_history_data,
+            headers=headers
+        )
+
+        if response.status_code not in [200, 201]:
+            logging.error(f"Failed to create case history: {response.text}")
+            return None
+
+        case_history = response.json()
+        logging.info(f"Created case history with ID: {case_history.get('id')}")
+        return case_history
+
+    except Exception as e:
+        logging.error(f"Error creating case history: {str(e)}")
+        return None
+
+def create_patient_report(token: str, patient_id: str, report_type: str, title: str, summary: str) -> Optional[Dict[str, Any]]:
+    """Create a report for a patient"""
+    logging.info(f"Creating {report_type} report for patient {patient_id}...")
+
+    headers = {"Authorization": f"Bearer {token}"}
+    report_data = {
+        "patient_id": patient_id,
+        "report_type": report_type,
+        "title": title,
+        "summary": summary,
+        "documents": []
+    }
+
+    try:
+        response = requests.post(
+            f"{PATIENTS_URL}/{patient_id}/reports",
+            json=report_data,
+            headers=headers
+        )
+
+        if response.status_code not in [200, 201]:
+            logging.error(f"Failed to create report: {response.text}")
+            return None
+
+        report = response.json()
+        logging.info(f"Created report with ID: {report.get('id')}")
+        return report
+
+    except Exception as e:
+        logging.error(f"Error creating report: {str(e)}")
         return None

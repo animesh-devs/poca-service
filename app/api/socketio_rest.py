@@ -223,6 +223,18 @@ async def send_ai_message(sid: str, request: SocketIOMessageRequest, db: Session
         if session_info.get('token') != request.token:
             raise HTTPException(status_code=401, detail="Token mismatch")
 
+        # Get AI session and chat for context
+        from app.models.ai import AISession
+        from app.models.chat import Chat
+
+        ai_session = db.query(AISession).filter(AISession.id == request.session_id).first()
+        if not ai_session:
+            raise HTTPException(status_code=404, detail="AI session not found")
+
+        chat = db.query(Chat).filter(Chat.id == ai_session.chat_id).first()
+        if not chat:
+            raise HTTPException(status_code=404, detail="Chat not found for AI session")
+
         # Get AI service
         ai_service = get_ai_service()
 
@@ -255,8 +267,54 @@ async def send_ai_message(sid: str, request: SocketIOMessageRequest, db: Session
         context.append({"role": "user", "content": request.message})
         question_count += 1
 
-        # Generate AI response
-        response_data = await ai_service.generate_response(request.message, context)
+        # Fetch patient and doctor context for AI prompt resolution
+        from app.models.patient import Patient
+        from app.models.doctor import Doctor
+        from app.models.mapping import UserPatientRelation
+        from app.models.case_history import CaseHistory
+        from app.models.user import User, UserRole
+
+        patient_data = None
+        doctor_data = None
+        case_summary = None
+        patient_relation = None
+
+        # Get current user for relation checking
+        current_user = db.query(User).filter(User.id == session_info.get('user_id')).first()
+
+        # Get patient information
+        patient = db.query(Patient).filter(Patient.id == chat.patient_id).first()
+        if patient:
+            patient_data = patient
+
+            # Get the most recent case history for case summary
+            case_history = db.query(CaseHistory).filter(
+                CaseHistory.patient_id == patient.id
+            ).order_by(CaseHistory.created_at.desc()).first()
+            if case_history and case_history.summary:
+                case_summary = case_history.summary
+
+            # Get patient relation if current user is a patient
+            if current_user and current_user.role == UserRole.PATIENT:
+                patient_relation = db.query(UserPatientRelation).filter(
+                    UserPatientRelation.user_id == current_user.id,
+                    UserPatientRelation.patient_id == patient.id
+                ).first()
+
+        # Get doctor information
+        doctor = db.query(Doctor).filter(Doctor.id == chat.doctor_id).first()
+        if doctor:
+            doctor_data = doctor
+
+        # Generate AI response with context
+        response_data = await ai_service.generate_response(
+            request.message,
+            context,
+            patient_data=patient_data,
+            doctor_data=doctor_data,
+            case_summary=case_summary,
+            patient_relation=patient_relation
+        )
 
         # Handle response based on type
         if isinstance(response_data, dict):

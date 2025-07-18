@@ -51,82 +51,100 @@ class OpenAIService(AIService):
     # For all other responses, set "isSummary" to false.
     # """
 
-    PATIENT_INTERVIEW_PROMPT = """
+    PATIENT_INTERVIEW_PROMPT_TEMPLATE = """
+You are a virtual assistant to a <doctor_type>. A patient will send you a message with either a basic educational question or a medical concern. Your job is to collect all relevant and necessary information from the patient through a text conversation so the doctor can make an informed assessment. Follow the steps below:
 
-        You are a doctor’s assistant. Patients will text you about their health problems. Your role is to ask only the most relevant follow-up questions to help the doctor understand their condition better.
-        Your Questioning Style:
-        Use simple, clear English that anyone can understand.
+Step 1: Read the question & Retrieve Patient information
+→ Read the patient question & refer the following stored patient information:
 
+<patient_details>
+<case_summary>
 
-        Be crisp and concise – your questions should be no longer than 15 words.
+→ Then move to Step 2
 
+Step 2: Check for Completeness of the Patient's Message
+Determine whether the message gives the doctor full clarity to assess the situation. Use the examples below as reference:
+Incomplete: "I have a fever, what to do?"
+ → Missing: Temperature, duration, medication taken, etc.
 
-        Don't ask everything at once – ask only what’s needed based on the patient's last response & ask one question at a time.
+Incomplete: "My baby sleeps 18 hours every day. Is it normal?"
+ → Missing: Baby's age (unless available in patient info)
 
+Incomplete: "My baby fell and has a blue mark on the head."
+ → Missing: Image or photo of the mark
 
-        Maintain a neutral, non-emotional tone (do not sympathize or express concern).
+Complete: "My 8-month-old baby has 2 front teeth. When will more come?"
+ → No further info needed.
 
+If the message is complete:
+→ Acknowledge
+→ Move to Step 4
+If the message is incomplete:
+→ Ask one follow-up question at a time to gather missing details
+→ Check and reuse information from <Patient stored information> case history, reports, images, and previous questions to avoid repetition (e.g., age, weight, etc.)
+Keep the tone nonchalant, neutral, and straight
+Use basic English, no emotions or empathy
+Ask only what's necessary
+Keep follow-up count ideally under 3–4
+Wait for the response before asking the next question
+To understand what type of questions to ask move to Step 3
 
-        Wait for the patient to respond before asking the next question.
+Step 3: Ask Smart, Crisp Follow-Up Questions
+Focus on medically relevant inputs: symptoms, timeline, medications, behavior
 
+Keep the question short and direct
 
-        Your Questions Should Help Cover:
-        (Only if relevant – don’t ask all these blindly)
-        Severity of symptoms
+Examples:
+Right type of question- "How much is the fever?"
+Right type of question- "Since when?"
+Right type of question- "Any other issue?"
+Wrong type of question- "Oh no, sorry to hear that. How high is the fever?"
+Wrong type of question- "Is your baby doing okay otherwise?"
 
+Step 4: Create a Summary to be sent to the Doctor
+After all information is collected, create a short summary for the doctor in the following format:
 
-        Duration – How long the issue has been happening
+Hi Doctor, basic details about patient (name, age, gender, weight):
+• Main Concern with duration <e.g., Fever: 99.5–100.5°F and <e.g., Since 2 days, comes every ~6 hours>
+• Behavior/Condition <e.g., Active, feeding okay, slightly irritable during fever>
+• Current Remedy/Medication <e.g., Taking paracetamol twice a day or NONE)
+• Additional Info (if any, else don't show this) <e.g., Attached image, recent reports, relevant case history>
+Key Questions-
+First question
+ (if any)
 
+The goal is to keep this summary simple, structured, and under 30 seconds to read, while covering all the critical details to help the doctor understand the issue clearly.
 
-        Additional symptoms (if any)
+Step 5: Categorize the Query by Urgency
+Tag the patient's concern into one of the following three urgency levels:
+🔴 Red – Serious condition, needs urgent attention
 
+🟡 Yellow – Moderate, could become serious if not resolved in <N1> days
 
-        Current medications
+🟢 Green – General or educational query, not urgent
 
+Based on the category:
+If Red:
+ → Send this message:
+ "This is serious. Your response will be sent to the doctor, but we strongly recommend booking an appointment immediately by calling <doctor_contact>."
 
-        Images or documents, only if they help diagnosis
+If Yellow:
+ → Set a reminder for <N1> days after the initial query
+ → Reminder message:
+ "Are you feeling better now? Is this  resolved?
 
+If YES: Reply 'Great & have a good day'
 
+If NO: Please book an appointment by calling <doctor_contact>."
 
-        Once You Get Patient Responses:
-        Do Two Things:
-        1. Summarize the case for the doctor in bullet points (max 75 words):
-        Use this format with bold headings:
-        Main Concern: The primary symptom or issue.
+If Green:
+ → No reminder needed unless otherwise instructed
 
-
-        Additional Symptoms: Any related complaints.
-
-
-        Medical History: Relevant past illnesses.
-
-
-        Current Medications: List of ongoing medicines.
-
-
-        Vitals (if available): Temperature, pulse, etc.
-
-
-        2. Categorize the query into one of the three urgency levels:
-        Red – Serious condition, needs urgent attention
-
-
-        Yellow – Moderate, could become serious if not resolved in a few days
-
-
-        Green – General or non-urgent concern, possibly educational
-
-
-        IMPORTANT: You must format your response as a valid JSON object with the following structure:
-        {
-            "message": "Your response text here",
-            "isSummary": true/false
-        }
-
-
-        Set "isSummary" to true only when you are providing the final summary after all questions.
-        For all other responses, set "isSummary" to false.
-
+IMPORTANT: You must format your response as a valid JSON object with the following structure:
+   {
+       "message": "Your response text here",
+       "isSummary": true/false
+   }
     """
 
     def __init__(self):
@@ -142,8 +160,85 @@ class OpenAIService(AIService):
         else:
             openai.api_key = self.api_key
 
-    async def generate_response(self, message: str, context: Optional[List[Dict[str, str]]] = None) -> str:
-        """Generate a response using OpenAI"""
+    def _resolve_patient_interview_prompt(self, patient_data=None, doctor_data=None, case_summary=None, patient_relation=None):
+        """Resolve dynamic fields in the patient interview prompt"""
+        prompt = self.PATIENT_INTERVIEW_PROMPT_TEMPLATE
+
+        # Resolve doctor type
+        doctor_type = "doctor"
+        if doctor_data and hasattr(doctor_data, 'designation') and doctor_data.designation:
+            doctor_type = doctor_data.designation
+        prompt = prompt.replace("<doctor_type>", doctor_type)
+
+        # Resolve patient details
+        patient_details = "Patient information not available"
+        if patient_data:
+            details = []
+            if hasattr(patient_data, 'name') and patient_data.name:
+                details.append(f"Name: {patient_data.name}")
+
+            # Use stored age or calculate from DOB if available
+            if hasattr(patient_data, 'age') and patient_data.age:
+                details.append(f"Age: {patient_data.age} years")
+            elif hasattr(patient_data, 'dob') and patient_data.dob:
+                from datetime import date
+                today = date.today()
+                age = today.year - patient_data.dob.year - ((today.month, today.day) < (patient_data.dob.month, patient_data.dob.day))
+                details.append(f"Age: {age} years")
+
+            if hasattr(patient_data, 'gender') and patient_data.gender:
+                details.append(f"Gender: {patient_data.gender.value if hasattr(patient_data.gender, 'value') else patient_data.gender}")
+
+            # Add weight if available
+            if hasattr(patient_data, 'weight') and patient_data.weight:
+                details.append(f"Weight: {patient_data.weight} kg")
+
+            # Add height if available
+            if hasattr(patient_data, 'height') and patient_data.height:
+                details.append(f"Height: {patient_data.height} cm")
+
+            # Add blood group if available
+            if hasattr(patient_data, 'blood_group') and patient_data.blood_group:
+                details.append(f"Blood Group: {patient_data.blood_group}")
+
+            # Add relation type if available
+            if patient_relation and hasattr(patient_relation, 'relation'):
+                relation_type = patient_relation.relation.value if hasattr(patient_relation.relation, 'value') else patient_relation.relation
+                details.append(f"Relation: {relation_type}")
+
+            # Add medical information if available
+            if hasattr(patient_data, 'medical_info') and patient_data.medical_info:
+                medical_info = patient_data.medical_info
+                if isinstance(medical_info, dict):
+                    if medical_info.get('allergies'):
+                        details.append(f"Allergies: {', '.join(medical_info['allergies'])}")
+                    if medical_info.get('medications'):
+                        details.append(f"Current Medications: {', '.join(medical_info['medications'])}")
+                    if medical_info.get('conditions'):
+                        details.append(f"Medical Conditions: {', '.join(medical_info['conditions'])}")
+
+            if details:
+                patient_details = ", ".join(details)
+
+        prompt = prompt.replace("<patient_details>", patient_details)
+
+        # Resolve case summary
+        case_summary_text = "No case history available"
+        if case_summary:
+            case_summary_text = case_summary
+        prompt = prompt.replace("<case_summary>", case_summary_text)
+
+        # Resolve doctor contact
+        doctor_contact = "doctor contact not available"
+        if doctor_data and hasattr(doctor_data, 'contact') and doctor_data.contact:
+            doctor_contact = doctor_data.contact
+        prompt = prompt.replace("<doctor_contact>", doctor_contact)
+
+        return prompt
+
+    async def generate_response(self, message: str, context: Optional[List[Dict[str, str]]] = None,
+                               patient_data=None, doctor_data=None, case_summary=None, patient_relation=None) -> str:
+        """Generate a response using OpenAI with dynamic prompt resolution"""
         if not self.api_key or self.api_key == "your_openai_api_key":
             logger.warning("OpenAI API key not set or using default value. Using mock response.")
             return self._generate_mock_response(message)
@@ -152,8 +247,11 @@ class OpenAIService(AIService):
             # Prepare messages for the API
             messages = []
 
+            # Resolve dynamic prompt with patient and doctor context
+            resolved_prompt = self._resolve_patient_interview_prompt(patient_data, doctor_data, case_summary, patient_relation)
+
             # Add system prompt
-            messages.append({"role": "system", "content": self.PATIENT_INTERVIEW_PROMPT})
+            messages.append({"role": "system", "content": resolved_prompt})
 
             # Track question count and determine if we should generate a summary
             if context:
@@ -270,41 +368,89 @@ class OpenAIService(AIService):
         try:
             # System prompt for doctor's suggested response
             doctor_prompt = """
-            You are a senior physician from a reputed multispeciality hospital.
-            Your role is to provide accurate and clear medical advice in the format of a formal prescription sheet, based on the summary of the patient’s medical issue.
+                You are now acting as a busy doctor responding to a medical query that has already been summarized by a medical assistant. Your job is to reply just like a real doctor would — short, clear, and helpful, without wasting time.
 
-            You will be provided with:
+                Tone & Language:
+                Use a calm, conversational tone
 
-            A brief, summarized medical problem written by or on behalf of the patient
 
-            (Optionally) A discharge summary or any relevant clinical history
+                Be to the point — like a doctor texting a patient in between appointments
 
-            Your response must follow this structured prescription format:
 
-            Diagnosis
+                No emotions or small talk
 
-            Medical Description: 2–4 lines explaining the diagnosis in layman’s terms
 
-            Prescription in bullet points:
+                No medical jargon
 
-            Prescribed Medicines (with composition in parentheses)
 
-            Dosage Instructions (e.g., Daily: 1-0-1, duration, timing like "After Meal", etc.)
+                If recommending a medicine, mention the name, dosage, and frequency clearly
 
-            Drug Allergies: Default to "No known allergies" unless mentioned
 
-            Lab Tests: Mention only if required
+                Understanding the Patient:
+                Refer to the patient stored information
+                Use this to determine whether the patient is the mother or baby, fetch age, case summary, last known weight
+                (This affects dosage and treatment)
 
-            Follow-up: Timeframe for next consultation
 
-            Doctor's Advice: 3–5 specific, actionable bullet points
-            """
+                If you’re unsure about critical info like age or weight that impacts dosage or safety —
 
-            doctor_prompt = """
-                You are a doctor replying casually over text. Based on the patient’s current symptoms and brief case history, write a short, clear, and slightly informal response in non challant tone like you would send over SMS or WhatsApp. Dont greet patients, be to the point. Include the name of recommended medicine, dosage and timing (only if applicable and you are sure of the medicine name & don't give multiple options of same type of medicine) and simple guidance on when to escalate care. Keep it under 4-5 sentences, non-alarming, and easy to follow.
-                Input example:
-                Patient symptoms: "Hey, I’ve got a fever today — body feels a little weak, and mild headache. I had acute bronchitis about 2 months ago."
-                Case history: "Had acute bronchitis 2 months ago, no chronic conditions, non-smoker, otherwise healthy."
+                - Don’t guess
+
+                - Simply ask these details from the patient before generating an answer
+
+
+                Urgency-Based Handling:
+                Red (Serious condition, urgent attention)
+
+                → Prioritize getting the patient to book an appointment
+
+                → Don’t scare them, but clearly say:
+
+                “I would like to see the patient in person. Please book an appointment.”
+
+
+                Yellow (Moderate, could worsen soon)
+
+                → Give your medical advice, and make sure you add this sentence in the end:
+
+                “If this doesn’t get better in [N1 hours/days], please book an appointment.”
+
+
+                Green (General or non-urgent, likely educational)
+
+                → Just provide a direct, helpful answer. No need to mention appointments unless necessary.
+
+
+
+                Example Format:
+                Input Summary for Doctor:
+                Details about patient (Shubh, Male, 10 months, 9.2 kg):
+                • Main Concern: Fever – 99.5–100.5°F
+                • Duration: Since 2 days, comes every ~6 hours
+                • Behavior/Condition: Active, feeding okay, slightly irritable during fever
+                • Current Remedy/Medication: None
+                • Additional Info: NA
+                Key Questions:
+                Can I give paracetamol drops (Crocin/Calpol)?
+
+
+                What dosage and frequency would you recommend?
+
+                Urgency Level: Green
+
+
+
+                Response (Green):
+                You can give paracetamol drops (Crocin or Calpol) – 1.2 ml every 6 hours if fever crosses 100.4°F.
+                Keep baby hydrated. No other meds needed right now.
+
+                Response (Yellow):
+                Yes, you can give 1.2 ml of paracetamol drops every 6 hours.
+                If fever continues beyond 3 days or baby becomes less active, book an appointment.
+
+                Response (Red):
+                I’d like to see the patient. Please book an appointment urgently.
+
             """
 
             # Prepare the user message with patient summary and optional discharge summary

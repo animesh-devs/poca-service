@@ -101,6 +101,28 @@ def register_socketio_handlers():
                         db = next(get_db())
                         current_user = auth_data['user']
 
+                        # Auto-resolve user_entity_id for patient users (same as WebSocket)
+                        if current_user.role == UserRole.PATIENT and not user_entity_id:
+                            # Try to find a "self" relation first
+                            from app.models.mapping import UserPatientRelation, RelationType
+                            self_relation = db.query(UserPatientRelation).filter(
+                                UserPatientRelation.user_id == current_user.id,
+                                UserPatientRelation.relation == RelationType.SELF
+                            ).first()
+
+                            if self_relation:
+                                user_entity_id = self_relation.patient_id
+                                logger.info(f"Auto-resolved user_entity_id to self relation patient ID {user_entity_id} for user {current_user.id}")
+                            else:
+                                # Try to find any relation
+                                any_relation = db.query(UserPatientRelation).filter(
+                                    UserPatientRelation.user_id == current_user.id
+                                ).first()
+
+                                if any_relation:
+                                    user_entity_id = any_relation.patient_id
+                                    logger.info(f"Auto-resolved user_entity_id to patient relation {user_entity_id} for user {current_user.id}")
+
                         # Verify AI session exists and user has access
                         ai_session = db.query(AISession).filter(AISession.id == session_id).first()
                         if not ai_session:
@@ -122,20 +144,30 @@ def register_socketio_handlers():
                         # Access control (same as WebSocket)
                         has_access = False
 
+                        logger.debug(f"Access control check - User: {current_user.id}, Role: {current_user.role}, user_entity_id: {user_entity_id}")
+                        logger.debug(f"Chat details - doctor_id: {chat.doctor_id}, patient_id: {chat.patient_id}")
+
                         if current_user.role == UserRole.ADMIN:
                             has_access = True
+                            logger.debug("Access granted: Admin user")
                         elif current_user.role == UserRole.DOCTOR:
                             if user_entity_id == chat.doctor_id:
                                 has_access = True
+                                logger.debug("Access granted: Doctor matches chat doctor_id")
+                            else:
+                                logger.debug(f"Access denied: Doctor user_entity_id {user_entity_id} != chat.doctor_id {chat.doctor_id}")
                         elif current_user.role == UserRole.PATIENT:
-                            if user_entity_id == chat.patient_id:
-                                from app.models.mapping import UserPatientRelation
-                                relation = db.query(UserPatientRelation).filter(
-                                    UserPatientRelation.user_id == current_user.id,
-                                    UserPatientRelation.patient_id == chat.patient_id
-                                ).first()
-                                if relation:
-                                    has_access = True
+                            # Check if user has access to this patient (through user-patient relation)
+                            from app.models.mapping import UserPatientRelation
+                            relation = db.query(UserPatientRelation).filter(
+                                UserPatientRelation.user_id == current_user.id,
+                                UserPatientRelation.patient_id == chat.patient_id
+                            ).first()
+                            if relation:
+                                has_access = True
+                                logger.debug(f"Access granted: Patient user has relation to patient {chat.patient_id}")
+                            else:
+                                logger.debug(f"Access denied: No user-patient relation found for user {current_user.id} and patient {chat.patient_id}")
 
                         if not has_access:
                             logger.warning(f"User {current_user.id} denied access to AI session {session_id}")
@@ -257,6 +289,26 @@ async def handle_ai_message(sid, data):
         # Get database session
         db = next(get_db())
 
+        # Get AI session and chat for context
+        from app.models.ai import AISession
+        from app.models.chat import Chat
+
+        ai_session = db.query(AISession).filter(AISession.id == session_id).first()
+        if not ai_session:
+            await sio_server.emit('error', {
+                'status': 'error',
+                'message': 'AI session not found'
+            }, room=sid, namespace='/socket.io')
+            return
+
+        chat = db.query(Chat).filter(Chat.id == ai_session.chat_id).first()
+        if not chat:
+            await sio_server.emit('error', {
+                'status': 'error',
+                'message': 'Chat not found for AI session'
+            }, room=sid, namespace='/socket.io')
+            return
+
         # Create new AI message in database
         db_message = AIMessage(
             session_id=session_id,
@@ -286,8 +338,74 @@ async def handle_ai_message(sid, data):
         context.append({"role": "user", "content": message_content})
         question_count += 1
 
-        # Generate AI response
-        response_data = await ai_service.generate_response(message_content, context)
+        # Get AI session and chat for context
+        from app.models.ai import AISession
+        from app.models.chat import Chat
+
+        ai_session = db.query(AISession).filter(AISession.id == session_id).first()
+        if not ai_session:
+            await sio_server.emit('error', {
+                'status': 'error',
+                'message': 'AI session not found'
+            }, room=sid, namespace='/socket.io')
+            return
+
+        chat = db.query(Chat).filter(Chat.id == ai_session.chat_id).first()
+        if not chat:
+            await sio_server.emit('error', {
+                'status': 'error',
+                'message': 'Chat not found for AI session'
+            }, room=sid, namespace='/socket.io')
+            return
+
+        # Fetch patient and doctor context for AI prompt resolution
+        from app.models.patient import Patient
+        from app.models.doctor import Doctor
+        from app.models.mapping import UserPatientRelation
+        from app.models.case_history import CaseHistory
+        from app.models.user import User, UserRole
+
+        patient_data = None
+        doctor_data = None
+        case_summary = None
+        patient_relation = None
+
+        # Get current user for relation checking
+        current_user = db.query(User).filter(User.id == session_info.get('user_id')).first()
+
+        # Get patient information
+        patient = db.query(Patient).filter(Patient.id == chat.patient_id).first()
+        if patient:
+            patient_data = patient
+
+            # Get the most recent case history for case summary
+            case_history = db.query(CaseHistory).filter(
+                CaseHistory.patient_id == patient.id
+            ).order_by(CaseHistory.created_at.desc()).first()
+            if case_history and case_history.summary:
+                case_summary = case_history.summary
+
+            # Get patient relation if current user is a patient
+            if current_user and current_user.role == UserRole.PATIENT:
+                patient_relation = db.query(UserPatientRelation).filter(
+                    UserPatientRelation.user_id == current_user.id,
+                    UserPatientRelation.patient_id == patient.id
+                ).first()
+
+        # Get doctor information
+        doctor = db.query(Doctor).filter(Doctor.id == chat.doctor_id).first()
+        if doctor:
+            doctor_data = doctor
+
+        # Generate AI response with context
+        response_data = await ai_service.generate_response(
+            message_content,
+            context,
+            patient_data=patient_data,
+            doctor_data=doctor_data,
+            case_summary=case_summary,
+            patient_relation=patient_relation
+        )
 
         # Handle response
         if isinstance(response_data, dict):
