@@ -146,11 +146,42 @@ def create_test_data():
         # Run migration to add health fields to patients table
         logger.info("Running migration to add health fields to patients table...")
         try:
-            from app.db.migrations.add_patient_health_fields import run_migration
-            run_migration(db)
-            logger.info("Migration completed successfully")
+            from sqlalchemy import text
+
+            # Check if the health fields already exist
+            result = db.execute(text("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'patients'
+                AND column_name IN ('age', 'blood_group', 'height', 'weight', 'medical_info', 'emergency_contact_name', 'emergency_contact_number')
+            """))
+            existing_columns = [row[0] for row in result.fetchall()]
+
+            if len(existing_columns) < 7:  # If not all health fields exist
+                # Add the new columns
+                migration_queries = [
+                    "ALTER TABLE patients ADD COLUMN IF NOT EXISTS age INTEGER",
+                    "ALTER TABLE patients ADD COLUMN IF NOT EXISTS blood_group VARCHAR",
+                    "ALTER TABLE patients ADD COLUMN IF NOT EXISTS height INTEGER",
+                    "ALTER TABLE patients ADD COLUMN IF NOT EXISTS weight INTEGER",
+                    "ALTER TABLE patients ADD COLUMN IF NOT EXISTS medical_info JSON",
+                    "ALTER TABLE patients ADD COLUMN IF NOT EXISTS emergency_contact_name VARCHAR",
+                    "ALTER TABLE patients ADD COLUMN IF NOT EXISTS emergency_contact_number VARCHAR"
+                ]
+
+                for query in migration_queries:
+                    try:
+                        db.execute(text(query))
+                    except Exception as e:
+                        logger.warning(f"Migration query may have failed (column may already exist): {query} - {e}")
+
+                db.commit()
+                logger.info("Migration completed successfully")
+            else:
+                logger.info("Health fields already exist, skipping migration")
+
         except Exception as e:
-            logger.warning(f"Migration may have already been run: {e}")
+            logger.warning(f"Migration failed, continuing anyway: {e}")
             # Continue with test data creation even if migration fails
         # Create admin user
         admin_id = str(uuid.uuid4())
@@ -754,7 +785,7 @@ def create_test_data():
         mother_report1 = Report(
             id=str(uuid.uuid4()),
             patient_id=mother_patient_id,
-            report_type=ReportType.BLOOD_TEST,
+            report_type=ReportType.POST_DELIVERY,
             title="Post-Delivery Health Assessment",
             summary="Post-delivery recovery excellent. Uterine involution normal. Breastfeeding well established. Hemoglobin: 11.2 g/dL. Blood pressure: 120/80 mmHg. Recommended: Continue iron supplements, adequate nutrition.",
             documents=[]
@@ -764,7 +795,7 @@ def create_test_data():
         mother_report2 = Report(
             id=str(uuid.uuid4()),
             patient_id=mother_patient_id,
-            report_type=ReportType.OTHER,
+            report_type=ReportType.LACTATION,
             title="Breastfeeding Assessment",
             summary="Breastfeeding established successfully. Good latch observed. Milk supply adequate. No signs of mastitis or nipple trauma. Recommendations: Continue exclusive breastfeeding, proper positioning techniques.",
             documents=[]
@@ -784,7 +815,7 @@ def create_test_data():
         newborn_report1 = Report(
             id=str(uuid.uuid4()),
             patient_id=newborn_patient_id,
-            report_type=ReportType.OTHER,
+            report_type=ReportType.NEWBORN_SCREENING,
             title="Newborn Health Assessment",
             summary="Healthy newborn male. Birth weight: 3.2kg (appropriate for gestational age). APGAR scores: 9/10. All newborn screening tests normal. Feeding well, good weight gain pattern.",
             documents=[]
@@ -794,7 +825,7 @@ def create_test_data():
         newborn_report2 = Report(
             id=str(uuid.uuid4()),
             patient_id=newborn_patient_id,
-            report_type=ReportType.OTHER,
+            report_type=ReportType.GROWTH_CHART,
             title="Growth and Development Chart",
             summary="Current weight: 3.2kg, Length: 50cm, Head circumference: 35cm. Growth parameters within normal percentiles. Developmental milestones appropriate for age.",
             documents=[]
