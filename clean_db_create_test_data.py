@@ -148,37 +148,44 @@ def create_test_data():
         try:
             from sqlalchemy import text
 
-            # Check if the health fields already exist
-            result = db.execute(text("""
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_name = 'patients'
-                AND column_name IN ('age', 'blood_group', 'height', 'weight', 'medical_info', 'emergency_contact_name', 'emergency_contact_number')
-            """))
-            existing_columns = [row[0] for row in result.fetchall()]
+            # Check if the health fields already exist using SQLite-specific PRAGMA
+            result = db.execute(text("PRAGMA table_info(patients)"))
+            existing_columns = [row[1] for row in result.fetchall()]  # row[1] is column name
 
-            if len(existing_columns) < 7:  # If not all health fields exist
-                # Add the new columns
-                migration_queries = [
-                    "ALTER TABLE patients ADD COLUMN IF NOT EXISTS age INTEGER",
-                    "ALTER TABLE patients ADD COLUMN IF NOT EXISTS blood_group VARCHAR",
-                    "ALTER TABLE patients ADD COLUMN IF NOT EXISTS height INTEGER",
-                    "ALTER TABLE patients ADD COLUMN IF NOT EXISTS weight INTEGER",
-                    "ALTER TABLE patients ADD COLUMN IF NOT EXISTS medical_info JSON",
-                    "ALTER TABLE patients ADD COLUMN IF NOT EXISTS emergency_contact_name VARCHAR",
-                    "ALTER TABLE patients ADD COLUMN IF NOT EXISTS emergency_contact_number VARCHAR"
-                ]
+            health_fields = ['age', 'blood_group', 'height', 'weight', 'medical_info', 'emergency_contact_name', 'emergency_contact_number']
+            missing_fields = [field for field in health_fields if field not in existing_columns]
+
+            if missing_fields:
+                logger.info(f"Adding missing health fields: {missing_fields}")
+                # Add the missing columns (SQLite doesn't support IF NOT EXISTS in ALTER TABLE)
+                migration_queries = []
+                for field in missing_fields:
+                    if field == 'age':
+                        migration_queries.append("ALTER TABLE patients ADD COLUMN age INTEGER")
+                    elif field == 'blood_group':
+                        migration_queries.append("ALTER TABLE patients ADD COLUMN blood_group VARCHAR")
+                    elif field == 'height':
+                        migration_queries.append("ALTER TABLE patients ADD COLUMN height INTEGER")
+                    elif field == 'weight':
+                        migration_queries.append("ALTER TABLE patients ADD COLUMN weight INTEGER")
+                    elif field == 'medical_info':
+                        migration_queries.append("ALTER TABLE patients ADD COLUMN medical_info JSON")
+                    elif field == 'emergency_contact_name':
+                        migration_queries.append("ALTER TABLE patients ADD COLUMN emergency_contact_name VARCHAR")
+                    elif field == 'emergency_contact_number':
+                        migration_queries.append("ALTER TABLE patients ADD COLUMN emergency_contact_number VARCHAR")
 
                 for query in migration_queries:
                     try:
                         db.execute(text(query))
+                        logger.info(f"Successfully executed: {query}")
                     except Exception as e:
-                        logger.warning(f"Migration query may have failed (column may already exist): {query} - {e}")
+                        logger.warning(f"Migration query failed (column may already exist): {query} - {e}")
 
                 db.commit()
                 logger.info("Migration completed successfully")
             else:
-                logger.info("Health fields already exist, skipping migration")
+                logger.info("All health fields already exist, skipping migration")
 
         except Exception as e:
             logger.warning(f"Migration failed, continuing anyway: {e}")
