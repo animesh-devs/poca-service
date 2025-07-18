@@ -287,10 +287,7 @@ Do not include any text outside of this JSON structure.
             except json.JSONDecodeError:
                 logger.warning(f"AI returned invalid JSON, wrapping plain text response: {response_text[:100]}...")
                 # If parsing fails, wrap the plain text in proper JSON format, defaulting isSummary to false
-                return {
-                    "message": response_text,
-                    "isSummary": False
-                }
+                return response_text
 
         except Exception as e:
             logger.error(f"Error generating response from OpenAI: {str(e)}")
