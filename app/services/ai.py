@@ -297,30 +297,41 @@ class OpenAIService(AIService):
         try:
             # Define critical output rules that must be included with every message
             CRITICAL_OUTPUT_RULES ="""
-                CRITICAL REMINDER:
-
-                You must always reply with only a single JSON object, as below:
+                You MUST respond only with a single JSON object in exactly this format:
 
                 json
                 {
                 "message": "Your follow-up question or summary here",
                 "isSummary": true/false
                 }
-                Do NOT output plain text, explanations, multiple JSON objects, “thank you”, or any extra message—EVER.
+                When gathering information (i.e., "isSummary": false):
 
-                If gathering info, "isSummary" must be false and the message must ONLY be a follow-up question.
+                Only send a single, direct, medically relevant follow-up question.
 
-                After collecting all necessary info, send the summary with "isSummary": true and the formatted message for the doctor.
+                The "message" field must contain only the question text.
 
-                Never end the conversation with a thank you, a closing statement, or a non-JSON response.
+                No acknowledgments, confirmations, gratitude, or any other text allowed.
 
-                Your ONLY valid outputs are:
+                Do NOT say “Understood,” “Thank you,” “Got it,” or similar phrases.
 
-                one follow-up question
+                When all required information is collected (i.e., "isSummary": true):
 
-                OR (if complete) the summary for the doctor
+                Send the final summary for the doctor once in the specified format.
 
-                Stay strict: one JSON object, per turn, following the above template—no exceptions.
+                Do not send any other messages or follow-ups after the summary.
+
+                Never send multiple JSON objects in one response. Only one JSON object per response is allowed.
+
+                Do NOT output any extra text, notes, explanations, or messages outside the JSON object — ever.
+
+                Your ONLY valid outputs at any turn are:
+
+                A single concise follow-up question for missing info ("isSummary": false)
+
+                The final summary to the doctor after all info is gathered ("isSummary": true)
+
+                Any deviation from these rules—such as acknowledgments, multiple JSON objects, summaries mid-conversation, or free text responses—is strictly prohibited.
+
             """
 
             # Prepare messages for the API
