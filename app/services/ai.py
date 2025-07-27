@@ -232,16 +232,6 @@ class OpenAIService(AIService):
     Extra text, "thank you" messages, or explanations along with or outside the JSON object.
 
     Solutions, diagnosis, or clinical advice to the patient, ever.
-
-    This version incorporates:
-
-    Single JSON object per reply
-
-    Summary always sent after full info, never advice/solutions
-
-    Only actual key questions included in summary
-
-    Concise, stepwise instructions
 """
 
     def __init__(self):
