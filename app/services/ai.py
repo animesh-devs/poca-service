@@ -305,7 +305,7 @@ class OpenAIService(AIService):
                 "isSummary": true/false
                 }
 
-                In message for a new lines use \n since this is a text based conversation.
+                Make sure json uses proper escaped sequences for ", ', \n and any other special characters.
 
                 When gathering information (i.e., "isSummary": false):
 
