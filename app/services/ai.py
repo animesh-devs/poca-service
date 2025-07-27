@@ -304,6 +304,9 @@ class OpenAIService(AIService):
                 "message": "Your follow-up question or summary here",
                 "isSummary": true/false
                 }
+
+                In message for a new lines use \n since this is a text based conversation.
+
                 When gathering information (i.e., "isSummary": false):
 
                 Only send a single, direct, medically relevant follow-up question.
