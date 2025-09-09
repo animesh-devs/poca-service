@@ -42,8 +42,11 @@ from app.models.mapping import (
 from app.models.chat import Chat, Message, MessageType
 from app.models.ai import AISession, AIMessage
 from app.models.document import FileDocument, DocumentType, UploadedBy
+from app.models.case_history import Document as CaseHistoryDocument
+from app.models.report import ReportDocument
 from app.api.auth import get_password_hash
 from app.config import settings
+from app.services.document_storage import document_storage
 
 # Store credentials and entity information for output
 credentials = {
@@ -58,6 +61,61 @@ credentials = {
     "ai_sessions": [],
     "ai_messages": []
 }
+
+def upload_document_from_file(file_path: str, admin_user_id: str, db, document_type: DocumentType = DocumentType.OTHER, remark: str = None) -> tuple[str, str]:
+    """Upload a document from file system to in-memory storage and create database record"""
+    try:
+        if not os.path.exists(file_path):
+            logger.warning(f"Document file not found: {file_path}")
+            return None, None
+
+        # Read file content
+        with open(file_path, 'rb') as f:
+            file_content = f.read()
+
+        file_size = len(file_content)
+        filename = os.path.basename(file_path)
+
+        # Determine content type
+        import mimetypes
+        content_type, _ = mimetypes.guess_type(file_path)
+        if not content_type:
+            content_type = "application/octet-stream"
+
+        # Store document in memory storage
+        storage_id = document_storage.store_document(
+            file_content=file_content,
+            filename=filename,
+            content_type=content_type
+        )
+
+        # Get the public base URL from environment variable or use default
+        public_base_url = os.getenv("PUBLIC_BASE_URL", settings.PUBLIC_BASE_URL)
+
+        # Create downloadable link using the public base URL from environment
+        download_link = f"{public_base_url}{settings.API_V1_PREFIX}/documents/{storage_id}/download"
+
+        # Create document record in database
+        db_document = FileDocument(
+            id=storage_id,
+            file_name=filename,
+            size=file_size,
+            link=download_link,
+            document_type=document_type,
+            uploaded_by=admin_user_id,
+            uploaded_by_role=UploadedBy.ADMIN,
+            remark=remark or f"Test document uploaded from {file_path}",
+            entity_id=None
+        )
+        db.add(db_document)
+        db.flush()
+
+        logger.info(f"Uploaded document: {filename} -> {download_link} (Storage ID: {storage_id})")
+        return storage_id, download_link
+
+    except Exception as e:
+        logger.error(f"Failed to upload document {file_path}: {e}")
+        return None, None
 
 def create_profile_photo_record(photo_filename: str, admin_user_id: str, db) -> str:
     """Create a database record for a profile photo using environment-based URL"""
@@ -779,16 +837,51 @@ def create_test_data():
         from app.models.case_history import CaseHistory
         from app.models.report import Report, ReportType, PatientReportMapping
 
-        # Mother's case history
+        # Upload actual PDF reports from data directory
+        logger.info("Uploading actual PDF reports from data directory...")
+
+        # Upload report1.pdf for mother
+        mother_report_doc_id, mother_report_doc_link = upload_document_from_file(
+            "data/reports/report1.pdf",
+            admin_id,
+            db,
+            DocumentType.OTHER,
+            "Mother's post-delivery health assessment report"
+        )
+
+        # Upload report2.pdf for newborn
+        newborn_report_doc_id, newborn_report_doc_link = upload_document_from_file(
+            "data/reports/report2.pdf",
+            admin_id,
+            db,
+            DocumentType.OTHER,
+            "Newborn's health assessment report"
+        )
+
+        # Mother's case history with document attachment
+        mother_case_history_id = str(uuid.uuid4())
         mother_case_history = CaseHistory(
-            id=str(uuid.uuid4()),
+            id=mother_case_history_id,
             patient_id=mother_patient_id,
             summary="Post-Delivery Care Summary: 28-year-old female, delivered healthy baby boy on June 15, 2024 via normal delivery. Current status: Post-delivery recovery progressing well. Breastfeeding established successfully. Current medications: Prenatal vitamins, Iron supplements, Calcium tablets. No known allergies. Concerns: Post-delivery recovery, breastfeeding support, maternal nutrition. Recommendations: Continue current supplements, adequate rest, proper nutrition for breastfeeding, regular follow-up visits.",
-            documents=[]
+            documents=[mother_report_doc_id] if mother_report_doc_id else []
         )
         db.add(mother_case_history)
 
-        # Mother's reports
+        # Add document to case history if upload was successful
+        if mother_report_doc_id and mother_report_doc_link:
+            case_history_doc = CaseHistoryDocument(
+                id=str(uuid.uuid4()),
+                case_history_id=mother_case_history_id,
+                file_name="report1.pdf",
+                size=os.path.getsize("data/reports/report1.pdf") if os.path.exists("data/reports/report1.pdf") else 0,
+                link=mother_report_doc_link,
+                uploaded_by=UploadedBy.ADMIN,
+                remark="Mother's post-delivery health assessment report attached to case history"
+            )
+            db.add(case_history_doc)
+
+        # Mother's reports with actual PDF attachment
         mother_report1_id = str(uuid.uuid4())
         mother_report1 = Report(
             id=mother_report1_id,
@@ -805,6 +898,19 @@ def create_test_data():
             report_id=mother_report1_id
         )
         db.add(mother_report1_mapping)
+
+        # Add actual PDF document to mother's report if upload was successful
+        if mother_report_doc_id and mother_report_doc_link:
+            mother_report_document = ReportDocument(
+                id=str(uuid.uuid4()),
+                report_id=mother_report1_id,
+                file_name="report1.pdf",
+                size=os.path.getsize("data/reports/report1.pdf") if os.path.exists("data/reports/report1.pdf") else 0,
+                link=mother_report_doc_link,
+                uploaded_by=admin_id,
+                remark="Mother's post-delivery health assessment report (actual PDF)"
+            )
+            db.add(mother_report_document)
 
         mother_report2_id = str(uuid.uuid4())
         mother_report2 = Report(
@@ -823,16 +929,30 @@ def create_test_data():
         )
         db.add(mother_report2_mapping)
 
-        # Newborn's case history
+        # Newborn's case history with document attachment
+        newborn_case_history_id = str(uuid.uuid4())
         newborn_case_history = CaseHistory(
-            id=str(uuid.uuid4()),
+            id=newborn_case_history_id,
             patient_id=newborn_patient_id,
             summary="Newborn Care Summary: Healthy baby boy born on June 15, 2024 at 39 weeks gestation. Birth weight: 3200g, Birth length: 50cm. Current status: Thriving newborn, exclusively breastfed. Current medications: Vitamin D drops as per pediatric guidelines. No known allergies. Concerns: Growth monitoring, feeding patterns, developmental milestones, vaccination schedule. Recommendations: Continue exclusive breastfeeding, regular weight monitoring, follow vaccination schedule, developmental assessments.",
-            documents=[]
+            documents=[newborn_report_doc_id] if newborn_report_doc_id else []
         )
         db.add(newborn_case_history)
 
-        # Newborn's reports
+        # Add document to newborn's case history if upload was successful
+        if newborn_report_doc_id and newborn_report_doc_link:
+            newborn_case_history_doc = CaseHistoryDocument(
+                id=str(uuid.uuid4()),
+                case_history_id=newborn_case_history_id,
+                file_name="report2.pdf",
+                size=os.path.getsize("data/reports/report2.pdf") if os.path.exists("data/reports/report2.pdf") else 0,
+                link=newborn_report_doc_link,
+                uploaded_by=UploadedBy.ADMIN,
+                remark="Newborn's health assessment report attached to case history"
+            )
+            db.add(newborn_case_history_doc)
+
+        # Newborn's reports with actual PDF attachment
         newborn_report1_id = str(uuid.uuid4())
         newborn_report1 = Report(
             id=newborn_report1_id,
@@ -849,6 +969,19 @@ def create_test_data():
             report_id=newborn_report1_id
         )
         db.add(newborn_report1_mapping)
+
+        # Add actual PDF document to newborn's report if upload was successful
+        if newborn_report_doc_id and newborn_report_doc_link:
+            newborn_report_document = ReportDocument(
+                id=str(uuid.uuid4()),
+                report_id=newborn_report1_id,
+                file_name="report2.pdf",
+                size=os.path.getsize("data/reports/report2.pdf") if os.path.exists("data/reports/report2.pdf") else 0,
+                link=newborn_report_doc_link,
+                uploaded_by=admin_id,
+                remark="Newborn's health assessment report (actual PDF)"
+            )
+            db.add(newborn_report_document)
 
         newborn_report2_id = str(uuid.uuid4())
         newborn_report2 = Report(
@@ -883,6 +1016,18 @@ def create_test_data():
             report_id=newborn_report3_id
         )
         db.add(newborn_report3_mapping)
+
+        # Log successful integration
+        if mother_report_doc_id and newborn_report_doc_id:
+            logger.info("✅ Successfully integrated actual PDF reports:")
+            logger.info(f"   - Mother's report (report1.pdf): {mother_report_doc_link}")
+            logger.info(f"   - Newborn's report (report2.pdf): {newborn_report_doc_link}")
+            logger.info("   - Mother's case history includes report1.pdf attachment")
+            logger.info("   - Newborn's case history includes report2.pdf attachment")
+            logger.info("   - Mother's report includes report1.pdf document")
+            logger.info("   - Newborn's report includes report2.pdf document")
+        else:
+            logger.warning("⚠️  Some PDF reports could not be uploaded - check data/reports/ directory")
 
         logger.info("✅ Mother and newborn test data created successfully!")
 
