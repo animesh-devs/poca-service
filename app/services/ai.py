@@ -311,27 +311,38 @@ Could this be a fracture or does it need an X-ray?"""
     }
 
     def _get_doctor_email(self, doctor_data):
-        """Extract doctor email from doctor data"""
+        """Extract doctor email from doctor data with detailed logging"""
+        logger.info(f"_get_doctor_email called with doctor_data: {doctor_data}")
         if not doctor_data:
+            logger.info("doctor_data is None, returning None")
             return None
         
         # Get the user associated with the doctor
         if hasattr(doctor_data, 'user') and doctor_data.user:
-            return doctor_data.user.email
+            email = doctor_data.user.email
+            logger.info(f"Found doctor email: {email}")
+            return email
         
+        logger.info("No user found for doctor_data, returning None")
         return None
 
     def _has_hardcoded_responses(self, doctor_data):
-        """Check if the doctor has hardcoded responses configured"""
+        """Check if the doctor has hardcoded responses configured with detailed logging"""
         doctor_email = self._get_doctor_email(doctor_data)
-        return doctor_email in self.HARDCODED_DOCTOR_CONFIGS
+        has_config = doctor_email in self.HARDCODED_DOCTOR_CONFIGS
+        logger.info(f"_has_hardcoded_responses: email={doctor_email}, has_config={has_config}")
+        logger.info(f"Available hardcoded configs: {list(self.HARDCODED_DOCTOR_CONFIGS.keys())}")
+        return has_config
 
     def _get_hardcoded_response(self, message: str, context: Optional[List[Dict[str, str]]] = None, doctor_data=None) -> dict:
-        """Generate hardcoded responses for configured doctors"""
+        """Generate hardcoded responses for configured doctors with detailed logging"""
         doctor_email = self._get_doctor_email(doctor_data)
+        logger.info(f"_get_hardcoded_response called for email: {doctor_email}")
         config = self.HARDCODED_DOCTOR_CONFIGS.get(doctor_email)
+        logger.info(f"Config found: {config is not None}")
         
         if not config:
+            logger.warning(f"No config found for doctor email: {doctor_email}")
             return None
         
         # Count how many user messages have been sent (questions answered)
@@ -339,18 +350,24 @@ Could this be a fracture or does it need an X-ray?"""
         if context:
             user_message_count = len([msg for msg in context if msg.get("role") == "user"])
         
+        logger.info(f"User message count: {user_message_count}")
+        logger.info(f"Total questions in config: {len(config['questions'])}")
+        
         questions = config["questions"]
         
         # If we haven't asked all questions yet, ask the next one
         if user_message_count < len(questions):
             question_index = user_message_count
             if question_index < len(questions):
+                question = questions[question_index]
+                logger.info(f"Returning question {question_index + 1}: {question}")
                 return {
-                    "message": questions[question_index],
+                    "message": question,
                     "isSummary": False
                 }
         
         # After all questions have been answered, return the fixed summary
+        logger.info("All questions answered, returning summary")
         return {
             "message": config["summary"],
             "isSummary": True
@@ -359,12 +376,32 @@ Could this be a fracture or does it need an X-ray?"""
     async def generate_response(self, message: str, context: Optional[List[Dict[str, str]]] = None,
                                patient_data=None, doctor_data=None, case_summary=None, patient_relation=None) -> str:
         """Generate a response using OpenAI with dynamic prompt resolution"""
-                # Check if this doctor has hardcoded responses configured
-        if self._has_hardcoded_responses(doctor_data):
-            logger.info(f"Using hardcoded responses for doctor: {self._get_doctor_email(doctor_data)}")
+                # Add comprehensive logging for debugging
+        logger.info(f"=== AI Service Debug Info ===")
+        logger.info(f"Message: {message}")
+        logger.info(f"Context length: {len(context) if context else 0}")
+        logger.info(f"Doctor data: {doctor_data}")
+        logger.info(f"Patient data: {patient_data}")
+        
+        # Check if this doctor has hardcoded responses configured
+        doctor_email = self._get_doctor_email(doctor_data)
+        logger.info(f"Doctor email: {doctor_email}")
+        
+        has_hardcoded = self._has_hardcoded_responses(doctor_data)
+        logger.info(f"Has hardcoded responses: {has_hardcoded}")
+        
+        if has_hardcoded:
+            logger.info(f"Using hardcoded responses for doctor: {doctor_email}")
             hardcoded_response = self._get_hardcoded_response(message, context, doctor_data)
+            logger.info(f"Hardcoded response: {hardcoded_response}")
             if hardcoded_response:
+                logger.info(f"Returning hardcoded response: {hardcoded_response}")
                 return hardcoded_response
+            else:
+                logger.warning(f"Hardcoded response was None for doctor: {doctor_email}")
+        else:
+            logger.info(f"No hardcoded responses configured for doctor: {doctor_email}")
+            logger.info("Proceeding with normal AI flow")
         
         if not self.api_key or self.api_key == "your_openai_api_key":
             logger.warning("OpenAI API key not set or using default value. Using mock response.")
