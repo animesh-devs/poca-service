@@ -289,7 +289,7 @@ class OpenAIService(AIService):
 
     # Hardcoded response configurations for specific doctors
     HARDCODED_DOCTOR_CONFIGS = {
-        "kavya@example.com": {
+        "Dr. Kavya Reddy": {
             "questions": [
                 "Which part of the hand has the swelling — wrist, fingers, or upper arm?",
                 "Can your baby move the hand normally, or does it hurt when moving?", 
@@ -304,51 +304,45 @@ Key Question:
 Could this be a fracture or does it need an X-ray?"""
         }
         # Add more doctor configurations here as needed
-        # "another_doctor@example.com": {
+        # "Dr. Another Doctor": {
         #     "questions": ["Question 1", "Question 2", ...],
         #     "summary": "Summary for this doctor"
         # }
     }
 
-    def _get_doctor_email(self, doctor_data):
-        """Extract doctor email from doctor data with detailed logging"""
-        logger.info(f"_get_doctor_email called with doctor_data: {doctor_data}")
+    def _get_doctor_identifier(self, doctor_data):
+        """Extract doctor identifier (name) from doctor data with detailed logging"""
+        logger.info(f"_get_doctor_identifier called with doctor_data: {doctor_data}")
         if not doctor_data:
             logger.info("doctor_data is None, returning None")
             return None
         
-        # First, try to get email directly from doctor object
-        if hasattr(doctor_data, 'email') and doctor_data.email:
-            email = doctor_data.email
-            logger.info(f"Found doctor email directly: {email}")
-            return email
+        # Use doctor name as identifier
+        if hasattr(doctor_data, 'name') and doctor_data.name:
+            name = doctor_data.name
+            logger.info(f"Found doctor name: {name}")
+            return name
         
-        # If no direct email, try to get it from the user relationship
-        if hasattr(doctor_data, 'user') and doctor_data.user:
-            email = doctor_data.user.email
-            logger.info(f"Found doctor email from user relationship: {email}")
-            return email
-        
-        logger.info("No email found for doctor_data, returning None")
+        logger.info("No name found for doctor_data, returning None")
         return None
 
     def _has_hardcoded_responses(self, doctor_data):
         """Check if the doctor has hardcoded responses configured with detailed logging"""
-        doctor_email = self._get_doctor_email(doctor_data)
-        has_config = doctor_email in self.HARDCODED_DOCTOR_CONFIGS
-        logger.info(f"_has_hardcoded_responses: email={doctor_email}, has_config={has_config}")
+        doctor_identifier = self._get_doctor_identifier(doctor_data)
+        has_config = doctor_identifier in self.HARDCODED_DOCTOR_CONFIGS
+        logger.info(f"_has_hardcoded_responses: identifier={doctor_identifier}, has_config={has_config}")
         logger.info(f"Available hardcoded configs: {list(self.HARDCODED_DOCTOR_CONFIGS.keys())}")
         return has_config
 
     def _get_hardcoded_response(self, message: str, context: Optional[List[Dict[str, str]]] = None, doctor_data=None) -> dict:
         """Generate hardcoded responses for configured doctors with detailed logging"""
-        doctor_email = self._get_doctor_email(doctor_data)
-        logger.info(f"_get_hardcoded_response called for email: {doctor_email}")
-        config = self.HARDCODED_DOCTOR_CONFIGS.get(doctor_email)
+        doctor_identifier = self._get_doctor_identifier(doctor_data)
+        logger.info(f"_get_hardcoded_response called for email: {doctor_identifier}")
+        config = self.HARDCODED_DOCTOR_CONFIGS.get(doctor_identifier)
         logger.info(f"Config found: {config is not None}")
         
         if not config:
-            logger.warning(f"No config found for doctor email: {doctor_email}")
+            logger.warning(f"No config found for doctor email: {doctor_identifier}")
             return None
         
         # Count how many user messages have been sent (questions answered)
@@ -390,23 +384,23 @@ Could this be a fracture or does it need an X-ray?"""
         logger.info(f"Patient data: {patient_data}")
         
         # Check if this doctor has hardcoded responses configured
-        doctor_email = self._get_doctor_email(doctor_data)
-        logger.info(f"Doctor email: {doctor_email}")
+        doctor_identifier = self._get_doctor_identifier(doctor_data)
+        logger.info(f"Doctor email: {doctor_identifier}")
         
         has_hardcoded = self._has_hardcoded_responses(doctor_data)
         logger.info(f"Has hardcoded responses: {has_hardcoded}")
         
         if has_hardcoded:
-            logger.info(f"Using hardcoded responses for doctor: {doctor_email}")
+            logger.info(f"Using hardcoded responses for doctor: {doctor_identifier}")
             hardcoded_response = self._get_hardcoded_response(message, context, doctor_data)
             logger.info(f"Hardcoded response: {hardcoded_response}")
             if hardcoded_response:
                 logger.info(f"Returning hardcoded response: {hardcoded_response}")
                 return hardcoded_response
             else:
-                logger.warning(f"Hardcoded response was None for doctor: {doctor_email}")
+                logger.warning(f"Hardcoded response was None for doctor: {doctor_identifier}")
         else:
-            logger.info(f"No hardcoded responses configured for doctor: {doctor_email}")
+            logger.info(f"No hardcoded responses configured for doctor: {doctor_identifier}")
             logger.info("Proceeding with normal AI flow")
         
         if not self.api_key or self.api_key == "your_openai_api_key":
