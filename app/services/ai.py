@@ -297,12 +297,66 @@ class OpenAIService(AIService):
                 "Is the swelling getting bigger or staying the same?"
             ],
             "summary": """Hi Doctor, basic details about patient (2-year-old child):
- • Main Concern: Fall from chair, visible bruise and swelling in hand, unable to move hand
- • Behavior/Condition: Not moving the hand, swelling stable
- • Current Remedy/Medication: Hot towel applied
-Key Question: 
-Could this be a fracture or does it need an X-ray?"""
+                    • Main Concern: Fall from chair, visible bruise and swelling in hand, unable to move hand
+                    • Behavior/Condition: Not moving the hand, swelling stable
+                    • Current Remedy/Medication: Hot towel applied
+                    Key Question: 
+                    Could this be a fracture or does it need an X-ray?"""
+        },
+        "Dr. Rajesh Sharma": {
+            "questions": [
+                "Since when does your baby have the fever?",
+                "Did you give any medicine for the fever?",
+                "Is your baby eating and playing normally, or less than usual?",
+                "Any other issue like cough, cold, vomiting, or loose motion?"
+            ],
+            "summary": """Hi Doctor, basic details about patient (2-year-old child):
+                    • Main Concern: Fever ~100°F for 2 days
+                    • Behavior/Condition: Less active than usual
+                    • Current Remedy/Medication: Crocin given
+                    • Additional Info: Cough and runny nose present
+                    Key Question – Should further treatment be started, or is monitoring at home fine?"""
+        },
+        "Dr. Rajesh Sharma": {
+            "questions": [
+                "Since when does your baby have the fever?",
+                "Did you give any medicine for the fever?",
+                "Is your baby eating and playing normally, or less than usual?",
+                "Any other issue like cough, cold, vomiting, or loose motion?"
+            ],
+            "summary": """Hi Doctor, basic details about patient (2-year-old child):
+                    • Main Concern: Fever ~100°F for 2 days
+                    • Behavior/Condition: Less active than usual
+                    • Current Remedy/Medication: Crocin given
+                    • Additional Info: Cough and runny nose present
+                    Key Question – Should further treatment be started, or is monitoring at home fine?"""
         }
+        # Add more doctor configurations here as needed
+        # "Dr. Another Doctor": {
+        #     "questions": ["Question 1", "Question 2", ...],
+        #     "summary": "Summary for this doctor"
+        # }
+    },
+        "Dr. Rajesh Sharma": {
+            "questions": [
+                "Since when does your baby have the fever?",
+                "Did you give any medicine for the fever?",
+                "Is your baby eating and playing normally, or less than usual?",
+                "Any other issue like cough, cold, vomiting, or loose motion?"
+            ],
+            "summary": """Hi Doctor, basic details about patient (2-year-old child):
+                    • Main Concern: Fever ~100°F for 2 days
+                    • Behavior/Condition: Less active than usual
+                    • Current Remedy/Medication: Crocin given
+                    • Additional Info: Cough and runny nose present
+                    Key Question – Should further treatment be started, or is monitoring at home fine?"""
+        }
+        # Add more doctor configurations here as needed
+        # "Dr. Another Doctor": {
+        #     "questions": ["Question 1", "Question 2", ...],
+        #     "summary": "Summary for this doctor"
+        # }
+    }
         # Add more doctor configurations here as needed
         # "Dr. Another Doctor": {
         #     "questions": ["Question 1", "Question 2", ...],
