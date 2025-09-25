@@ -287,85 +287,9 @@ class OpenAIService(AIService):
 
         return prompt
 
-    # Hardcoded response configurations for specific doctors
-    HARDCODED_DOCTOR_CONFIGS = {
-        "kavya@example.com": {
-            "questions": [
-                "Which part of the hand has the swelling — wrist, fingers, or upper arm?",
-                "Can your baby move the hand normally, or does it hurt when moving?", 
-                "Did you give any first aid or medicine after the fall?",
-                "Is the swelling getting bigger or staying the same?"
-            ],
-            "summary": """Hi Doctor, basic details about patient (2-year-old child):
- • Main Concern: Fall from chair, visible bruise and swelling in hand, unable to move hand
- • Behavior/Condition: Not moving the hand, swelling stable
- • Current Remedy/Medication: Hot towel applied
-Key Question: 
-Could this be a fracture or does it need an X-ray?"""
-        }
-        # Add more doctor configurations here as needed
-        # "another_doctor@example.com": {
-        #     "questions": ["Question 1", "Question 2", ...],
-        #     "summary": "Summary for this doctor"
-        # }
-    }
-
-    def _get_doctor_email(self, doctor_data):
-        """Extract doctor email from doctor data"""
-        if not doctor_data:
-            return None
-        
-        # Get the user associated with the doctor
-        if hasattr(doctor_data, 'user') and doctor_data.user:
-            return doctor_data.user.email
-        
-        return None
-
-    def _has_hardcoded_responses(self, doctor_data):
-        """Check if the doctor has hardcoded responses configured"""
-        doctor_email = self._get_doctor_email(doctor_data)
-        return doctor_email in self.HARDCODED_DOCTOR_CONFIGS
-
-    def _get_hardcoded_response(self, message: str, context: Optional[List[Dict[str, str]]] = None, doctor_data=None) -> dict:
-        """Generate hardcoded responses for configured doctors"""
-        doctor_email = self._get_doctor_email(doctor_data)
-        config = self.HARDCODED_DOCTOR_CONFIGS.get(doctor_email)
-        
-        if not config:
-            return None
-        
-        # Count how many user messages have been sent (questions answered)
-        user_message_count = 0
-        if context:
-            user_message_count = len([msg for msg in context if msg.get("role") == "user"])
-        
-        questions = config["questions"]
-        
-        # If we haven't asked all questions yet, ask the next one
-        if user_message_count < len(questions):
-            question_index = user_message_count
-            if question_index < len(questions):
-                return {
-                    "message": questions[question_index],
-                    "isSummary": False
-                }
-        
-        # After all questions have been answered, return the fixed summary
-        return {
-            "message": config["summary"],
-            "isSummary": True
-        }
-
     async def generate_response(self, message: str, context: Optional[List[Dict[str, str]]] = None,
                                patient_data=None, doctor_data=None, case_summary=None, patient_relation=None) -> str:
         """Generate a response using OpenAI with dynamic prompt resolution"""
-                # Check if this doctor has hardcoded responses configured
-        if self._has_hardcoded_responses(doctor_data):
-            logger.info(f"Using hardcoded responses for doctor: {self._get_doctor_email(doctor_data)}")
-            hardcoded_response = self._get_hardcoded_response(message, context, doctor_data)
-            if hardcoded_response:
-                return hardcoded_response
-        
         if not self.api_key or self.api_key == "your_openai_api_key":
             logger.warning("OpenAI API key not set or using default value. Using mock response.")
             return self._generate_mock_response(message)
