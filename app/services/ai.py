@@ -317,13 +317,19 @@ Could this be a fracture or does it need an X-ray?"""
             logger.info("doctor_data is None, returning None")
             return None
         
-        # Get the user associated with the doctor
-        if hasattr(doctor_data, 'user') and doctor_data.user:
-            email = doctor_data.user.email
-            logger.info(f"Found doctor email: {email}")
+        # First, try to get email directly from doctor object
+        if hasattr(doctor_data, 'email') and doctor_data.email:
+            email = doctor_data.email
+            logger.info(f"Found doctor email directly: {email}")
             return email
         
-        logger.info("No user found for doctor_data, returning None")
+        # If no direct email, try to get it from the user relationship
+        if hasattr(doctor_data, 'user') and doctor_data.user:
+            email = doctor_data.user.email
+            logger.info(f"Found doctor email from user relationship: {email}")
+            return email
+        
+        logger.info("No email found for doctor_data, returning None")
         return None
 
     def _has_hardcoded_responses(self, doctor_data):
