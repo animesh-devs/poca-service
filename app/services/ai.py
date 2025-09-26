@@ -316,6 +316,18 @@ class OpenAIService(AIService):
                     • Current Remedy/Medication: Crocin given
                     • Additional Info: Cough and runny nose present
                     Key Question – Should further treatment be started, or is monitoring at home fine?"""
+        },
+        "Dr. Amit Kumar": {
+            "questions": [
+                "Are you exclusively breastfeeding, or only occasionally now?",
+                "Do you have any other medical condition or are you taking any other medicines right now?"
+            ],
+            "summary": """Hi Doctor, basic details about patient (mother of 2-year-old, breastfeeding ~3 times a day):
+                    • Main Concern: Is Meftal Spas safe during breastfeeding for severe period cramps
+                    • Behavior/Condition: No other medical conditions
+                    • Current Remedy/Medication: NONE
+                    • Additional Info: Baby is 2 years old, breastfeeding 3 times daily
+                    Key Question – Is Meftal Spas safe to take while breastfeeding?"""
         }
     }
 
