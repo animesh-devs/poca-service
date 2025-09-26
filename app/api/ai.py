@@ -979,10 +979,10 @@ async def generate_suggested_response(
 
         doctor_data = db.query(Doctor).filter(Doctor.id == chat.doctor_id).first()
 
-        doctor_identifier = self._get_doctor_identifier(doctor_data)
+        doctor_identifier = ai_service._get_doctor_identifier(doctor_data)
         logger.info(f"Doctor email: {doctor_identifier}")
         
-        has_hardcoded = self._has_hardcoded_suggested_responses(doctor_data)
+        has_hardcoded = ai_service._has_hardcoded_suggested_responses(doctor_data)
         logger.info(f"Has hardcoded suggested responses: {has_hardcoded}")
         
         if has_hardcoded:
