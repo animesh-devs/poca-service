@@ -1,3 +1,4 @@
+from app.models.doctor import Doctor
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import Dict
@@ -976,11 +977,30 @@ async def generate_suggested_response(
         # Generate a suggested response using the AI service
         ai_service = get_ai_service()
 
-        # Use the dedicated suggested response method with discharge summary
-        suggested_response = await ai_service.generate_suggested_response(
-            request_data.summary,
-            discharge_summary
-        )
+        doctor_data = db.query(Doctor).filter(Doctor.id == chat.doctor_id).first()
+
+        doctor_identifier = self._get_doctor_identifier(doctor_data)
+        logger.info(f"Doctor email: {doctor_identifier}")
+        
+        has_hardcoded = self._has_hardcoded_suggested_responses(doctor_data)
+        logger.info(f"Has hardcoded suggested responses: {has_hardcoded}")
+        
+        if has_hardcoded:
+            logger.info(f"Using hardcoded suggested responses for doctor: {doctor_identifier}")
+            hardcoded_response = ai_service._get_hardcoded_suggested_responses(doctor_data)
+            logger.info(f"Hardcoded response: {hardcoded_response}")
+            if hardcoded_response:
+                logger.info(f"Returning suggested hardcoded response: {hardcoded_response}")
+                suggested_response = hardcoded_response
+            else:
+                logger.warning(f"Hardcoded suggested response was None for doctor: {doctor_identifier}")
+        else:
+            logger.info(f"No hardcoded suggested responses configured for doctor: {doctor_identifier}")
+            logger.info("Proceeding with normal AI flow")
+            suggested_response = await ai_service.generate_suggested_response(
+                request_data.summary,
+                discharge_summary
+            )
 
         # Create a new AI message for the suggested response
         db_message = AIMessage(
