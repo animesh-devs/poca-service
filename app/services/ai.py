@@ -372,7 +372,7 @@ class OpenAIService(AIService):
     def _get_hardcoded_suggested_responses(self, doctor_data):
         """Check if the doctor has hardcoded responses configured with detailed logging"""
         doctor_identifier = self._get_doctor_identifier(doctor_data)
-        response = self.HARDCODED_DOCTOR_CONFIGS.get(doctor_identifier)
+        response = self.HARDCODED_SUGGESTED_RESPONSES.get(doctor_identifier)
         logger.info(f"_get_hardcoded_suggested_responses: identifier={doctor_identifier}, has_config={response}")
         logger.info(f"Available hardcoded suggested configs: {list(self.HARDCODED_SUGGESTED_RESPONSES.keys())}")
         return response
