@@ -317,11 +317,11 @@ class OpenAIService(AIService):
                     • Additional Info: Cough and runny nose present
                     Key Question – Should further treatment be started, or is monitoring at home fine?"""
         }
-        # Add more doctor configurations here as needed
-        # "Dr. Another Doctor": {
-        #     "questions": ["Question 1", "Question 2", ...],
-        #     "summary": "Summary for this doctor"
-        # }
+    }
+
+    HARDCODED_SUGGESTED_RESPONSES = {
+        "Dr. Kavya Reddy": "Possible fracture. Limit movement. Get an X-ray immediately. I would like to see the patient in person. Please book an appointment",
+        "Dr. Rajesh Sharma": "Give paracetamol 15 mg/kg per dose, max 4 times a day. Keep fluids up, monitor activity. If fever or cough doesn't improve in 2 days, please book an appointment."
     }
 
     def _get_doctor_identifier(self, doctor_data):
@@ -347,6 +347,22 @@ class OpenAIService(AIService):
         logger.info(f"_has_hardcoded_responses: identifier={doctor_identifier}, has_config={has_config}")
         logger.info(f"Available hardcoded configs: {list(self.HARDCODED_DOCTOR_CONFIGS.keys())}")
         return has_config
+
+    def _has_hardcoded_suggested_responses(self, doctor_data):
+        """Check if the doctor has hardcoded responses configured with detailed logging"""
+        doctor_identifier = self._get_doctor_identifier(doctor_data)
+        has_config = doctor_identifier in self.HARDCODED_SUGGESTED_RESPONSES
+        logger.info(f"_has_hardcoded_responses: identifier={doctor_identifier}, has_config={has_config}")
+        logger.info(f"Available hardcoded configs: {list(self.HARDCODED_SUGGESTED_RESPONSES.keys())}")
+        return has_config
+
+    def _get_hardcoded_suggested_responses(self, doctor_data):
+        """Check if the doctor has hardcoded responses configured with detailed logging"""
+        doctor_identifier = self._get_doctor_identifier(doctor_data)
+        response = self.HARDCODED_DOCTOR_CONFIGS.get(doctor_identifier)
+        logger.info(f"_get_hardcoded_suggested_responses: identifier={doctor_identifier}, has_config={response}")
+        logger.info(f"Available hardcoded suggested configs: {list(self.HARDCODED_SUGGESTED_RESPONSES.keys())}")
+        return response
 
     def _get_hardcoded_response(self, message: str, context: Optional[List[Dict[str, str]]] = None, doctor_data=None) -> dict:
         """Generate hardcoded responses for configured doctors with detailed logging"""
@@ -554,16 +570,7 @@ class OpenAIService(AIService):
         }
 
     async def generate_suggested_response(self, patient_summary: str, discharge_summary: str = None) -> str:
-        """Generate a suggested medical response for a doctor based on patient summary and optional discharge summary"""
-        
-        # Check if this doctor has hardcoded suggested responses
-        if doctor_data and self._has_hardcoded_suggested_responses(doctor_data):
-            doctor_identifier = self._get_doctor_identifier(doctor_data)
-            hardcoded_response = self.HARDCODED_SUGGESTED_RESPONSES.get(doctor_identifier)
-            if hardcoded_response:
-                logger.info(f"Using hardcoded suggested response for doctor: {doctor_identifier}")
-                return hardcoded_response
-                if not self.api_key or self.api_key == "your_openai_api_key":
+        if not self.api_key or self.api_key == "your_openai_api_key":
             logger.warning("OpenAI API key not set or using default value. Using mock response.")
             return self._generate_mock_suggested_response(patient_summary, discharge_summary)
 
