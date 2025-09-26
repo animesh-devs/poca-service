@@ -333,7 +333,8 @@ class OpenAIService(AIService):
 
     HARDCODED_SUGGESTED_RESPONSES = {
         "Dr. Kavya Reddy": "Possible fracture. Limit movement. Get an X-ray immediately. I would like to see the patient in person. Please book an appointment",
-        "Dr. Rajesh Sharma": "Give paracetamol 15 mg/kg per dose, max 4 times a day. Keep fluids up, monitor activity. If fever or cough doesn't improve in 2 days, please book an appointment."
+        "Dr. Rajesh Sharma": "Give paracetamol 15 mg/kg per dose, max 4 times a day. Keep fluids up, monitor activity. If fever or cough doesn't improve in 2 days, please book an appointment.",
+        "Dr. Amit Kumar": "Meftal Spas not recommended while breastfeeding. Use paracetamol 500 mg up to 3 times a day for pain instead."
     }
 
     def _get_doctor_identifier(self, doctor_data):
