@@ -399,7 +399,7 @@ class OpenAIService(AIService):
         questions = config["questions"]
         
         # If we haven't asked all questions yet, ask the next one
-        if user_message_count < len(questions):
+        if user_message_count <= len(questions):
             question_index = user_message_count - 1
             if question_index < len(questions):
                 question = questions[question_index]
