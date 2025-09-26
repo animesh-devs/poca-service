@@ -991,7 +991,7 @@ async def generate_suggested_response(
             logger.info(f"Hardcoded response: {hardcoded_response}")
             if hardcoded_response:
                 logger.info(f"Returning suggested hardcoded response: {hardcoded_response}")
-                suggested_response = hardcoded_response
+                suggested_response = f"{hardcoded_response}"
             else:
                 logger.warning(f"Hardcoded suggested response was None for doctor: {doctor_identifier}")
         else:
@@ -1006,7 +1006,7 @@ async def generate_suggested_response(
         db_message = AIMessage(
             session_id=session_id,
             message=f"Patient summary: {request_data.summary}",
-            response=f"{suggested_response}",
+            response=suggested_response,
             is_summary=False  # This is not a summary, it's a suggested response
         )
 
